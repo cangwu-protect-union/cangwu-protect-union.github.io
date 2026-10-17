@@ -1,0 +1,289 @@
+/* ============================================================
+   style.css —— 全站共用样式
+   三个 HTML 页面都通过 <link rel="stylesheet" href="css/style.css">
+   引用这一个文件。所以改这里一处，三个页面同时生效。
+   这就是把 CSS 单独拿出来放的原因。
+   ============================================================ */
+
+
+/* --- 1. 颜色变量 -------------------------------------------------
+   想换整个网站的配色，只改这一段就够了，不用去 HTML 里翻。
+   :root 里的变量名以 -- 开头，用 var(--名字) 取用。 */
+:root {
+  --bg:        #ffffff;   /* 背景色 */
+  --fg:        #1f2328;   /* 正文颜色 */
+  --muted:     #656d76;   /* 次要文字（灰色） */
+  --border:    #d8dee4;   /* 分隔线、边框 */
+  --card:      #f6f8fa;   /* 卡片/代码块底色 */
+  --accent:    #0969da;   /* 强调色（链接、按钮） */
+  --accent-fg: #ffffff;   /* 强调色上的文字 */
+
+  --radius:     10px;     /* 圆角大小 */
+  --max-width: 760px;     /* 正文最大宽度，太宽会难读 */
+}
+
+/* 如果用户的系统是深色模式，自动换成深色配色。
+   试试把 Windows 的「深色模式」开关切一下，刷新页面就能看到效果。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #0d1117;
+    --fg:        #e6edf3;
+    --muted:     #8b949e;
+    --border:    #30363d;
+    --card:      #161b22;
+    --accent:    #4493f8;
+    --accent-fg: #0d1117;
+  }
+}
+
+
+/* --- 2. 基础排版 ------------------------------------------------- */
+
+/* 让 padding 和 border 算进元素宽度里，不然算尺寸很容易错 */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.75;          /* 行高，中文页面 1.7~1.8 比较舒服 */
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { line-height: 1.35; margin: 0 0 .5em; }
+h1 { font-size: 2rem; }
+h2 {
+  font-size: 1.35rem;
+  margin-top: 2.5em;         /* 章节之间留出足够空白 */
+  padding-bottom: .3em;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.05rem; }
+
+p  { margin: 0 0 1em; }
+ul { padding-left: 1.3em; }
+li { margin-bottom: .4em; }
+
+/* 行内的代码样式，例如 <code>C++</code> */
+code {
+  font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  font-size: .9em;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: .1em .35em;
+}
+
+/* 多行代码块 */
+pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  overflow-x: auto;          /* 代码太长时横向滚动，不撑破页面 */
+  font-size: .85rem;
+  line-height: 1.6;
+}
+pre code { background: none; border: none; padding: 0; font-size: 1em; }
+
+/* 页面内容的居中容器。每个区块都套在 .container 里 */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+
+/* --- 3. 顶部导航条 ----------------------------------------------- */
+.site-header {
+  border-bottom: 1px solid var(--border);
+  position: sticky;          /* 往下滚动时导航条固定在顶部 */
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;           /* 屏幕窄的时候自动换行 */
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.logo { font-weight: 700; font-size: 1.1rem; color: var(--fg); }
+.logo:hover { text-decoration: none; color: var(--accent); }
+
+.site-header nav { display: flex; gap: 4px; }
+
+.site-header nav a {
+  color: var(--muted);
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: .95rem;
+}
+.site-header nav a:hover {
+  background: var(--card);
+  color: var(--fg);
+  text-decoration: none;
+}
+/* .active 标记「当前所在页面」。每个 HTML 里给自己那一条加上这个 class */
+.site-header nav a.active {
+  color: var(--fg);
+  background: var(--card);
+  font-weight: 600;
+}
+
+
+/* --- 4. 页面顶部的大标题区 --------------------------------------- */
+.hero { padding: 56px 0 8px; }
+.hero h1 { font-size: 2.4rem; }
+
+.lead {
+  font-size: 1.1rem;
+  color: var(--muted);
+  max-width: 46em;
+}
+
+.hero-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+/* 按钮。默认是实心，加 .btn-ghost 变成描边样式 */
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.btn:hover { text-decoration: none; opacity: .88; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--card); opacity: 1; }
+
+
+/* --- 5. 时间线（首页的「最近在做什么」） ------------------------- */
+.timeline { list-style: none; padding: 0; margin: 0; }
+
+.timeline li {
+  display: flex;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline li:last-child { border-bottom: none; }
+
+.timeline .date {
+  flex: 0 0 84px;            /* 固定宽度，让所有日期对齐成一列 */
+  color: var(--muted);
+  font-size: .85rem;
+  font-family: ui-monospace, Consolas, monospace;
+  padding-top: 3px;
+}
+.timeline p { margin: .15em 0 0; color: var(--muted); font-size: .95rem; }
+
+
+/* --- 6. 项目卡片 ------------------------------------------------- */
+.cards { display: grid; gap: 16px; }
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 20px 22px;
+}
+.card h3 { margin-top: 0; }
+.card p  { color: var(--muted); font-size: .95rem; margin-bottom: .8em; }
+
+/* 卡片底部的小标签，例如 <li>C++</li> */
+.tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tags li {
+  font-size: .78rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 99px;       /* 足够大的圆角 = 胶囊形状 */
+  padding: 2px 10px;
+  margin: 0;
+}
+
+
+/* --- 7. 「关于」页的信息表 --------------------------------------- */
+.info-list { list-style: none; padding: 0; }
+.info-list li {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.info-list .k { flex: 0 0 110px; color: var(--muted); }
+
+/* 列表前面的说明文字，例如「以下是组织外群众可以参与的活动」 */
+.list-intro {
+  color: var(--muted);
+  font-size: .92rem;
+  margin: .2em 0 .8em;
+}
+
+/* 信息表里的分组标题，例如「回合制游戏工作室」。
+   它本身也是一个 <li>，所以这里取消横向排列，让它独占一行。 */
+.info-list li.group-label {
+  display: block;
+  border-bottom: none;
+  padding: 18px 0 4px;
+  font-weight: 700;
+  font-size: .95rem;
+  color: var(--fg);
+}
+
+
+/* --- 8. 页脚 ----------------------------------------------------- */
+.site-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 72px;
+  padding: 26px 0 40px;
+  color: var(--muted);
+  font-size: .88rem;
+}
+.site-footer p { margin: 0; }
+
+
+/* --- 9. 工具类 --------------------------------------------------- */
+.muted { color: var(--muted); }
+
+
+/* --- 10. 窄屏适配 -------------------------------------------------
+   手机屏幕宽度通常在 400px 以内。这里用 560px 作为分界，
+   把横排的元素改成竖排，字号也调小一点。 */
+@media (max-width: 560px) {
+  .hero { padding-top: 36px; }
+  .hero h1 { font-size: 1.8rem; }
+
+  .timeline li { flex-direction: column; gap: 2px; }
+  .timeline .date { flex: none; }
+
+  .info-list li { flex-direction: column; gap: 0; }
+}
