@@ -11,7 +11,7 @@
    ============================================================ */
 
 window.GUI_CLOUDBASE = {
-  envId: "",           // 例："cangwu-protect-union-d7a350be12a"
+  envId: "cangwu-protect-union-d7a350be12a",
   publishableKey: "",  // 例："eyJhbGciOiJIUzI1NiIs..."
   table: "gui_entries"
 };
