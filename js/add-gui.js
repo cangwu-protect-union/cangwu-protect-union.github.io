@@ -276,4 +276,64 @@
       copyState.hidden = false;
     });
   });
+
+  /* ---------- 图片选择与上传 ---------- */
+  var fileInput   = document.getElementById("fImageFile");
+  var pickBtn     = document.getElementById("pickImageBtn");
+  var clearBtn    = document.getElementById("clearImageBtn");
+  var imgStatus   = document.getElementById("imgStatus");
+  var imgPreview  = document.getElementById("imgPreview");
+  var imgPreviewImg = document.getElementById("imgPreviewImg");
+  var imgUrlInput = document.getElementById("fImage");
+
+  function setStatus(text, cls) {
+    imgStatus.textContent = text;
+    imgStatus.className = "img-status muted" + (cls ? " " + cls : "");
+  }
+
+  function showPreview(src) {
+    if (src) { imgPreviewImg.src = src; imgPreview.hidden = false; }
+    else { imgPreviewImg.removeAttribute("src"); imgPreview.hidden = true; }
+  }
+
+  pickBtn.addEventListener("click", function () { fileInput.click(); });
+
+  clearBtn.addEventListener("click", function () {
+    fileInput.value = "";
+    imgUrlInput.value = "";
+    showPreview("");
+    setStatus("未选择");
+    clearBtn.hidden = true;
+    pickBtn.textContent = "选择图片";
+  });
+
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    if (!window.GuiUpload || !window.GuiUpload.isConfigured()) {
+      setStatus("云存储未配置，无法上传", "is-error");
+      return;
+    }
+
+    /* 先本地预览，让用户马上看到选中的图 */
+    showPreview(URL.createObjectURL(file));
+    setStatus("正在压缩并上传…");
+    pickBtn.disabled = true;
+    clearBtn.hidden = true;
+
+    window.GuiUpload.uploadFile(file).then(function (url) {
+      imgUrlInput.value = url;
+      setStatus("已上传（图片已托管在云存储）", "is-done");
+      pickBtn.textContent = "换一张";
+      clearBtn.hidden = false;
+    }).catch(function (err) {
+      setStatus("上传失败：" + err.message, "is-error");
+      imgUrlInput.value = "";
+      showPreview("");
+      pickBtn.textContent = "选择图片";
+    }).then(function () {
+      pickBtn.disabled = false;
+    });
+  });
 })();
