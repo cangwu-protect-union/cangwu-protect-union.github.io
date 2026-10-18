@@ -50,6 +50,12 @@
           canvas.width = tw;
           canvas.height = th;
           var ctx = canvas.getContext("2d");
+
+          /* 先铺白底：JPEG 不支持透明通道，不铺底的话透明区域会变成黑色。
+             带透明背景的 PNG / 抠图贴纸会变成黑块，很难看。 */
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, tw, th);
+
           ctx.drawImage(img, 0, 0, tw, th);
 
           canvas.toBlob(function (blob) {
@@ -65,7 +71,10 @@
 
       img.onerror = function () {
         URL.revokeObjectURL(url);
-        reject(new Error("无法读取这张图片"));
+        reject(new Error(
+          "浏览器无法解码这张图片。如果是 iPhone 的 HEIC 格式，请先在相册里" +
+          "「存储为 JPEG」，或用截图代替；也可以直接把图片上传到别处后粘贴网址。"
+        ));
       };
 
       img.src = url;
