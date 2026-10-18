@@ -3,117 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudBase 可行性探测</title>
+  <title>CloudBase 连通探测</title>
   <meta name="robots" content="noindex">
   <style>
-    body{font-family:system-ui,"Microsoft YaHei",monospace;padding:24px;line-height:1.8;max-width:900px}
+    body{font-family:system-ui,"Microsoft YaHei",sans-serif;padding:24px;line-height:1.8;max-width:900px;margin:0 auto}
     h1{font-size:1.3rem}
-    .box{border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin:12px 0;font-family:Consolas,monospace;font-size:.9rem;white-space:pre-wrap;word-break:break-all}
-    .ok{color:#087443;border-color:#087443;background:#f0fdf6}
-    .bad{color:#b42318;border-color:#b42318;background:#fdf2f1}
-    .wait{color:#666}
-    input{font:inherit;padding:8px 10px;border:1px solid #ccc;border-radius:6px;width:340px}
-    button{font:inherit;padding:8px 16px;border:0;border-radius:6px;background:#0969da;color:#fff;cursor:pointer}
+    label{display:block;font-weight:600;font-size:.9rem;margin:14px 0 6px}
+    input{font:inherit;padding:9px 12px;border:1px solid #ccc;border-radius:7px;width:100%;max-width:520px;box-sizing:border-box}
+    button{font:inherit;padding:9px 20px;border:0;border-radius:7px;background:#0969da;color:#fff;cursor:pointer;margin-top:16px}
     button:disabled{opacity:.5;cursor:default}
+    .box{border:1px solid #ddd;border-radius:8px;padding:12px 15px;margin:10px 0;font-family:Consolas,monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;background:#fafafa}
+    .ok{color:#087443;border-color:#9bd8b6;background:#f0fdf6}
+    .bad{color:#b42318;border-color:#f0b4ae;background:#fdf2f1}
+    .wait{color:#555}
+    code{background:#eee;padding:1px 5px;border-radius:4px}
+    .hint{font-size:.85rem;color:#666}
   </style>
 </head>
 <body>
-  <h1>CloudBase 可行性探测</h1>
-  <p>目的：确认 <code>cangwu-protect-union.github.io</code> 能否调用 CloudBase（安全域名是否放行）。
-     只做「匿名登录 + 读一次数据库」，不写入任何数据。</p>
+  <h1>CloudBase 连通探测</h1>
+  <p class="hint">只做只读检测（读一次表），不写入任何数据。填两个值即可。</p>
 
-  <p>
-    环境 ID：<input id="envId" placeholder="例如 gui-db-1a2b3c4d5e6f7" autocomplete="off">
-    集合名：<input id="colName" value="gui_entries" style="width:180px">
-  </p>
-  <p><button id="run">开始探测</button></p>
+  <label for="envId">环境 ID（EnvId）</label>
+  <input id="envId" placeholder="cangwu-protect-union-d7a350be12a" autocomplete="off">
 
+  <label for="pk">Publishable Key</label>
+  <input id="pk" placeholder="eyJhbGciOiJIUzI1NiIs..." autocomplete="off">
+
+  <p class="hint">从「云开发平台 → 身份认证 → ApiKey 管理」复制 <b>Publishable Key</b>（不是 API Key）。</p>
+
+  <button id="run">开始探测</button>
   <div id="out"></div>
 
-<script type="module">
-const out = document.getElementById("out");
-const btn = document.getElementById("run");
+<script>
+(function () {
+  var out = document.getElementById("out");
+  var btn = document.getElementById("run");
 
-function errText(e) {
-  if (!e) return "未知错误";
-  if (typeof e === "string") return e;
-  const parts = [];
-  for (const k of ["code", "message", "errMsg", "name", "statusCode"]) {
-    if (e[k] !== undefined) parts.push(k + ": " + e[k]);
-  }
-  if (!parts.length) {
-    try { return JSON.stringify(e, Object.getOwnPropertyNames(e)); } catch (_) { return String(e); }
-  }
-  return parts.join("\n");
-}
-
-function line(text, cls) {
-  const d = document.createElement("div");
-  d.className = "box " + (cls || "wait");
-  d.textContent = text;
-  out.appendChild(d);
-  return d;
-}
-
-btn.addEventListener("click", async () => {
-  const envId = document.getElementById("envId").value.trim();
-  const colName = document.getElementById("colName").value.trim() || "gui_entries";
-  out.innerHTML = "";
-
-  if (!envId) { line("请先填写环境 ID", "bad"); return; }
-  btn.disabled = true;
-
-  const t0 = Date.now();
-  line("1) 加载 CloudBase SDK …");
-
-  let cloudbase;
-  try {
-    const mod = await import("./js/lib/cloudbase.bundle.js");
-    cloudbase = mod.default || mod;
-    line("1) SDK 加载成功（" + (Date.now() - t0) + "ms）", "ok");
-  } catch (e) {
-    line("1) SDK 加载失败：" + e.message, "bad");
-    btn.disabled = false;
-    return;
-  }
-
-  line("2) 初始化 + 匿名登录 …");
-  let app, authInstance;
-  try {
-    const t1 = Date.now();
-    app = cloudbase.init({ env: envId });
-    authInstance = app.auth({ persistence: "local" });
-    if (!authInstance.hasLoginState || !(await authInstance.hasLoginState())) {
-      await authInstance.signInAnonymously();
+  function errText(e) {
+    if (!e) return "未知错误";
+    if (typeof e === "string") return e;
+    var parts = [];
+    for (var k of ["code", "message", "error", "error_description", "name", "statusCode"]) {
+      if (e[k] !== undefined && e[k] !== "") parts.push(k + ": " + e[k]);
     }
-    line("2) 匿名登录成功（" + (Date.now() - t1) + "ms）", "ok");
-  } catch (e) {
-    const msg = e;
-    line("2) 匿名登录失败：" + errText(msg) +
-         "\n\n排查：① 环境 ID 是否正确 ② 是否已在「身份认证/登录方式」启用匿名登录 ③ 安全域名是否已添加本域名",
-         "bad");
-    btn.disabled = false;
-    return;
+    if (!parts.length) {
+      try { return JSON.stringify(e); } catch (_) { return String(e); }
+    }
+    return parts.join("\n");
   }
 
-  line("3) 读取集合 " + colName + " …");
-  try {
-    const t2 = Date.now();
-    const db = app.database({ auth: authInstance });   /* 关键：显式传 auth */
-    const res = await db.collection(colName).limit(3).get();
-    line("3) 读取成功（" + (Date.now() - t2) + "ms），返回 " +
-         (res.data ? res.data.length : 0) + " 条\n" + JSON.stringify(res.data, null, 2).slice(0, 600), "ok");
-  } catch (e) {
-    const msg = e;
-    line("3) 读取失败：" + errText(msg) +
-         "\n\n排查：① 集合 " + colName + " 是否已创建 ② 集合安全规则是否允许读取", "bad");
-    btn.disabled = false;
-    return;
+  function line(text, cls) {
+    var d = document.createElement("div");
+    d.className = "box " + (cls || "wait");
+    d.textContent = text;
+    out.appendChild(d);
+    return d;
   }
 
-  line("✅ 全部通过：安全域名放行，CloudBase 可用。可以把结果告诉 DeepSeek。", "ok");
-  btn.disabled = false;
-});
+  btn.addEventListener("click", function () {
+    var envId = document.getElementById("envId").value.trim();
+    var pk = document.getElementById("pk").value.trim();
+    out.innerHTML = "";
+
+    if (!envId || !pk) { line("请把环境 ID 和 Publishable Key 都填上", "bad"); return; }
+    btn.disabled = true;
+
+    var base = "https://" + envId + ".api.tcloudbasegateway.com/v1/rdb/rest/gui_entries";
+    var t0 = Date.now();
+
+    line("1) 请求 " + base + " …");
+
+    fetch(base + "?select=*&limit=5", {
+      headers: {
+        "Authorization": "Bearer " + pk,
+        "Content-Type": "application/json"
+      }
+    }).then(function (res) {
+      var ms = Date.now() - t0;
+      return res.text().then(function (txt) {
+        if (res.ok) {
+          line("1) 网络连通 ✓（" + ms + "ms），HTTP " + res.status, "ok");
+          var rows;
+          try { rows = JSON.parse(txt); } catch (e) { rows = null; }
+          if (Array.isArray(rows)) {
+            line("2) 读取成功 ✓ 返回 " + rows.length + " 条\n" + JSON.stringify(rows, null, 2).slice(0, 700), "ok");
+            line("✅ 全部通过：数据库已连通，可以把结果告诉 DeepSeek 了。", "ok");
+          } else {
+            line("2) 返回内容不是数组：\n" + txt.slice(0, 400), "bad");
+          }
+        } else {
+          line("1) HTTP " + res.status + "（" + ms + "ms）\n" + txt.slice(0, 500), "bad");
+          var hint = "";
+          if (res.status === 401 || /MISSING_CREDENTIALS|PERMISSION_DENIED/.test(txt)) {
+            hint = "\n\n→ Publishable Key 不对，或它不是「Publishable Key」。\n  去 身份认证 → ApiKey 管理 重新复制。";
+          } else if (/permission denied|42501/.test(txt)) {
+            hint = "\n\n→ 表权限没授。去 SQL 编辑器重跑 cloudbase-setup.sql 的第 7 步（grant）。";
+          } else if (/relation .* does not exist|42P01/.test(txt)) {
+            hint = "\n\n→ 表 gui_entries 不存在。去 SQL 编辑器跑 cloudbase-setup.sql。";
+          } else if (res.status === 404) {
+            hint = "\n\n→ 环境 ID 不对，或环境还没初始化完。";
+          }
+          if (hint) line("排查建议" + hint, "bad");
+        }
+      });
+    }).catch(function (e) {
+      line("1) 请求失败（" + (Date.now() - t0) + "ms）：" + errText(e) + "\n\n→ 网络问题，或环境 ID 拼错导致域名不存在。", "bad");
+    }).then(function () {
+      btn.disabled = false;
+    });
+  });
+})();
 </script>
 </body>
 </html>

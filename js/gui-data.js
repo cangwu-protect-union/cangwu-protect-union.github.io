@@ -1,20 +1,21 @@
 /* ============================================================
    gui-data.js —— 鬼图鉴的数据访问层
    ------------------------------------------------------------
-   所有「读条目 / 存条目」都走这里，页面本身不关心数据存在哪。
-
-   数据来源有三层，按顺序合并：
+   数据来源三层，按顺序合并：
      1. 种子数据（data/gui-entries.js 里的示例条目）
-     2. 云数据库（Supabase，需在 data/config.js 里填配置）
-     3. 浏览器本地存储（云端没配置时的兜底，也用于缓存当次新增）
+     2. 云数据库（腾讯云 CloudBase PostgreSQL，需在 data/config.js 配置）
+     3. 浏览器本地存储（云端没配置或连不上时的兜底）
 
-   云端没配置时，一切照常工作，只是条目只存在这台设备上。
+   云端接口：CloudBase 的 PostgreSQL Data API（PostgREST 协议）
+     GET  https://{envId}.api.tcloudbasegateway.com/v1/rdb/rest/gui_entries
+     POST 同上
+   认证：Authorization: Bearer <Publishable Key>
    ============================================================ */
 (function () {
   "use strict";
 
   var LOCAL_KEY = "gui_extra_entries";
-  var TIMEOUT_MS = 5000;
+  var TIMEOUT_MS = 6000;
 
   /* 熔断：云端连不上时 5 分钟内不再重试，避免每次打开页面都卡住 */
   var BREAK_MS = 5 * 60 * 1000;
@@ -24,31 +25,24 @@
 
   /* ---------------- 云端配置 ---------------- */
   function cfg() {
-    var c = window.GUI_SUPABASE || {};
-    if (!c.url || !c.anonKey) return null;
-
-    /* 容错：只保留 https://xxx.supabase.co 这一部分。
-       用户可能把 API 页面上的完整地址（带 /rest/v1/）整段复制过来，
-       而下面拼接请求时会自动加上 /rest/v1，所以要先把尾巴去掉。 */
-    var base = String(c.url).trim().replace(/\/+$/, "");   // 去掉尾部斜杠
-    base = base.replace(/\/rest\/v1$/, "");                // 去掉 /rest/v1
-    base = base.replace(/\/+$/, "");
-
+    var c = window.GUI_CLOUDBASE || {};
+    if (!c.envId || !c.publishableKey) return null;
     return {
-      url: base,
-      anonKey: c.anonKey,
+      base: "https://" + String(c.envId).trim() + ".api.tcloudbasegateway.com/v1/rdb/rest/",
+      key: String(c.publishableKey).trim(),
       table: c.table || "gui_entries"
     };
   }
 
   function remoteEnabled() { return cfg() !== null; }
 
-  function headers(c) {
-    return {
-      "apikey": c.anonKey,
-      "Authorization": "Bearer " + c.anonKey,
+  function headers(c, extra) {
+    var h = {
+      "Authorization": "Bearer " + c.key,
       "Content-Type": "application/json"
     };
+    if (extra) { for (var k in extra) { h[k] = extra[k]; } }
+    return h;
   }
 
   function withTimeout(promise, ms) {
@@ -69,11 +63,10 @@
   }
 
   function writeLocal(list) {
-    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch (err) { /* 忽略配额错误 */ }
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch (err) { /* 配额满时忽略 */ }
   }
 
   /* ---------------- 读取 ---------------- */
-  /* 返回 Promise<Array>：种子 + 云端 + 本地，按 id 去重 */
   function list() {
     var seed = window.GUI_SEED_ENTRIES || [];
     var local = readLocal();
@@ -83,11 +76,15 @@
       return Promise.resolve(seed.concat(local));
     }
 
-    var url = c.url + "/rest/v1/" + c.table + "?select=*&order=created_at.desc&limit=1000";
+    var url = c.base + c.table + "?select=*&order=created_at.desc&limit=1000";
 
     return withTimeout(
       fetch(url, { headers: headers(c) }).then(function (res) {
-        if (!res.ok) throw new Error("云端返回 " + res.status);
+        if (!res.ok) {
+          return res.text().then(function (t) {
+            throw new Error("云端返回 " + res.status + " " + t.slice(0, 160));
+          });
+        }
         return res.json();
       }),
       TIMEOUT_MS
@@ -100,72 +97,66 @@
       });
       return merge(seed, remote, local);
     }).catch(function (err) {
-      /* 云端挂了也不能让页面空白：退回本地数据 */
       markDown();
       console.warn("[鬼图鉴] 云端读取失败，已切换为本地数据（5 分钟内不再重试）：", err.message);
       return seed.concat(local);
     });
   }
 
-  /* 按 id 去重合并：后面出现的覆盖前面的 */
   function merge() {
-    var out = [];
-    var index = {};
+    var out = [], index = {};
     for (var i = 0; i < arguments.length; i++) {
       var arr = arguments[i] || [];
       for (var j = 0; j < arr.length; j++) {
         var e = arr[j];
         if (!e || !e.id) continue;
-        if (index[e.id] === undefined) {
-          index[e.id] = out.length;
-          out.push(e);
-        } else {
-          out[index[e.id]] = e;
-        }
+        if (index[e.id] === undefined) { index[e.id] = out.length; out.push(e); }
+        else { out[index[e.id]] = e; }
       }
     }
     return out;
   }
 
   /* ---------------- 新增 ---------------- */
-  /* 返回 Promise<{entry, remoteSaved, error}> */
   function add(entry) {
     var c = cfg();
 
     if (!c || isDown()) {
-      var local = readLocal();
-      local.push(entry);
-      writeLocal(local);
+      var local0 = readLocal();
+      local0.push(entry);
+      writeLocal(local0);
       return Promise.resolve({ entry: entry, remoteSaved: false, error: null });
     }
 
-    var url = c.url + "/rest/v1/" + c.table;
+    var url = c.base + c.table;
     var payload = {
-      id: entry.id, title: entry.title, image: entry.image,
-      intro: entry.intro, body: entry.body,
-      tags: entry.tags || [], date: entry.date
+      id: entry.id,
+      title: entry.title,
+      image: entry.image,
+      intro: entry.intro,
+      body: entry.body,
+      tags: entry.tags || [],
+      date: entry.date
     };
 
     return withTimeout(
       fetch(url, {
         method: "POST",
-        headers: Object.assign({ "Prefer": "return=minimal" }, headers(c)),
+        headers: headers(c, { "Prefer": "return=minimal" }),
         body: JSON.stringify(payload)
       }),
       TIMEOUT_MS
     ).then(function (res) {
       if (!res.ok) {
-        return res.text().then(function (txt) {
-          throw new Error("云端保存失败 " + res.status + " " + txt.slice(0, 200));
+        return res.text().then(function (t) {
+          throw new Error("云端保存失败 " + res.status + " " + t.slice(0, 200));
         });
       }
-      /* 云端成功后也在本地留一份缓存，断网时仍能看到 */
       var local = readLocal();
       local.push(entry);
       writeLocal(local);
       return { entry: entry, remoteSaved: true, error: null };
     }).catch(function (err) {
-      /* 云端失败：退回本地，保证用户的心血不丢 */
       markDown();
       var local = readLocal();
       local.push(entry);
