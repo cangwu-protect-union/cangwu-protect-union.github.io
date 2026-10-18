@@ -199,28 +199,66 @@
     var entry = {
       id: window.GuiData.newId(),
       title: title,
-      image: image || window.guiPlaceholder(title.slice(0, 1), "#2f4858", "#8ecae6"),
+      image: image || "",   /* 留空即可，显示时会自动生成占位图 */
       intro: intro,
       body: body,
       tags: tags,
       date: new Date().toISOString().slice(0, 10)
     };
 
-    var submitBtn = entryForm.querySelector('button[type="submit"]');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "提交中…"; }
-
-    window.GuiData.add(entry).then(function (result) {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "确认"; }
-
+    window.GuiData.add(entry).then(function () {
       formSection.hidden = true;
       doneSection.hidden = false;
 
-      var msg = "条目「" + title + "」已加入图鉴，现在可以搜索和查看。";
-      if (result.error) {
-        msg += "\n（注意：云端保存失败，本条只保存在这台设备上：" + result.error + "）";
-      }
-      document.getElementById("doneText").textContent = msg;
+      document.getElementById("doneText").textContent =
+        "条目「" + title + "」已保存在这台设备上，现在就能在图鉴里搜索和查看。";
       document.getElementById("doneView").href = "条目.html?id=" + encodeURIComponent(entry.id);
+    });
+  });
+
+  /* ---------- 复制 JSON：生成完整的 entries.json 内容 ---------- */
+  var copyBtn = document.getElementById("copyBtn");
+  var copyState = document.getElementById("copyState");
+
+  copyBtn.addEventListener("click", function () {
+    copyState.hidden = true;
+    window.GuiData.buildRepoFile().then(function (text) {
+      function done(msg, ok) {
+        copyState.textContent = msg;
+        copyState.hidden = false;
+        copyState.className = ok ? "gate-error gate-ok" : "gate-error";
+      }
+
+      function fallback() {
+        /* 剪贴板 API 不可用时（非 https 或权限被拒），显示一个可选中的文本框 */
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+
+        if (ok) { done("已复制到剪贴板。去 GitHub 粘贴即可。", true); return; }
+
+        /* 真的复制不了：把完整内容放进页面，让用户自己全选复制 */
+        var box = document.getElementById("copyManual");
+        if (box) { box.value = text; box.hidden = false; box.focus(); box.select(); }
+        done("浏览器不允许自动复制。完整内容已显示在下方，请点一下文本框按 Ctrl+A、Ctrl+C。", false);
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          done("已复制 " + text.length + " 个字符到剪贴板。去 GitHub 粘贴即可。", true);
+        }).catch(fallback);
+      } else {
+        fallback();
+      }
+    }).catch(function (e) {
+      copyState.textContent = "生成 JSON 失败：" + e.message;
+      copyState.hidden = false;
     });
   });
 })();

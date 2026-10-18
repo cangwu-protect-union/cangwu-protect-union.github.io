@@ -39,7 +39,7 @@
     root.innerHTML =
       '<h1 class="entry-title">' + esc(entry.title) + "</h1>" +
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
-      (entry.image ? '<div class="entry-hero"><img src="' + esc(entry.image) + '" alt=""></div>' : "") +
+      '<div class="entry-hero"><img src="' + esc(window.guiImageFor(entry)) + '" alt=""></div>' +
       '<div class="entry-body">' + paras + "</div>" +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
