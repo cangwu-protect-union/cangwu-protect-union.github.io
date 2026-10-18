@@ -317,13 +317,18 @@
     }
 
     /* 先本地预览，让用户马上看到选中的图 */
-    showPreview(URL.createObjectURL(file));
-    setStatus("正在压缩并上传…");
+    var isHeic = window.GuiUpload.looksHeic(file);
+    showPreview(isHeic ? "" : URL.createObjectURL(file));
+
+    setStatus(isHeic ? "检测到 HEIC，准备转换…" : "正在压缩并上传…");
     pickBtn.disabled = true;
     clearBtn.hidden = true;
 
-    window.GuiUpload.uploadFile(file).then(function (url) {
+    window.GuiUpload.uploadFile(file, function (stepText) {
+      setStatus(stepText);
+    }).then(function (url) {
       imgUrlInput.value = url;
+      showPreview(url);
       setStatus("已上传（图片已托管在云存储）", "is-done");
       pickBtn.textContent = "换一张";
       clearBtn.hidden = false;
