@@ -1,0 +1,24 @@
+{
+  // ===== 给这个项目专用的 VS Code 设置 =====
+  // 这些设置只在这个文件夹里生效，不影响你以后打开别的项目。
+
+  // 文件编码固定 UTF-8（不带 BOM）。
+  // 这个网站有大量中文，如果编码变成 ANSI/GBK，中文会全变乱码。
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+
+  // 换行符固定成 LF。Windows 默认是 CRLF，
+  // 改成 CRLF 会让 Git 每次都提示换行符警告，也会产生假的「整文件改动」。
+  "files.eol": "\n",
+
+  // 保存时自动删掉行尾多余的空格
+  "files.trimTrailingWhitespace": true,
+
+  // 编辑器外观：标签宽度 2 空格（网页代码的习惯）
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  // 自动保存：改完不用按 Ctrl+S，1 秒后自己存。
+  // 如果你更想自己按 Ctrl+S，把下面这项改成 "off"。
+  "files.autoSave": "afterDelay"
+}

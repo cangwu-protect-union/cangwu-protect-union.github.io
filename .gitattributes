@@ -1,0 +1,18 @@
+# 让 Git 统一按 LF（换行符）保存网页源码。
+#
+# 为什么需要这个文件：
+# Windows 上 Git 默认会在 LF 和 CRLF 之间来回转换（core.autocrlf=true），
+# 于是每次提交都提示 "LF will be replaced by CRLF"。网页文件用 LF 最稳，
+# 部署到 GitHub Pages 时也不会因为换行符差异而出现莫名其妙的整文件改动。
+#
+# text=auto  让 Git 自动识别文本文件
+# eol=lf     存进仓库和取到工作区都用 LF
+
+* text=auto eol=lf
+
+# 图片是二进制文件，不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
