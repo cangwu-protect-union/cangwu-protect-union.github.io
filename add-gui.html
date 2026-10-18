@@ -63,8 +63,20 @@
         </div>
 
         <div class="field">
-          <label for="fImage">图片网址 <span class="muted">（可留空，留空则使用占位图）</span></label>
-          <input id="fImage" name="image" type="url" placeholder="https://… 或 images/xxx.jpg">
+          <label>图片 <span class="muted">（可留空，留空会自动生成占位图）</span></label>
+
+          <div class="img-upload">
+            <input id="fImageFile" type="file" accept="image/*" hidden>
+            <button type="button" class="btn btn-ghost" id="pickImageBtn">选择图片</button>
+            <button type="button" class="btn btn-ghost" id="clearImageBtn" hidden>移除图片</button>
+            <span class="img-status muted" id="imgStatus">未选择</span>
+          </div>
+
+          <div class="img-preview" id="imgPreview" hidden>
+            <img id="imgPreviewImg" alt="图片预览">
+          </div>
+
+          <input id="fImage" name="image" type="url" placeholder="或直接粘贴图片网址 https://…">
         </div>
 
         <div class="field">
@@ -116,6 +128,7 @@
   <script src="data/config.js"></script>
   <script src="data/gui-entries.js"></script>
   <script src="js/gui-data.js"></script>
+  <script src="js/gui-upload.js"></script>
   <script src="js/add-gui.js"></script>
 </body>
 </html>

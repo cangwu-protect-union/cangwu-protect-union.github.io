@@ -566,3 +566,30 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
   resize: vertical;
 }
 .copy-manual[hidden] { display: none; }
+
+/* 图片上传：按钮行 + 状态文字 + 预览 */
+.img-upload {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.img-status { font-size: .85rem; }
+.img-status.is-error { color: #b42318; }
+.img-status.is-done { color: #087443; }
+
+.img-preview {
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+  max-width: 280px;
+}
+.img-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.img-preview[hidden] { display: none; }
