@@ -1,0 +1,26 @@
+# Git 忽略清单：这里列出的文件不会被上传到 GitHub
+#
+# 以 # 开头的行是注释，写给自己看的
+
+# 我生成的页面预览截图，属于本地临时文件
+.preview/
+
+# 本地私人笔记：记录了不该公开的信息。
+# 加进忽略清单后，它不会出现在 GitHub 上，也不会被 git add . 带上。
+.local-notes.md
+
+# Windows 的缩略图缓存
+Thumbs.db
+
+# macOS 自动生成的文件（换电脑时用得上）
+.DS_Store
+
+# VS Code 在这个项目里产生的本地文件。
+# 但 .vscode/settings.json 要保留（它规定了统一用 UTF-8 和 LF，是对所有人都有用的项目设置）
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Office（Word / Excel / PowerPoint）打开文件时生成的临时锁文件，形如 ~$README.md
+# 这种文件是给 Office 自己用的，不该提交。前面那个 ~$ 是固定开头。
+~$*

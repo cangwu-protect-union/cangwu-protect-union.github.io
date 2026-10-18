@@ -1,0 +1,9 @@
+{
+  // VS Code 会给打开这个项目的人推荐这些扩展（需要联网才能装）。
+  "recommendations": [
+    // 在编辑器里右键就能「用浏览器打开当前页面」，改完直接看效果
+    "ritwickdey.LiveServer",
+    // 中文界面（VS Code 菜单变成中文）
+    "MS-CEINTL.vscode-language-pack-zh-hans"
+  ]
+}
