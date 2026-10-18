@@ -593,3 +593,164 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
   height: auto;
 }
 .img-preview[hidden] { display: none; }
+
+
+/* =============================================================
+   16. 多图上传：拖拽区 + 缩略图网格
+   ============================================================= */
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px 18px;
+  text-align: center;
+  background: var(--card);
+  transition: border-color .15s, background .15s;
+  margin-bottom: 12px;
+}
+.dropzone.is-drag {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+.dz-emoji { font-size: 1.8rem; line-height: 1; margin-bottom: 8px; opacity: .7; }
+.dz-main { margin: 0 0 6px; font-size: .95rem; }
+.dz-sub { margin: 0; font-size: .82rem; color: var(--muted); }
+.dz-sub kbd {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .8em;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+/* 文字链式按钮（用在拖拽区里） */
+.link-btn {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:hover { opacity: .8; }
+
+/* 缩略图网格 */
+.thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 6px 0 14px;
+}
+.thumbs[hidden] { display: none; }
+
+.thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.thumb-uploading img { opacity: .45; }
+.thumb-error { border-color: #f0b4ae; }
+.thumb-error img { display: none; }
+
+.thumb-badge {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  font-size: .68rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .68);
+  color: #fff;
+  white-space: nowrap;
+}
+.thumb-badge.is-err { background: #b42318; }
+
+.thumb-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .62);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.thumb-del:hover { background: #b42318; }
+
+.thumb-retry {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: .75rem;
+  padding: 4px 12px;
+  border: 1px solid #f0b4ae;
+  border-radius: 999px;
+  background: #fff;
+  color: #b42318;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+
+/* =============================================================
+   17. 多图：详情页画廊 + 列表页多图标识
+   ============================================================= */
+
+.entry-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 22px 0 26px;
+}
+.gallery-item {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card);
+  aspect-ratio: 4 / 3;
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+
+/* 列表卡片缩略图上的「N 图」角标 */
+.gui-card-img { position: relative; }
+.gui-card-multi {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  font-size: .66rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .68);
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* 窄屏：画廊改成单列 */
+@media (max-width: 560px) {
+  .entry-gallery { grid-template-columns: 1fr; }
+}

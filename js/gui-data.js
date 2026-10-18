@@ -102,8 +102,8 @@
     ).then(function (rows) {
       return (Array.isArray(rows) ? rows : []).map(function (r) {
         return {
-          id: r.id, title: r.title, image: r.image, intro: r.intro,
-          body: r.body, tags: r.tags || [], date: r.date
+          id: r.id, title: r.title, image: r.image, images: r.images || [],
+          intro: r.intro, body: r.body, tags: r.tags || [], date: r.date
         };
       });
     });
@@ -164,7 +164,7 @@
     }
 
     var url = c.base + c.table;
-    var payload = {
+    var basePayload = {
       id: entry.id,
       title: entry.title,
       image: entry.image,
@@ -174,22 +174,50 @@
       date: entry.date
     };
 
-    return withTimeout(
-      fetch(url, {
-        method: "POST",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify(payload)
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
+    function post(body) {
+      return withTimeout(
+        fetch(url, {
+          method: "POST",
+          headers: headers(c, { "Prefer": "return=minimal" }),
+          body: JSON.stringify(body)
+        }),
+        TIMEOUT_MS
+      );
+    }
+
+    /* 注意：必须浅拷贝。直接 payload = basePayload 会让两者指向同一个对象，
+       后面加上 images 会把 basePayload 也污染，导致降级重试仍然失败。 */
+    var payload = {};
+    for (var k in basePayload) payload[k] = basePayload[k];
+    if (entry.images && entry.images.length) payload.images = entry.images;
+
+    return post(payload).then(function (res) {
+      /* 如果数据库还没执行多图迁移（缺 images 字段），自动降级为单图重试一次 */
+      if (res.status === 400 || res.status === 404) {
+        return res.text().then(function (t) {
+          if (/images|PGRST204|42703/.test(t)) {
+            return post(basePayload).then(function (res2) {
+              if (!res2.ok) {
+                return res2.text().then(function (t2) {
+                  throw new Error("云端保存失败 " + res2.status + " " + t2.slice(0, 200));
+                });
+              }
+              return { degraded: true };
+            });
+          }
+          throw new Error("云端保存失败 " + res.status + " " + t.slice(0, 200));
+        });
+      }
       if (!res.ok) {
         return res.text().then(function (t) {
           throw new Error("云端保存失败 " + res.status + " " + t.slice(0, 200));
         });
       }
+      return { degraded: false };
+    }).then(function (r) {
       /* 云端已保存，本地副本可以清掉（避免重复显示） */
       removeLocal(entry.id);
-      return { entry: entry, remoteSaved: true, error: null };
+      return { entry: entry, remoteSaved: true, error: null, degraded: r.degraded };
     }).catch(function (err) {
       markDown();
       return { entry: entry, remoteSaved: false, error: err.message };

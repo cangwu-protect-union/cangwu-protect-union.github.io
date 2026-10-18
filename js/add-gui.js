@@ -177,10 +177,23 @@
 
     var title = document.getElementById("fTitle").value.trim();
     var body  = document.getElementById("fBody").value.trim();
-    var image = document.getElementById("fImage").value.trim();
+    var images = collectedImages();
     var tags  = document.getElementById("fTags").value
       .split(/[,，]/).map(function (s) { return s.trim(); })
       .filter(function (s) { return s !== ""; });
+
+    if (anyUploading()) {
+      formError.textContent = "还有图片正在上传，请等全部完成后再点确认。";
+      formError.hidden = false;
+      return;
+    }
+
+    var failed = queue.filter(function (i) { return i.status === "error"; });
+    if (failed.length) {
+      formError.textContent = "有 " + failed.length + " 张图片上传失败，请重试或移除后再提交。";
+      formError.hidden = false;
+      return;
+    }
 
     if (!title) {
       formError.textContent = "标题不能为空。";
@@ -199,7 +212,8 @@
     var entry = {
       id: window.GuiData.newId(),
       title: title,
-      image: image || "",   /* 留空即可，显示时会自动生成占位图 */
+      image: images[0] || "",   /* 封面图：第一张，列表页用 */
+      images: images,           /* 全部图片 */
       intro: intro,
       body: body,
       tags: tags,
@@ -277,68 +291,214 @@
     });
   });
 
-  /* ---------- 图片选择与上传 ---------- */
+  /* ============================================================
+     多图上传队列
+     - 支持多选 / 拖拽 / 粘贴
+     - 并发 2 个上传，其余排队
+     - 每张单独显示状态，失败可单独重试
+     ============================================================ */
   var fileInput   = document.getElementById("fImageFile");
   var pickBtn     = document.getElementById("pickImageBtn");
-  var clearBtn    = document.getElementById("clearImageBtn");
-  var imgStatus   = document.getElementById("imgStatus");
-  var imgPreview  = document.getElementById("imgPreview");
-  var imgPreviewImg = document.getElementById("imgPreviewImg");
+  var dropzone    = document.getElementById("dropzone");
+  var thumbsEl    = document.getElementById("thumbs");
   var imgUrlInput = document.getElementById("fImage");
 
-  function setStatus(text, cls) {
-    imgStatus.textContent = text;
-    imgStatus.className = "img-status muted" + (cls ? " " + cls : "");
+  var queue = [];              /* { key, name, previewUrl, status, url, error } */
+  var seq = 0;
+  var running = 0;
+  var MAX_CONCURRENT = 2;
+
+  function anyUploading() {
+    return queue.some(function (i) { return i.status === "uploading"; });
   }
 
-  function showPreview(src) {
-    if (src) { imgPreviewImg.src = src; imgPreview.hidden = false; }
-    else { imgPreviewImg.removeAttribute("src"); imgPreview.hidden = true; }
+  function renderThumbs() {
+    if (!queue.length) { thumbsEl.innerHTML = ""; thumbsEl.hidden = true; return; }
+    thumbsEl.hidden = false;
+
+    thumbsEl.innerHTML = queue.map(function (it) {
+      var badge = "";
+      if (it.status === "uploading") badge = '<span class="thumb-badge">上传中</span>';
+      else if (it.status === "error") badge = '<span class="thumb-badge is-err">失败</span>';
+
+      var retry = it.status === "error"
+        ? '<button type="button" class="thumb-retry" data-retry="' + it.key + '">重试</button>'
+        : "";
+
+      var src = it.previewUrl || it.url || "";
+      return '<div class="thumb thumb-' + it.status + '" data-key="' + it.key + '">' +
+               '<img src="' + escAttr(src) + '" alt="">' +
+               badge + retry +
+               '<button type="button" class="thumb-del" data-del="' + it.key + '" title="移除">×</button>' +
+             '</div>';
+    }).join("");
   }
 
+  function escAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  /* 启动队列中还没开始的条目 */
+  function pump() {
+    while (running < MAX_CONCURRENT) {
+      var next = queue.filter(function (i) { return i.status === "waiting"; })[0];
+      if (!next) break;
+      startUpload(next);
+    }
+  }
+
+  function startUpload(item) {
+    item.status = "uploading";
+    item.error = "";
+    running++;
+    renderThumbs();
+
+    window.GuiUpload.uploadFile(item.file).then(function (url) {
+      item.url = url;
+      item.status = "done";
+      /* 上传完成后把预览换成云端地址，避免一直占着内存 */
+      if (item.previewUrl && item.previewUrl.indexOf("blob:") === 0) {
+        URL.revokeObjectURL(item.previewUrl);
+        item.previewUrl = url;
+      }
+    }).catch(function (err) {
+      item.status = "error";
+      item.error = err.message || "上传失败";
+    }).then(function () {
+      running--;
+      renderThumbs();
+      pump();
+    });
+  }
+
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    var added = 0;
+
+    files.forEach(function (f) {
+      if (!f) return;
+      var isImage = /^image\//.test(f.type) || (window.GuiUpload && window.GuiUpload.looksHeic(f));
+      if (!isImage) return;
+
+      var item = {
+        key: "img" + (++seq),
+        name: f.name || "粘贴的图片",
+        file: f,
+        /* HEIC 浏览器多半解不了，先不留 blob 预览，等转码后用云端地址 */
+        previewUrl: (window.GuiUpload && window.GuiUpload.looksHeic(f))
+          ? "" : URL.createObjectURL(f),
+        status: "waiting",
+        url: "",
+        error: ""
+      };
+      queue.push(item);
+      added++;
+    });
+
+    if (added) {
+      renderThumbs();
+      pump();
+    } else if (files.length) {
+      formError.textContent = "选中的文件里没有图片。";
+      formError.hidden = false;
+      setTimeout(function () { formError.hidden = true; }, 4000);
+    }
+  }
+
+  /* ---- 点击选择 ---- */
   pickBtn.addEventListener("click", function () { fileInput.click(); });
-
-  clearBtn.addEventListener("click", function () {
-    fileInput.value = "";
-    imgUrlInput.value = "";
-    showPreview("");
-    setStatus("未选择");
-    clearBtn.hidden = true;
-    pickBtn.textContent = "选择图片";
+  fileInput.addEventListener("change", function () {
+    addFiles(fileInput.files);
+    fileInput.value = "";   /* 允许重复选同一个文件 */
   });
 
-  fileInput.addEventListener("change", function () {
-    var file = fileInput.files && fileInput.files[0];
-    if (!file) return;
+  /* ---- 拖拽 ---- */
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dropzone.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add("is-drag");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dropzone.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("is-drag");
+    });
+  });
+  dropzone.addEventListener("drop", function (e) {
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) addFiles(dt.files);
+  });
 
-    if (!window.GuiUpload || !window.GuiUpload.isConfigured()) {
-      setStatus("云存储未配置，无法上传", "is-error");
+  /* ---- 粘贴（Ctrl+V 直接贴截图） ---- */
+  document.addEventListener("paste", function (e) {
+    /* 如果焦点在文本框里，粘贴文本是正常操作，不拦截 */
+    var el = e.target;
+    var typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    if (typing) {
+      /* 但如果是图片，仍然要接管 */
+      var items0 = (e.clipboardData && e.clipboardData.items) || [];
+      var hasImg = Array.prototype.some.call(items0, function (i) { return /^image\//.test(i.type); });
+      if (!hasImg) return;
+    }
+    if (formSection.hidden) return;   /* 还没通过验证，不响应 */
+
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (/^image\//.test(items[i].type)) {
+        var f = items[i].getAsFile();
+        if (f) {
+          /* 粘贴的截图没有文件名，补一个便于识别 */
+          if (!f.name) { try { Object.defineProperty(f, "name", { value: "粘贴的截图.png" }); } catch (err) {} }
+          files.push(f);
+        }
+      }
+    }
+    if (files.length) {
+      e.preventDefault();
+      addFiles(files);
+    }
+  });
+
+  /* ---- 缩略图上的删除 / 重试（事件委托） ---- */
+  thumbsEl.addEventListener("click", function (e) {
+    var delKey = e.target.getAttribute && e.target.getAttribute("data-del");
+    if (delKey) {
+      queue = queue.filter(function (i) {
+        if (i.key === delKey) {
+          if (i.previewUrl && i.previewUrl.indexOf("blob:") === 0) URL.revokeObjectURL(i.previewUrl);
+          return false;
+        }
+        return true;
+      });
+      renderThumbs();
       return;
     }
 
-    /* 先本地预览，让用户马上看到选中的图 */
-    var isHeic = window.GuiUpload.looksHeic(file);
-    showPreview(isHeic ? "" : URL.createObjectURL(file));
-
-    setStatus(isHeic ? "检测到 HEIC，准备转换…" : "正在压缩并上传…");
-    pickBtn.disabled = true;
-    clearBtn.hidden = true;
-
-    window.GuiUpload.uploadFile(file, function (stepText) {
-      setStatus(stepText);
-    }).then(function (url) {
-      imgUrlInput.value = url;
-      showPreview(url);
-      setStatus("已上传（图片已托管在云存储）", "is-done");
-      pickBtn.textContent = "换一张";
-      clearBtn.hidden = false;
-    }).catch(function (err) {
-      setStatus("上传失败：" + err.message, "is-error");
-      imgUrlInput.value = "";
-      showPreview("");
-      pickBtn.textContent = "选择图片";
-    }).then(function () {
-      pickBtn.disabled = false;
-    });
+    var retryKey = e.target.getAttribute && e.target.getAttribute("data-retry");
+    if (retryKey) {
+      var it = queue.filter(function (i) { return i.key === retryKey; })[0];
+      if (it) {
+        it.status = "waiting";
+        it.error = "";
+        renderThumbs();
+        pump();
+      }
+    }
   });
+
+  /* 收集已上传成功的图片地址（按添加顺序） */
+  function collectedImages() {
+    var urls = queue.filter(function (i) { return i.status === "done" && i.url; })
+                    .map(function (i) { return i.url; });
+    /* 手动粘贴的网址排在最后 */
+    var manual = imgUrlInput.value.trim();
+    if (manual) urls.push(manual);
+    return urls;
+  }
 })();

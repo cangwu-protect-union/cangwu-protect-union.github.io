@@ -36,10 +36,25 @@
       return "<li>" + esc(t) + "</li>";
     }).join("");
 
+    /* 图片区：一张就正常显示，多张就排成画廊 */
+    var imgs = window.guiImagesFor(entry);
+    var gallery = "";
+    if (imgs.length === 1) {
+      gallery = '<div class="entry-hero"><img src="' + esc(imgs[0]) + '" alt=""></div>';
+    } else if (imgs.length > 1) {
+      gallery = '<div class="entry-gallery">' +
+        imgs.map(function (u, i) {
+          return '<figure class="gallery-item">' +
+                   '<img src="' + esc(u) + '" alt="" loading="' + (i === 0 ? "eager" : "lazy") + '">' +
+                 '</figure>';
+        }).join("") +
+      '</div>';
+    }
+
     root.innerHTML =
       '<h1 class="entry-title">' + esc(entry.title) + "</h1>" +
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
-      '<div class="entry-hero"><img src="' + esc(window.guiImageFor(entry)) + '" alt=""></div>' +
+      gallery +
       '<div class="entry-body">' + paras + "</div>" +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
