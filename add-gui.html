@@ -63,20 +63,19 @@
         </div>
 
         <div class="field">
-          <label>图片 <span class="muted">（可留空，留空会自动生成占位图）</span></label>
+          <label>图片 <span class="muted">（可多选、可拖拽、可粘贴；留空会自动生成占位图）</span></label>
 
-          <div class="img-upload">
-            <input id="fImageFile" type="file" accept="image/*" hidden>
-            <button type="button" class="btn btn-ghost" id="pickImageBtn">选择图片</button>
-            <button type="button" class="btn btn-ghost" id="clearImageBtn" hidden>移除图片</button>
-            <span class="img-status muted" id="imgStatus">未选择</span>
+          <div class="dropzone" id="dropzone">
+            <div class="dz-emoji">🖼</div>
+            <p class="dz-main">把图片拖到这里，或者 <button type="button" class="link-btn" id="pickImageBtn">选择文件</button></p>
+            <p class="dz-sub">支持多选 · 也可以直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴截图 · 支持 HEIC</p>
           </div>
 
-          <div class="img-preview" id="imgPreview" hidden>
-            <img id="imgPreviewImg" alt="图片预览">
-          </div>
+          <input id="fImageFile" type="file" accept="image/*" multiple hidden>
 
-          <input id="fImage" name="image" type="url" placeholder="或直接粘贴图片网址 https://…">
+          <div class="thumbs" id="thumbs" hidden></div>
+
+          <input id="fImage" name="image" type="url" placeholder="也可以粘贴单张图片网址 https://…">
         </div>
 
         <div class="field">

@@ -22,9 +22,11 @@
       return "<li>" + esc(t) + "</li>";
     }).join("");
     var href = "条目.html?id=" + encodeURIComponent(e.id);
+    var imgCount = window.guiImagesFor(e).length;
+    var multi = imgCount > 1 ? '<span class="gui-card-multi">' + imgCount + ' 图</span>' : "";
     return "" +
       '<a class="gui-card" href="' + href + '">' +
-        '<div class="gui-card-img"><img src="' + esc(window.guiImageFor(e)) + '" alt="" loading="lazy"></div>' +
+        '<div class="gui-card-img"><img src="' + esc(window.guiImageFor(e)) + '" alt="" loading="lazy">' + multi + '</div>' +
         '<div class="gui-card-body">' +
           '<h3 class="gui-card-title">' + esc(e.title) + "</h3>" +
           '<p class="gui-card-intro">' + esc(e.intro) + "</p>" +

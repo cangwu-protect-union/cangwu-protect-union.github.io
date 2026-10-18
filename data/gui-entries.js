@@ -106,10 +106,24 @@ window.GUI_SEED_ENTRIES = [
 
 ];
 
-/* 取条目图片：有 image 就用，没有就按标题首字生成占位图。
-   这样 entries.json 里不用存超长的 data URI。 */
+/* 取条目的全部图片地址（数组）。兼容三种数据形态：
+   - images: ["url1","url2"]   ← 新版多图
+   - image: "url"              ← 老版单图
+   - 都没有                     ← 返回空数组，由调用方生成占位图 */
+window.guiImagesFor = function (entry) {
+  if (!entry) return [];
+  var out = [];
+  if (Array.isArray(entry.images)) {
+    out = entry.images.filter(function (u) { return u && String(u).trim() !== ""; });
+  }
+  if (!out.length && entry.image) out = [entry.image];
+  return out;
+};
+
+/* 取条目的封面图（列表页用）：第一张图，没有就按标题首字生成占位图。 */
 window.guiImageFor = function (entry) {
-  if (entry && entry.image) return entry.image;
+  var all = window.guiImagesFor(entry);
+  if (all.length) return all[0];
   var title = (entry && entry.title) || "？";
   var palette = [
     ["#2f4858", "#8ecae6"], ["#3d5a80", "#ee6c4d"], ["#6d597a", "#e0aaff"],
