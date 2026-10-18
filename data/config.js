@@ -11,7 +11,11 @@
    ============================================================ */
 
 window.GUI_SUPABASE = {
-  url: "",        // 例："https://abcdefghijkl.supabase.co"
-  anonKey: "",    // 例："eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  // ⚠️ 2026-10-18：Supabase 在中国大陆不可达（*.supabase.co 被 DNS 污染 + IP 阻断），
+  // 已停用。原配置留在这里备查，等网络条件具备时可恢复：
+  //   项目地址: https://dmtdmzspivllcybdcjtp.supabase.co
+  //   anon key: 208 字符（原值见 git 历史或 Supabase 后台）
+  url: "",
+  anonKey: "",
   table: "gui_entries"
 };
