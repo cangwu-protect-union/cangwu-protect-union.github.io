@@ -83,10 +83,37 @@
 
     <!-- ===== 完成提示 ===== -->
     <section id="doneSection" hidden>
-      <h1>已完成</h1>
+      <h1>条目已保存</h1>
       <p class="lead" id="doneText"></p>
+
+      <div class="submit-box">
+        <h2>最后一步：提交到仓库</h2>
+        <p class="muted">条目已存在你的浏览器里，但要让<strong>所有人</strong>看到，需要把它提交到 GitHub 仓库。</p>
+
+        <ol class="submit-steps">
+          <li>点下面的按钮，复制 JSON 内容</li>
+          <li>打开 <a href="https://github.com/cangwu-protect-union/cangwu-protect-union.github.io/blob/main/data/entries.json" target="_blank" rel="noopener">data/entries.json</a>，点右上角铅笔图标</li>
+          <li>全选（Ctrl+A）后粘贴（Ctrl+V），覆盖原内容</li>
+          <li>点绿色 <code>Commit changes</code>，等 1 分钟生效</li>
+        </ol>
+
+        <p class="gate-actions">
+          <button type="button" class="btn" id="copyBtn">复制 JSON</button>
+          <a class="btn btn-ghost" id="doneView" href="guitu.html">先看看该条目</a>
+        </p>
+        <p class="gate-error" id="copyState" hidden></p>
+        <textarea id="copyManual" class="copy-manual" hidden spellcheck="false" aria-label="手动复制用的 JSON"></textarea>
+
+        <details class="submit-alt">
+          <summary>或者：用本地 Git 提交（如果你会用命令行）</summary>
+          <p>把复制的内容粘贴到 <code>data/entries.json</code>，然后在项目目录执行：</p>
+<pre><code>git add data/entries.json
+git commit -m "新增图鉴条目"
+git push</code></pre>
+        </details>
+      </div>
+
       <p class="gate-actions">
-        <a class="btn" id="doneView" href="guitu.html">查看该条目</a>
         <a class="btn btn-ghost" href="guitu.html">返回图鉴</a>
       </p>
     </section>

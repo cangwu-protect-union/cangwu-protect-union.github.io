@@ -506,3 +506,63 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 
 .card-actions { margin: 14px 0 0; }
 .card-actions .btn { padding: 7px 16px; font-size: .9rem; }
+
+
+/* =============================================================
+   15. 增加条目 · 提交到仓库的说明区
+   ============================================================= */
+
+.submit-box {
+  margin: 26px 0 0;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.submit-box h2 {
+  margin: 0 0 .6em;
+  font-size: 1.1rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.submit-box .muted { font-size: .92rem; }
+
+.submit-steps {
+  margin: 14px 0 18px;
+  padding-left: 1.4em;
+  font-size: .92rem;
+}
+.submit-steps li { margin-bottom: .5em; }
+
+.submit-alt { margin-top: 18px; font-size: .9rem; }
+.submit-alt summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: .9rem;
+}
+.submit-alt pre { margin-top: 10px; }
+
+/* 成功状态提示（复制成功） */
+.gate-ok {
+  color: #087443;
+  background: #f0fdf6;
+  border-color: #9bd8b6;
+}
+
+/* 手动复制用的文本框（自动复制失败时才显示） */
+.copy-manual {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .8rem;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  resize: vertical;
+}
+.copy-manual[hidden] { display: none; }

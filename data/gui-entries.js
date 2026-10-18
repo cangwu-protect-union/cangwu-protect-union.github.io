@@ -105,3 +105,19 @@ window.GUI_SEED_ENTRIES = [
   }
 
 ];
+
+/* 取条目图片：有 image 就用，没有就按标题首字生成占位图。
+   这样 entries.json 里不用存超长的 data URI。 */
+window.guiImageFor = function (entry) {
+  if (entry && entry.image) return entry.image;
+  var title = (entry && entry.title) || "？";
+  var palette = [
+    ["#2f4858", "#8ecae6"], ["#3d5a80", "#ee6c4d"], ["#6d597a", "#e0aaff"],
+    ["#1b4332", "#95d5b2"], ["#3a0ca3", "#f72585"], ["#22223b", "#9a8c98"]
+  ];
+  /* 用标题算个稳定下标，保证同一条目每次颜色一样 */
+  var sum = 0;
+  for (var i = 0; i < title.length; i++) sum += title.charCodeAt(i);
+  var c = palette[sum % palette.length];
+  return window.guiPlaceholder(title.charAt(0), c[0], c[1]);
+};

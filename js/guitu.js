@@ -24,7 +24,7 @@
     var href = "条目.html?id=" + encodeURIComponent(e.id);
     return "" +
       '<a class="gui-card" href="' + href + '">' +
-        '<div class="gui-card-img"><img src="' + esc(e.image) + '" alt="" loading="lazy"></div>' +
+        '<div class="gui-card-img"><img src="' + esc(window.guiImageFor(e)) + '" alt="" loading="lazy"></div>' +
         '<div class="gui-card-body">' +
           '<h3 class="gui-card-title">' + esc(e.title) + "</h3>" +
           '<p class="gui-card-intro">' + esc(e.intro) + "</p>" +
