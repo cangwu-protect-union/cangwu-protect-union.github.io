@@ -14,14 +14,28 @@
   "use strict";
 
   var LOCAL_KEY = "gui_extra_entries";
-  var TIMEOUT_MS = 8000;
+  var TIMEOUT_MS = 5000;
+
+  /* 熔断：云端连不上时 5 分钟内不再重试，避免每次打开页面都卡住 */
+  var BREAK_MS = 5 * 60 * 1000;
+  var downUntil = 0;
+  function isDown() { return Date.now() < downUntil; }
+  function markDown() { downUntil = Date.now() + BREAK_MS; }
 
   /* ---------------- 云端配置 ---------------- */
   function cfg() {
     var c = window.GUI_SUPABASE || {};
     if (!c.url || !c.anonKey) return null;
+
+    /* 容错：只保留 https://xxx.supabase.co 这一部分。
+       用户可能把 API 页面上的完整地址（带 /rest/v1/）整段复制过来，
+       而下面拼接请求时会自动加上 /rest/v1，所以要先把尾巴去掉。 */
+    var base = String(c.url).trim().replace(/\/+$/, "");   // 去掉尾部斜杠
+    base = base.replace(/\/rest\/v1$/, "");                // 去掉 /rest/v1
+    base = base.replace(/\/+$/, "");
+
     return {
-      url: String(c.url).replace(/\/+$/, ""),
+      url: base,
       anonKey: c.anonKey,
       table: c.table || "gui_entries"
     };
@@ -65,7 +79,7 @@
     var local = readLocal();
     var c = cfg();
 
-    if (!c) {
+    if (!c || isDown()) {
       return Promise.resolve(seed.concat(local));
     }
 
@@ -87,7 +101,8 @@
       return merge(seed, remote, local);
     }).catch(function (err) {
       /* 云端挂了也不能让页面空白：退回本地数据 */
-      console.warn("[鬼图鉴] 云端读取失败，使用本地数据：", err.message);
+      markDown();
+      console.warn("[鬼图鉴] 云端读取失败，已切换为本地数据（5 分钟内不再重试）：", err.message);
       return seed.concat(local);
     });
   }
@@ -117,7 +132,7 @@
   function add(entry) {
     var c = cfg();
 
-    if (!c) {
+    if (!c || isDown()) {
       var local = readLocal();
       local.push(entry);
       writeLocal(local);
@@ -151,6 +166,7 @@
       return { entry: entry, remoteSaved: true, error: null };
     }).catch(function (err) {
       /* 云端失败：退回本地，保证用户的心血不丢 */
+      markDown();
       var local = readLocal();
       local.push(entry);
       writeLocal(local);
