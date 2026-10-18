@@ -206,12 +206,26 @@
       date: new Date().toISOString().slice(0, 10)
     };
 
-    window.GuiData.add(entry).then(function () {
+    var submitBtn = entryForm.querySelector('button[type="submit"]');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "上传中…"; }
+
+    window.GuiData.add(entry).then(function (result) {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "确认"; }
+
       formSection.hidden = true;
       doneSection.hidden = false;
 
-      document.getElementById("doneText").textContent =
-        "条目「" + title + "」已保存在这台设备上，现在就能在图鉴里搜索和查看。";
+      var failBox = document.getElementById("failBox");
+      var doneText = document.getElementById("doneText");
+
+      if (result.remoteSaved) {
+        failBox.hidden = true;
+        doneText.textContent = "条目「" + title + "」已上传到云端，所有设备都能看到，可以立即搜索。";
+      } else {
+        failBox.hidden = false;
+        doneText.textContent = "条目「" + title + "」已保存在这台设备上。";
+      }
+
       document.getElementById("doneView").href = "条目.html?id=" + encodeURIComponent(entry.id);
     });
   });
@@ -222,7 +236,8 @@
 
   copyBtn.addEventListener("click", function () {
     copyState.hidden = true;
-    window.GuiData.buildRepoFile().then(function (text) {
+    Promise.resolve(window.GuiData.readLocal()).then(function (localEntries) {
+      var text = JSON.stringify({ entries: localEntries }, null, 2);
       function done(msg, ok) {
         copyState.textContent = msg;
         copyState.hidden = false;
