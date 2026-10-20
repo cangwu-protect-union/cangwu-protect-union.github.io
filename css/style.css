@@ -754,3 +754,199 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 @media (max-width: 560px) {
   .entry-gallery { grid-template-columns: 1fr; }
 }
+
+
+/* =============================================================
+   18. 编辑图鉴 / 旧图鉴 / 版本系统
+   ============================================================= */
+
+/* ---- 页面内嵌验证表单 ---- */
+.gate-form .field { margin-bottom: 18px; }
+
+/* ---- 「再次验证身份」模态框 ---- */
+.gate-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .48);
+}
+.gate-modal[hidden] { display: none; }
+
+.gate-modal-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 24px 26px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
+}
+.gate-modal-title { margin: 0 0 .5em; font-size: 1.15rem; border: none; padding: 0; }
+.gate-modal-desc { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+
+/* ---- 旧图鉴方格视图（一行三个） ---- */
+.old-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 4px;
+}
+.old-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  aspect-ratio: 1 / 1;
+  padding: 12px;
+  text-align: center;
+  color: var(--fg);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  transition: border-color .15s, transform .15s;
+}
+.old-tile:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.old-tile-name {
+  font-weight: 600;
+  font-size: .95rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.old-tile-count { font-size: .74rem; color: var(--muted); }
+
+/* 已删除的条目：灰底白字 */
+.old-tile.is-deleted {
+  background: #6d7680;
+  border-color: #5b636b;
+  color: #fff;
+}
+.old-tile.is-deleted .old-tile-count { color: rgba(255, 255, 255, .72); }
+.old-tile.is-deleted:hover { border-color: #2b3138; }
+
+/* 窄屏：两列 */
+@media (max-width: 560px) {
+  .old-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .old-tile-name { font-size: .85rem; }
+}
+
+/* ---- 版本列表 ---- */
+.ver-list { display: grid; gap: 12px; }
+
+.ver-item {
+  display: block;
+  padding: 14px 16px;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color .15s, transform .15s;
+}
+.ver-item:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.ver-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: .76rem;
+}
+.ver-time { color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.ver-tag {
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 8px;
+  background: var(--bg);
+}
+.ver-title { font-weight: 600; font-size: .98rem; margin-bottom: 4px; }
+.ver-preview { color: var(--muted); font-size: .88rem; line-height: 1.6; }
+
+/* ---- 版本查看页顶部提示条 ---- */
+.version-banner {
+  margin: 18px 0 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card);
+}
+.version-banner[hidden] { display: none; }
+.version-banner p { margin: 0 0 10px; font-size: .9rem; color: var(--muted); }
+.version-banner p:last-child { margin-bottom: 0; }
+
+/* ---- 条目编辑器 ---- */
+.editor-title { font-size: 1.6rem; margin-top: 0; }
+
+.para-list { display: grid; gap: 10px; margin-bottom: 12px; }
+
+.para-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.para-row textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: .95rem;
+  line-height: 1.7;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  resize: vertical;
+}
+.para-row textarea:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, .12);
+}
+.para-del {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.para-del:hover { border-color: #b42318; color: #b42318; background: #fdf2f1; }
+
+/* ---- 危险操作区 ---- */
+.editor-sep {
+  margin: 34px 0 20px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.danger-zone p { font-size: .88rem; margin-bottom: 10px; }
+
+.btn-danger {
+  background: transparent;
+  color: #b42318;
+  border: 1px solid #f0b4ae;
+}
+.btn-danger:hover { background: #fdf2f1; opacity: 1; }
+.btn-danger:disabled { opacity: .5; cursor: default; }
