@@ -177,7 +177,8 @@
 
     var title = document.getElementById("fTitle").value.trim();
     var body  = document.getElementById("fBody").value.trim();
-    var images = collectedImages();
+    var media = collectedMedia();
+    var images = media.images;
     var tags  = document.getElementById("fTags").value
       .split(/[,，]/).map(function (s) { return s.trim(); })
       .filter(function (s) { return s !== ""; });
@@ -213,7 +214,8 @@
       id: window.GuiData.newId(),
       title: title,
       image: images[0] || "",   /* 封面图：第一张，列表页用 */
-      images: images,           /* 全部图片 */
+      images: images,           /* 全部原图：详情页用 */
+      thumbs: media.thumbs,     /* 对应缩略图：列表页用 */
       intro: intro,
       body: body,
       tags: tags,
@@ -355,14 +357,15 @@
     running++;
     renderThumbs();
 
-    window.GuiUpload.uploadFile(item.file).then(function (url) {
-      item.url = url;
+    window.GuiUpload.uploadFile(item.file).then(function (res) {
+      item.url = res.url;          /* 原图：详情页用 */
+      item.thumb = res.thumb;      /* 缩略图：列表页用 */
       item.status = "done";
-      /* 上传完成后把预览换成云端地址，避免一直占着内存 */
+      /* 上传完成后把预览换成缩略图地址（小，不占内存） */
       if (item.previewUrl && item.previewUrl.indexOf("blob:") === 0) {
         URL.revokeObjectURL(item.previewUrl);
-        item.previewUrl = url;
       }
+      item.previewUrl = res.thumb || res.url;
     }).catch(function (err) {
       item.status = "error";
       item.error = err.message || "上传失败";
@@ -391,6 +394,7 @@
           ? "" : URL.createObjectURL(f),
         status: "waiting",
         url: "",
+        thumb: "",
         error: ""
       };
       queue.push(item);
@@ -492,13 +496,18 @@
     }
   });
 
-  /* 收集已上传成功的图片地址（按添加顺序） */
-  function collectedImages() {
-    var urls = queue.filter(function (i) { return i.status === "done" && i.url; })
-                    .map(function (i) { return i.url; });
-    /* 手动粘贴的网址排在最后 */
+  /* 收集已上传成功的图片地址（按添加顺序）
+     返回 { images: 原图数组, thumbs: 缩略图数组 }
+     两个数组长度一致、顺序对应；手动粘贴的网址没有缩略图，用空串占位，
+     显示时 guiThumbFor() 会自动回退到原图。 */
+  function collectedMedia() {
+    var done = queue.filter(function (i) { return i.status === "done" && i.url; });
+    var images = done.map(function (i) { return i.url; });
+    var thumbs = done.map(function (i) { return i.thumb || ""; });
+
     var manual = imgUrlInput.value.trim();
-    if (manual) urls.push(manual);
-    return urls;
+    if (manual) { images.push(manual); thumbs.push(""); }
+
+    return { images: images, thumbs: thumbs };
   }
 })();

@@ -125,6 +125,7 @@
           title: latest.title,
           image: latest.image || "",
           images: latest.images || [],
+          thumbs: latest.thumbs || [],
           intro: latest.intro || "",
           body: latest.body || "",
           tags: latest.tags || [],

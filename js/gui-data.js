@@ -122,6 +122,7 @@
       return (Array.isArray(rows) ? rows : []).map(function (r) {
         return {
           id: r.id, title: r.title, image: r.image, images: r.images || [],
+          thumbs: r.thumbs || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at
         };
@@ -184,76 +185,92 @@
     }
 
     var url = c.base + c.table;
-    var basePayload = {
+
+    /* 组装完整记录（含图片与缩略图）。
+       数据库若还没迁移到对应字段，sendWithColumnFallback 会自动去掉再重试，
+       所以「先发代码后跑 SQL」的中间状态也不会保存失败。 */
+    var payload = {
       id: entry.id,
       title: entry.title,
       image: entry.image,
+      images: entry.images || [],
+      thumbs: entry.thumbs || [],
       intro: entry.intro,
       body: entry.body,
       tags: entry.tags || [],
       date: entry.date
     };
 
-    function post(body) {
-      return withTimeout(
-        fetch(url, {
-          method: "POST",
-          headers: headers(c, { "Prefer": "return=minimal" }),
-          body: JSON.stringify(body)
-        }),
-        TIMEOUT_MS
-      );
-    }
-
-    /* 注意：必须浅拷贝。直接 payload = basePayload 会让两者指向同一个对象，
-       后面加上 images 会把 basePayload 也污染，导致降级重试仍然失败。 */
-    var payload = {};
-    for (var k in basePayload) payload[k] = basePayload[k];
-    if (entry.images && entry.images.length) payload.images = entry.images;
-
-    return post(payload).then(function (res) {
-      /* 如果数据库还没执行多图迁移（缺 images 字段），自动降级为单图重试一次 */
-      if (res.status === 400 || res.status === 404) {
-        return res.text().then(function (t) {
-          if (/images|PGRST204|42703/.test(t)) {
-            return post(basePayload).then(function (res2) {
-              if (!res2.ok) {
-                return res2.text().then(function (t2) {
-                  throw new Error("云端保存失败 " + res2.status + " " + t2.slice(0, 200));
-                });
-              }
-              return { degraded: true };
-            });
-          }
-          throw new Error("云端保存失败 " + res.status + " " + t.slice(0, 200));
-        });
-      }
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("云端保存失败 " + res.status + " " + t.slice(0, 200));
-        });
-      }
-      return { degraded: false };
-    }).then(function (r) {
+    return sendWithColumnFallback(url, "POST", payload, c).then(function () {
       /* 云端已保存，本地副本可以清掉（避免重复显示） */
       removeLocal(entry.id);
-      return { entry: entry, remoteSaved: true, error: null, degraded: r.degraded };
+      return { entry: entry, remoteSaved: true, error: null };
     }).catch(function (err) {
       markDown();
       return { entry: entry, remoteSaved: false, error: err.message };
     });
   }
-
   /* ============================================================
      编辑 / 版本相关（需要数据库执行过 version-setup.sql）
      ============================================================ */
 
+  /* ------------------------------------------------------------
+     通用写入：先按原样发；如果数据库缺某个字段（PGRST204 / 42703），
+     自动把那个字段去掉再重试，最多重试 3 次。
+     这样在「缩略图字段还没迁移」的阶段，保存也不会失败。
+     ------------------------------------------------------------ */
+  function sendWithColumnFallback(url, method, payload, c) {
+    var body = {};
+    for (var k in payload) body[k] = payload[k];
+
+    function attempt(left) {
+      return withTimeout(
+        fetch(url, {
+          method: method,
+          headers: headers(c, { "Prefer": "return=minimal" }),
+          body: JSON.stringify(body)
+        }),
+        TIMEOUT_MS
+      ).then(function (res) {
+        if (res.ok) return res;
+
+        return res.text().then(function (txt) {
+          if ((res.status === 400 || res.status === 404) &&
+              /PGRST204|42703/.test(txt) && left > 0) {
+            /* 从错误信息里挖出缺的字段名，例如：
+               Could not find the 'thumbs' column of 'gui_entries'
+               column gui_entries.thumbs does not exist */
+            var m = txt.match(/'([a-zA-Z_][a-zA-Z0-9_]*)' column/) ||
+                    txt.match(/column [a-zA-Z_0-9]+\.([a-zA-Z_][a-zA-Z0-9_]*) does not exist/);
+            var col = m && m[1];
+            if (col && Object.prototype.hasOwnProperty.call(body, col)) {
+              delete body[col];
+              return attempt(left - 1);
+            }
+          }
+          var err = new Error("保存失败 HTTP " + res.status + " " + txt.slice(0, 160));
+          err.status = res.status;
+          err.body = txt;
+          throw err;
+        });
+      });
+    }
+
+    return attempt(3).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (txt) {
+          throw new Error("保存失败 HTTP " + res.status + " " + txt.slice(0, 160));
+        });
+      }
+    });
+  }
   /* 把条目内容整理成一行记录（版本表和条目表共用这些字段） */
   function toRow(e) {
     return {
       title: e.title,
       image: e.image || "",
       images: e.images || [],
+      thumbs: e.thumbs || [],
       intro: e.intro || "",
       body: e.body || "",
       tags: e.tags || [],
@@ -277,6 +294,7 @@
       return (Array.isArray(rows) ? rows : []).map(function (r) {
         return {
           id: r.id, title: r.title, image: r.image, images: r.images || [],
+          thumbs: r.thumbs || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
         };
@@ -298,21 +316,8 @@
     row.entry_id = entry.id;
     row.reason = reason || "edit";
 
-    return withTimeout(
-      fetch(c.base + "gui_entry_versions", {
-        method: "POST",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify(row)
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("归档失败 HTTP " + res.status + " " + t.slice(0, 160));
-        });
-      }
-      return row.version_id;
-    });
+    return sendWithColumnFallback(c.base + "gui_entry_versions", "POST", row, c)
+      .then(function () { return row.version_id; });
   }
 
   /* 读所有版本（旧图鉴列表用） */
@@ -345,20 +350,7 @@
     row.updated_at = new Date().toISOString();
 
     var url = c.base + c.table + "?id=eq." + encodeURIComponent(entry.id);
-    return withTimeout(
-      fetch(url, {
-        method: "PATCH",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify(row)
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("保存失败 HTTP " + res.status + " " + t.slice(0, 160));
-        });
-      }
-    });
+    return sendWithColumnFallback(url, "PATCH", row, c);
   }
 
   /* 软删除：只把 deleted 置为 true，数据库里不删行 */
@@ -417,20 +409,7 @@
     var row = toRow(entry);
     row.id = entry.id;
 
-    return withTimeout(
-      fetch(c.base + c.table, {
-        method: "POST",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify(row)
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("新增失败 HTTP " + res.status + " " + t.slice(0, 160));
-        });
-      }
-    });
+    return sendWithColumnFallback(c.base + c.table, "POST", row, c);
   }
   function newId() {
     return "gu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);

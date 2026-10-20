@@ -124,6 +124,7 @@
             title: version.title,
             image: (version.images && version.images[0]) || version.image || "",
             images: version.images || [],
+            thumbs: version.thumbs || [],
             intro: version.intro || "",
             body: version.body || "",
             tags: version.tags || [],
