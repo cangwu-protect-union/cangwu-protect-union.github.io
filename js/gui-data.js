@@ -88,22 +88,42 @@
 
   /* ---------------- 云数据库 ---------------- */
   function fetchCloud(c) {
-    var url = c.base + c.table + "?select=*&order=created_at.desc&limit=1000";
-    return withTimeout(
-      fetch(url, { headers: headers(c) }).then(function (res) {
-        if (!res.ok) {
-          return res.text().then(function (t) {
-            throw new Error("云端返回 " + res.status + " " + t.slice(0, 160));
-          });
-        }
-        return res.json();
-      }),
-      TIMEOUT_MS
-    ).then(function (rows) {
+    /* 正常情况：只取未删除的条目。
+       如果数据库还没执行 version-setup.sql（没有 deleted 字段），
+       自动退回「不带过滤」的老查询，保证公开图鉴页不会因此报错。 */
+    var baseUrl = c.base + c.table + "?select=*";
+    var withFilter = baseUrl + "&deleted=eq.false&order=created_at.desc&limit=1000";
+    var withoutFilter = baseUrl + "&order=created_at.desc&limit=1000";
+
+    function attempt(url) {
+      return withTimeout(
+        fetch(url, { headers: headers(c) }).then(function (res) {
+          if (!res.ok) {
+            return res.text().then(function (t) {
+              var err = new Error("云端返回 " + res.status + " " + t.slice(0, 160));
+              err.status = res.status;
+              err.body = t;
+              throw err;
+            });
+          }
+          return res.json();
+        }),
+        TIMEOUT_MS
+      );
+    }
+
+    return attempt(withFilter).catch(function (err) {
+      /* 缺字段（400 + PGRST204/42703）时降级重试一次 */
+      if (err.status === 400 && /deleted|PGRST204|42703/.test(err.body || err.message || "")) {
+        return attempt(withoutFilter);
+      }
+      throw err;
+    }).then(function (rows) {
       return (Array.isArray(rows) ? rows : []).map(function (r) {
         return {
           id: r.id, title: r.title, image: r.image, images: r.images || [],
-          intro: r.intro, body: r.body, tags: r.tags || [], date: r.date
+          intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
+          deleted: !!r.deleted, updated_at: r.updated_at
         };
       });
     });
@@ -224,13 +244,213 @@
     });
   }
 
+  /* ============================================================
+     编辑 / 版本相关（需要数据库执行过 version-setup.sql）
+     ============================================================ */
+
+  /* 把条目内容整理成一行记录（版本表和条目表共用这些字段） */
+  function toRow(e) {
+    return {
+      title: e.title,
+      image: e.image || "",
+      images: e.images || [],
+      intro: e.intro || "",
+      body: e.body || "",
+      tags: e.tags || [],
+      date: e.date || ""
+    };
+  }
+
+  /* 读全部条目（含已删除的），编辑界面和旧图鉴用 */
+  function listAll() {
+    var c = cfg();
+    if (!c || isDown()) return Promise.resolve([]);
+
+    var url = c.base + c.table + "?select=*&order=created_at.desc&limit=1000";
+    return withTimeout(
+      fetch(url, { headers: headers(c) }).then(function (res) {
+        if (!res.ok) throw new Error("读取失败 HTTP " + res.status);
+        return res.json();
+      }),
+      TIMEOUT_MS
+    ).then(function (rows) {
+      return (Array.isArray(rows) ? rows : []).map(function (r) {
+        return {
+          id: r.id, title: r.title, image: r.image, images: r.images || [],
+          intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
+          deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
+        };
+      });
+    }).catch(function (err) {
+      markDown();
+      console.warn("[鬼图鉴] 读取全部条目失败：", err.message);
+      return [];
+    });
+  }
+
+  /* 把一条条目的当前内容存进版本表 */
+  function archiveVersion(entry, reason) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云数据库未配置"));
+
+    var row = toRow(entry);
+    row.version_id = "v-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+    row.entry_id = entry.id;
+    row.reason = reason || "edit";
+
+    return withTimeout(
+      fetch(c.base + "gui_entry_versions", {
+        method: "POST",
+        headers: headers(c, { "Prefer": "return=minimal" }),
+        body: JSON.stringify(row)
+      }),
+      TIMEOUT_MS
+    ).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error("归档失败 HTTP " + res.status + " " + t.slice(0, 160));
+        });
+      }
+      return row.version_id;
+    });
+  }
+
+  /* 读所有版本（旧图鉴列表用） */
+  function listVersions() {
+    var c = cfg();
+    if (!c || isDown()) return Promise.resolve([]);
+
+    var url = c.base + "gui_entry_versions?select=*&order=archived_at.desc&limit=2000";
+    return withTimeout(
+      fetch(url, { headers: headers(c) }).then(function (res) {
+        if (!res.ok) throw new Error("读取版本失败 HTTP " + res.status);
+        return res.json();
+      }),
+      TIMEOUT_MS
+    ).then(function (rows) {
+      return Array.isArray(rows) ? rows : [];
+    }).catch(function (err) {
+      markDown();
+      console.warn("[鬼图鉴] 读取版本失败：", err.message);
+      return [];
+    });
+  }
+
+  /* 改一个已有条目（PATCH），返回 Promise<void> */
+  function updateEntry(entry) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云数据库未配置"));
+
+    var row = toRow(entry);
+    row.updated_at = new Date().toISOString();
+
+    var url = c.base + c.table + "?id=eq." + encodeURIComponent(entry.id);
+    return withTimeout(
+      fetch(url, {
+        method: "PATCH",
+        headers: headers(c, { "Prefer": "return=minimal" }),
+        body: JSON.stringify(row)
+      }),
+      TIMEOUT_MS
+    ).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error("保存失败 HTTP " + res.status + " " + t.slice(0, 160));
+        });
+      }
+    });
+  }
+
+  /* 软删除：只把 deleted 置为 true，数据库里不删行 */
+  function softDelete(entryId) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云数据库未配置"));
+
+    var url = c.base + c.table + "?id=eq." + encodeURIComponent(entryId);
+    return withTimeout(
+      fetch(url, {
+        method: "PATCH",
+        headers: headers(c, { "Prefer": "return=minimal" }),
+        body: JSON.stringify({ deleted: true, updated_at: new Date().toISOString() })
+      }),
+      TIMEOUT_MS
+    ).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error("删除失败 HTTP " + res.status + " " + t.slice(0, 160));
+        });
+      }
+    });
+  }
+
+  /* 恢复：把某条目重新设为可见，并写入指定的内容（不传则用它的最新版本） */
+  function restoreEntry(entryId, content) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云数据库未配置"));
+
+    var row = content ? toRow(content) : {};
+    row.deleted = false;
+    row.updated_at = new Date().toISOString();
+
+    var url = c.base + c.table + "?id=eq." + encodeURIComponent(entryId);
+    return withTimeout(
+      fetch(url, {
+        method: "PATCH",
+        headers: headers(c, { "Prefer": "return=minimal" }),
+        body: JSON.stringify(row)
+      }),
+      TIMEOUT_MS
+    ).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error("恢复失败 HTTP " + res.status + " " + t.slice(0, 160));
+        });
+      }
+    });
+  }
+
+  /* 新增一个条目（编辑界面用，走和 add 相同的逻辑但不写本地缓冲） */
+  function insertEntry(entry) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云数据库未配置"));
+
+    var row = toRow(entry);
+    row.id = entry.id;
+
+    return withTimeout(
+      fetch(c.base + c.table, {
+        method: "POST",
+        headers: headers(c, { "Prefer": "return=minimal" }),
+        body: JSON.stringify(row)
+      }),
+      TIMEOUT_MS
+    ).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error("新增失败 HTTP " + res.status + " " + t.slice(0, 160));
+        });
+      }
+    });
+  }
   function newId() {
     return "gu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   }
 
   window.GuiData = {
-    list: list,
-    add: add,
+    /* 读 */
+    list: list,                     /* 公开列表：只含未删除的 */
+    listAll: listAll,               /* 全部条目：含已删除的 */
+    listVersions: listVersions,     /* 所有历史版本 */
+
+    /* 写 */
+    add: add,                       /* 新增（带本地缓冲，增加条目页用） */
+    insertEntry: insertEntry,       /* 新增（编辑界面用） */
+    updateEntry: updateEntry,       /* 修改 */
+    softDelete: softDelete,         /* 软删除：只标记不删行 */
+    restoreEntry: restoreEntry,     /* 恢复 */
+    archiveVersion: archiveVersion, /* 归档旧版本 */
+
+    /* 工具 */
     newId: newId,
     remoteEnabled: remoteEnabled,
     readLocal: readLocal
