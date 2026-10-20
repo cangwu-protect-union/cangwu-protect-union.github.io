@@ -120,6 +120,23 @@ window.guiImagesFor = function (entry) {
   return out;
 };
 
+/* 取条目的缩略图地址数组（与 guiImagesFor 等长、顺序对应）。
+   老条目没有 thumbs 字段时，自动回退用原图，不会出错。 */
+window.guiThumbsFor = function (entry) {
+  var imgs = window.guiImagesFor(entry);
+  var th = (entry && Array.isArray(entry.thumbs)) ? entry.thumbs : [];
+  return imgs.map(function (u, i) {
+    var t = th[i];
+    return (t && String(t).trim() !== "") ? t : u;
+  });
+};
+
+/* 取条目的封面缩略图（列表卡片用）。没有图片时回退到占位图。 */
+window.guiThumbFor = function (entry) {
+  var all = window.guiThumbsFor(entry);
+  if (all.length) return all[0];
+  return window.guiImageFor(entry);   /* 内含占位图逻辑 */
+};
 /* 取条目的封面图（列表页用）：第一张图，没有就按标题首字生成占位图。 */
 window.guiImageFor = function (entry) {
   var all = window.guiImagesFor(entry);

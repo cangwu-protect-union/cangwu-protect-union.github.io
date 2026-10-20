@@ -23,7 +23,8 @@
   var formError  = document.getElementById("formError");
 
   var entry = null;          /* 原始条目（用于存档旧版本） */
-  var images = [];           /* 当前图片地址数组，编辑中 */
+  var images = [];           /* 当前原图地址数组，编辑中 */
+  var thumbs = [];           /* 与 images 一一对应的缩略图地址 */
   var busy = false;
 
   var id = new URLSearchParams(location.search).get("id");
@@ -79,8 +80,10 @@
     if (!images.length) { imgList.innerHTML = ""; imgList.hidden = true; return; }
     imgList.hidden = false;
     imgList.innerHTML = images.map(function (u, i) {
+      /* 缩略图优先；没有缩略图的老条目回退到原图 */
+      var show = (thumbs[i] && thumbs[i] !== "") ? thumbs[i] : u;
       return '<div class="thumb thumb-done" data-i="' + i + '">' +
-               '<img src="' + esc(u) + '" alt="">' +
+               '<img src="' + esc(show) + '" alt="">' +
                '<button type="button" class="thumb-del" data-del="' + i + '" title="移除">×</button>' +
              "</div>";
     }).join("");
@@ -90,7 +93,11 @@
     var d = e.target.getAttribute && e.target.getAttribute("data-del");
     if (d === null || d === undefined) return;
     var i = parseInt(d, 10);
-    if (!isNaN(i)) { images.splice(i, 1); renderImages(); }
+    if (!isNaN(i)) {
+      images.splice(i, 1);
+      thumbs.splice(i, 1);   /* 两个数组必须同步删，否则缩略图会错位 */
+      renderImages();
+    }
   });
 
   document.getElementById("addImgBtn").addEventListener("click", function () { imgFile.click(); });
@@ -105,8 +112,9 @@
     imgStatus.className = "img-status muted";
 
     files.forEach(function (f) {
-      window.GuiUpload.uploadFile(f).then(function (url) {
-        images.push(url);
+      window.GuiUpload.uploadFile(f).then(function (res) {
+        images.push(res.url);
+        thumbs.push(res.thumb || "");
         renderImages();
       }).catch(function (err) {
         imgStatus.textContent = "有图片上传失败：" + err.message;
@@ -139,6 +147,7 @@
     document.getElementById("fTitle").value = entry.title || "";
     document.getElementById("fTags").value = (entry.tags || []).join(", ");
     images = window.guiImagesFor(entry).slice();
+    thumbs = window.guiThumbsFor(entry).slice();
     renderImages();
 
     var paras = String(entry.body || "").split(/\n+/).filter(function (p) { return p.trim() !== ""; });
@@ -187,6 +196,7 @@
       title: title,
       image: images[0] || "",
       images: images,
+      thumbs: thumbs,
       intro: intro,
       body: body,
       tags: tags,

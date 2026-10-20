@@ -20,8 +20,10 @@
 (function () {
   "use strict";
 
-  var MAX_EDGE = 1280;      /* 压缩后的最长边（像素） */
-  var QUALITY = 0.82;       /* JPEG 质量 */
+  var MAX_EDGE = 1280;      /* 原图压缩后的最长边（像素） */
+  var QUALITY = 0.82;       /* 原图 JPEG 质量 */
+var THUMB_EDGE = 260;     /* 缩略图最长边：列表显示 96px，2 倍屏 192px，取 260 留余量 */
+var THUMB_QUALITY = 0.72; /* 缩略图 JPEG 质量，通常 8~15KB */
   var BUCKET = "gui-images";
   var HEIC_LIB = "js/lib/heic2any.min.js";
 
@@ -97,12 +99,13 @@
 
   /* ---------------- 缩放到画布并导出 JPEG ---------------- */
 
-  function drawAndExport(img) {
+  /* 把已解码的图片缩放到指定最长边，导出 JPEG Blob */
+  function drawAndExport(img, maxEdge, quality) {
     var w = img.naturalWidth;
     var h = img.naturalHeight;
     if (!w || !h) throw new Error("图片尺寸无效");
 
-    var scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+    var scale = Math.min(1, maxEdge / Math.max(w, h));
     var tw = Math.round(w * scale);
     var th = Math.round(h * scale);
 
@@ -121,11 +124,24 @@
       canvas.toBlob(function (blob) {
         if (!blob) { reject(new Error("图片处理失败")); return; }
         resolve({ blob: blob, width: tw, height: th });
-      }, "image/jpeg", QUALITY);
+      }, "image/jpeg", quality);
     });
   }
 
   /* ---------------- 压缩主流程 ---------------- */
+
+  /* 解码 → 同时导出「原图」和「缩略图」两份
+     返回：{ blob, width, height, thumbBlob, thumbWidth, thumbHeight } */
+  function renderBoth(img) {
+    var full = drawAndExport(img, MAX_EDGE, QUALITY);
+    var thumb = drawAndExport(img, THUMB_EDGE, THUMB_QUALITY);
+    return Promise.all([full, thumb]).then(function (rs) {
+      return {
+        blob: rs[0].blob, width: rs[0].width, height: rs[0].height,
+        thumbBlob: rs[1].blob, thumbWidth: rs[1].width, thumbHeight: rs[1].height
+      };
+    });
+  }
 
   /* onStep(text) 用于给界面反馈进度 */
   function compress(file, onStep) {
@@ -138,7 +154,7 @@
     step("正在读取图片…");
 
     return decodeToImage(file).then(function (r) {
-      var p = drawAndExport(r.img);
+      var p = renderBoth(r.img);
       URL.revokeObjectURL(r.url);
       return p;
     }).catch(function (err) {
@@ -153,7 +169,7 @@
       }).then(function (jpegBlob) {
         step("正在压缩…");
         return decodeToImage(jpegBlob).then(function (r2) {
-          var p = drawAndExport(r2.img);
+          var p = renderBoth(r2.img);
           URL.revokeObjectURL(r2.url);
           return p;
         });
@@ -163,20 +179,18 @@
 
   /* ---------------- 上传 ---------------- */
 
-  function makeName() {
+  /* 生成对象名；suffix 用来区分原图和缩略图 */
+  function makeName(suffix) {
     var d = new Date();
     var pad = function (n) { return (n < 10 ? "0" : "") + n; };
     var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
                 "-" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
     var rand = Math.random().toString(36).slice(2, 8);
-    return "gui/" + stamp + "-" + rand + ".jpg";
+    return "gui/" + stamp + "-" + rand + (suffix || "") + ".jpg";
   }
 
-  function upload(blob) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云存储未配置"));
-
-    var name = makeName();
+  /* 上传单个 Blob，返回公开地址 */
+  function uploadBlob(c, blob, name) {
     var url = c.base + "/v1/storages/object/" + BUCKET + "/" + name;
 
     return fetch(url, {
@@ -192,8 +206,15 @@
           throw new Error("上传失败 HTTP " + res.status + " " + t.slice(0, 200));
         });
       }
-      return c.base + "/v1/storages/object/" + BUCKET + "/" + name;
+      return url;
     });
+  }
+
+  /* 兼容旧调用：只上传原图 */
+  function upload(blob) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云存储未配置"));
+    return uploadBlob(c, blob, makeName(""));
   }
 
   /* ---------------- 对外接口 ---------------- */
@@ -203,10 +224,34 @@
     compress: compress,
     upload: upload,
     looksHeic: looksHeic,
-    /* 一步到位：文件 → 公开 URL */
+
+    /* 一步到位：文件 → { url: 原图地址, thumb: 缩略图地址 }
+       两张图共用同一个时间戳前缀，方便对照 */
     uploadFile: function (file, onStep) {
+      var c = cfg();
+      if (!c) return Promise.reject(new Error("云存储未配置"));
+
+      var step = onStep || function () {};
+
       return compress(file, onStep).then(function (r) {
-        return upload(r.blob);
+        var base = makeName("");
+        var fullName = base;
+        var thumbName = base.replace(/\.jpg$/, "-t.jpg");
+
+        step("正在上传原图…");
+        return uploadBlob(c, r.blob, fullName).then(function (fullUrl) {
+          step("正在上传缩略图…");
+          return uploadBlob(c, r.thumbBlob, thumbName).then(function (thumbUrl) {
+            return {
+              url: fullUrl,
+              thumb: thumbUrl,
+              width: r.width,
+              height: r.height,
+              size: r.blob.size,
+              thumbSize: r.thumbBlob.size
+            };
+          });
+        });
       });
     }
   };
