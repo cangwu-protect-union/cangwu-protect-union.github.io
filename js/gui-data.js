@@ -325,7 +325,7 @@
     var c = cfg();
     if (!c || isDown()) return Promise.resolve([]);
 
-    var url = c.base + "gui_entry_versions?select=*&order=archived_at.desc&limit=2000";
+    var url = c.base + "gui_entry_versions?select=*&applied=eq.false&order=archived_at.desc&limit=2000";
     return withTimeout(
       fetch(url, { headers: headers(c) }).then(function (res) {
         if (!res.ok) throw new Error("读取版本失败 HTTP " + res.status);
@@ -341,6 +341,15 @@
     });
   }
 
+  /* 把一个版本标记为「已应用」——它已经变成当前内容，不该再出现在旧图鉴里。
+     只写 applied 一个字段（数据库的列级授权也只允许改这一列）。 */
+  function markVersionApplied(versionId) {
+    var c = cfg();
+    if (!c) return Promise.resolve();
+
+    var url = c.base + "gui_entry_versions?version_id=eq." + encodeURIComponent(versionId);
+    return sendWithColumnFallback(url, "PATCH", { applied: true }, c);
+  }
   /* 改一个已有条目（PATCH），返回 Promise<void> */
   function updateEntry(entry) {
     var c = cfg();
@@ -428,6 +437,7 @@
     softDelete: softDelete,         /* 软删除：只标记不删行 */
     restoreEntry: restoreEntry,     /* 恢复 */
     archiveVersion: archiveVersion, /* 归档旧版本 */
+    markVersionApplied: markVersionApplied, /* 标记版本已应用（从旧图鉴隐藏） */
 
     /* 工具 */
     newId: newId,

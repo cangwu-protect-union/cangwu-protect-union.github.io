@@ -17,6 +17,12 @@
 
   var groups = [];   /* { entryId, name, deleted, count } */
 
+  /* 旧图鉴属于编辑区，未验证的话跳回去验证再回来 */
+  if (!window.GuiGate.isVerified()) {
+    location.replace("edit-gui.html?next=" + encodeURIComponent(location.pathname + location.search));
+    return;
+  }
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")

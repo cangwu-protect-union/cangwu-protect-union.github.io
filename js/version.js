@@ -16,6 +16,12 @@
   var applyBtn = document.getElementById("applyBtn");
 
   var versionId = new URLSearchParams(location.search).get("v");
+
+  /* 旧图鉴属于编辑区，未验证的话跳回去验证再回来 */
+  if (!window.GuiGate.isVerified()) {
+    location.replace("edit-gui.html?next=" + encodeURIComponent(location.pathname + location.search));
+    return;
+  }
   var version = null;
   var entry = null;
   var busy = false;
@@ -108,36 +114,35 @@
         return;
       }
 
-      window.GuiGate.ask({
-        message: "确认应用「" + version.title + "」的这个历史版本？请再次验证身份。"
-      }).then(function (ok) {
-        if (!ok) { location.href = "projects.html"; return; }
+      busy = true;
+      applyBtn.disabled = true;
+      applyBtn.textContent = "应用中…";
 
-        busy = true;
-        applyBtn.disabled = true;
-        applyBtn.textContent = "应用中…";
-
-        /* 先存档当前版本，再替换内容 */
-        window.GuiData.archiveVersion(entry, "edit").then(function () {
-          return window.GuiData.updateEntry({
-            id: entry.id,
-            title: version.title,
-            image: (version.images && version.images[0]) || version.image || "",
-            images: version.images || [],
-            thumbs: version.thumbs || [],
-            intro: version.intro || "",
-            body: version.body || "",
-            tags: version.tags || [],
-            date: version.date || entry.date
-          });
-        }).then(function () {
-          location.href = "edit-gui.html";
-        }).catch(function (err) {
-          busy = false;
-          applyBtn.disabled = false;
-          applyBtn.textContent = "应用这个版本";
-          bannerText.textContent = "应用失败：" + err.message;
+      /* 1. 把当前内容存进旧图鉴
+         2. 用这个版本的内容替换
+         3. 把这个版本标记为「已应用」——它已经变成当前内容，
+            不该再出现在旧图鉴里，否则看起来像复制了一份 */
+      window.GuiData.archiveVersion(entry, "edit").then(function () {
+        return window.GuiData.updateEntry({
+          id: entry.id,
+          title: version.title,
+          image: (version.images && version.images[0]) || version.image || "",
+          images: version.images || [],
+          thumbs: version.thumbs || [],
+          intro: version.intro || "",
+          body: version.body || "",
+          tags: version.tags || [],
+          date: version.date || entry.date
         });
+      }).then(function () {
+        return window.GuiData.markVersionApplied(version.version_id);
+      }).then(function () {
+        location.href = "edit-gui.html";
+      }).catch(function (err) {
+        busy = false;
+        applyBtn.disabled = false;
+        applyBtn.textContent = "应用这个版本";
+        bannerText.textContent = "应用失败：" + err.message;
       });
     });
   }
