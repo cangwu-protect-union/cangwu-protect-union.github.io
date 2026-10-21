@@ -33,6 +33,7 @@
     <section id="editSection" hidden>
       <h1>编辑图鉴</h1>
       <p class="lead">点条目进入编辑；也可以新增条目或查阅旧图鉴。</p>
+      <p class="muted gui-note">这里只列出已存入数据库的条目；公开图鉴里另外 6 条是示例数据，不在此列。</p>
 
       <div class="gui-toolbar">
         <div class="gui-search">
@@ -42,6 +43,9 @@
           </svg>
           <input id="guiSearch" type="search" placeholder="搜索条目名…" autocomplete="off" aria-label="搜索条目名">
         </div>
+      </div>
+
+      <div class="gui-actions">
         <a class="btn" href="add-gui.html">增加条目</a>
         <a class="btn btn-ghost" href="old-gui.html">查看旧图鉴</a>
       </div>

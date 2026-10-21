@@ -18,6 +18,12 @@
   var verCount = document.getElementById("verCount");
 
   var entryId = new URLSearchParams(location.search).get("id");
+
+  /* 旧图鉴属于编辑区，未验证的话跳回去验证再回来 */
+  if (!window.GuiGate.isVerified()) {
+    location.replace("edit-gui.html?next=" + encodeURIComponent(location.pathname + location.search));
+    return;
+  }
   var entry = null;
   var versions = [];
 
@@ -113,30 +119,28 @@
         return;
       }
 
-      window.GuiGate.ask({
-        message: "确认恢复条目「" + latest.title + "」？请再次验证身份。"
-      }).then(function (ok) {
-        if (!ok) { location.href = "projects.html"; return; }
+      restoreBtn.disabled = true;
+      restoreBtn.textContent = "恢复中…";
 
-        restoreBtn.disabled = true;
-        restoreBtn.textContent = "恢复中…";
-
-        window.GuiData.restoreEntry(entryId, {
-          title: latest.title,
-          image: latest.image || "",
-          images: latest.images || [],
-          thumbs: latest.thumbs || [],
-          intro: latest.intro || "",
-          body: latest.body || "",
-          tags: latest.tags || [],
-          date: latest.date || ""
-        }).then(function () {
-          location.href = "edit-gui.html";
-        }).catch(function (err) {
-          restoreBtn.disabled = false;
-          restoreBtn.textContent = "恢复此条目";
-          groupState.textContent = "恢复失败：" + err.message;
-        });
+      window.GuiData.restoreEntry(entryId, {
+        title: latest.title,
+        image: latest.image || "",
+        images: latest.images || [],
+        thumbs: latest.thumbs || [],
+        intro: latest.intro || "",
+        body: latest.body || "",
+        tags: latest.tags || [],
+        date: latest.date || ""
+      }).then(function () {
+        /* 被恢复的这个版本已经变成当前内容，要从旧图鉴里消失，
+           否则看起来像同时存在两份。 */
+        return window.GuiData.markVersionApplied(latest.version_id);
+      }).then(function () {
+        location.href = "edit-gui.html";
+      }).catch(function (err) {
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = "恢复此条目";
+        groupState.textContent = "恢复失败：" + err.message;
       });
     });
   }

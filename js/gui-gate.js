@@ -3,9 +3,15 @@
    ------------------------------------------------------------
    所有需要「成员身份」的地方都调用这里，避免每个页面各写一遍：
 
-     GuiGate.mount(el, { onPass })   在指定容器里渲染验证表单
-     GuiGate.ask()                   弹出模态框，要求再答一次（返回 Promise<boolean>）
-     GuiGate.require(onPass)         便捷入口
+     GuiGate.require(el, { onPass })   ★推荐：验证一次，整个会话内都记住
+     GuiGate.mount(el, { onPass })     只在这一个页面验证（不记状态）
+     GuiGate.ask()                     弹模态框再验证一次（保留备用）
+
+   ★「只验证一次」的机制：
+     验证通过后把时间戳写进 sessionStorage。之后再进编辑区的任何页面
+     （编辑列表、条目编辑器、旧图鉴、版本页…）都直接放行，不再重复问题目。
+     关闭浏览器标签页后自动失效，下次打开需要重新验证。
+     有效期 60 分钟，避免长时间不操作还留着一个已登录状态。
 
    安全说明：
      答案不存明文，只存 SHA-256 哈希。但这终究是**纯前端**验证，
@@ -129,6 +135,27 @@
     return result;
   }
 
+  /* ---------- 会话内的验证状态 ----------
+     验证通过后记下时间戳，60 分钟内同一标签页不再重复验证。 */
+  var SESSION_KEY = "gui_verified_until";
+  var SESSION_TTL = 60 * 60 * 1000;   /* 60 分钟 */
+
+  function isVerified() {
+    try {
+      var until = parseInt(sessionStorage.getItem(SESSION_KEY) || "0", 10);
+      return !!until && Date.now() < until;
+    } catch (e) {
+      return false;   /* 隐私模式下 sessionStorage 不可用，就每次验证 */
+    }
+  }
+
+  function markVerified() {
+    try { sessionStorage.setItem(SESSION_KEY, String(Date.now() + SESSION_TTL)); } catch (e) {}
+  }
+
+  function clearVerified() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+  }
   /* ---------- 校验一组答案 ---------- */
   function verifyValues(values) {
     return Promise.all(values.map(function (v) { return sha256Hex(normalize(v)); }))
@@ -209,6 +236,28 @@
     });
   }
 
+  /* ---------- 页面级验证（会话内只问一次） ----------
+     用法：GuiGate.require(容器元素, { onPass, cancelHref, failHref })
+     · 之前已经验证过 → 立刻调用 onPass，界面上什么都不显示
+     · 没验证过       → 在容器里渲染验证表单，通过后标记会话并调用 onPass */
+  function require_(container, opts) {
+    opts = opts || {};
+
+    if (isVerified()) {
+      if (container) container.innerHTML = "";
+      if (opts.onPass) opts.onPass();
+      return;
+    }
+
+    mount(container, {
+      cancelHref: opts.cancelHref,
+      failHref: opts.failHref,
+      onPass: function () {
+        markVerified();
+        if (opts.onPass) opts.onPass();
+      }
+    });
+  }
   /* ---------- 模态框再验证 ----------
      用法：GuiGate.ask().then(ok => { ... })  ok 为 true 表示验证通过
      用于「确认修改」「删除条目」「应用旧版」「恢复」等破坏性操作 */
@@ -297,8 +346,19 @@
   /* ---------- 对外接口 ---------- */
   window.GuiGate = {
     questions: QUESTIONS,
+
+    /* 页面级验证：整个会话只需一次 */
+    require: require_,
+
+    /* 其他用法 */
     mount: mount,
     ask: ask,
+
+    /* 会话状态（退出编辑区时可以主动清掉） */
+    isVerified: isVerified,
+    markVerified: markVerified,
+    clearVerified: clearVerified,
+
     verifyValues: verifyValues,
     normalize: normalize
   };

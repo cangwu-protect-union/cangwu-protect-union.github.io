@@ -29,21 +29,7 @@
       <h1>组织验证</h1>
       <p class="lead">编纂者需通过验证才能增加条目。请回答以下问题，答案需完全一致。</p>
 
-      <form id="gateForm" autocomplete="off">
-        <div class="field">
-          <label for="q1">问题一：CPU远征行动指定前哨站</label>
-          <input id="q1" name="q1" type="text" placeholder="请输入答案">
-        </div>
-        <div class="field">
-          <label for="q2">问题二：CPU远征行动指定驱鬼补给</label>
-          <input id="q2" name="q2" type="text" placeholder="请输入答案">
-        </div>
-        <p class="gate-error" id="gateError" hidden></p>
-        <div class="gate-actions">
-          <button type="submit" class="btn">验证</button>
-          <a class="btn btn-ghost" href="guitu.html">取消</a>
-        </div>
-      </form>
+      <div id="gateMount"></div>
     </section>
 
     <!-- ===== 第二关：增加条目表单 ===== -->
@@ -126,6 +112,7 @@
 
   <script src="data/config.js"></script>
   <script src="data/gui-entries.js"></script>
+  <script src="js/gui-gate.js"></script>
   <script src="js/gui-data.js"></script>
   <script src="js/gui-upload.js"></script>
   <script src="js/add-gui.js"></script>

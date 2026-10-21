@@ -7,8 +7,8 @@
      · 图片：追加（上传）、单独移除
      · 删除整条条目（软删除，内容进旧图鉴）
 
-   两个破坏性操作（确认 / 删除）都会先用 GuiGate.ask() 再次验证身份；
-   验证不通过就退回项目界面，什么都不改。
+   组织验证只在进入编辑区时做一次（会话内有效），
+   这里的确认 / 删除只弹普通确认框，不再要求重复答题。
    ============================================================ */
 (function () {
   "use strict";
@@ -28,6 +28,13 @@
   var busy = false;
 
   var id = new URLSearchParams(location.search).get("id");
+
+  /* 没通过组织验证就不该待在这一页：跳回编辑列表去验证，
+     验证完再用 ?next= 自动回到这里。 */
+  if (!window.GuiGate.isVerified()) {
+    location.replace("edit-gui.html?next=" + encodeURIComponent(location.pathname + location.search));
+    return;
+  }
 
   /* ---------- 小工具 ---------- */
   function esc(s) {
@@ -203,27 +210,22 @@
       date: entry.date
     };
 
-    window.GuiGate.ask({
-      message: "确认修改后，当前版本会存入「旧图鉴」，改后的内容替换展示。请再次验证身份。"
-    }).then(function (ok) {
-      if (!ok) { location.href = "projects.html"; return; }
+    /* 不再二次验证：进入编辑区时已经验证过（会话内有效） */
+    busy = true;
+    var btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+    btn.textContent = "保存中…";
 
-      busy = true;
-      var btn = document.getElementById("saveBtn");
-      btn.disabled = true;
-      btn.textContent = "保存中…";
-
-      /* 先存档旧版本，再保存新内容 */
-      window.GuiData.archiveVersion(entry, "edit").then(function () {
-        return window.GuiData.updateEntry(updated);
-      }).then(function () {
-        location.href = "edit-gui.html";
-      }).catch(function (err) {
-        busy = false;
-        btn.disabled = false;
-        btn.textContent = "确认";
-        fail("保存失败：" + err.message);
-      });
+    /* 先把当前内容存进旧图鉴，再写入新内容 */
+    window.GuiData.archiveVersion(entry, "edit").then(function () {
+      return window.GuiData.updateEntry(updated);
+    }).then(function () {
+      location.href = "edit-gui.html";
+    }).catch(function (err) {
+      busy = false;
+      btn.disabled = false;
+      btn.textContent = "确认";
+      fail("保存失败：" + err.message);
     });
   });
 
@@ -236,26 +238,21 @@
       return;   /* 取消：什么都不做 */
     }
 
-    window.GuiGate.ask({
-      message: "确认删除条目「" + entry.title + "」？内容会存入「旧图鉴」，之后可以恢复。请再次验证身份。"
-    }).then(function (ok) {
-      if (!ok) { location.href = "projects.html"; return; }
+    /* 不再二次验证：进入编辑区时已经验证过 */
+    busy = true;
+    var btn = document.getElementById("deleteBtn");
+    btn.disabled = true;
+    btn.textContent = "删除中…";
 
-      busy = true;
-      var btn = document.getElementById("deleteBtn");
-      btn.disabled = true;
-      btn.textContent = "删除中…";
-
-      window.GuiData.archiveVersion(entry, "delete").then(function () {
-        return window.GuiData.softDelete(entry.id);
-      }).then(function () {
-        location.href = "edit-gui.html";
-      }).catch(function (err) {
-        busy = false;
-        btn.disabled = false;
-        btn.textContent = "删除条目";
-        fail("删除失败：" + err.message);
-      });
+    window.GuiData.archiveVersion(entry, "delete").then(function () {
+      return window.GuiData.softDelete(entry.id);
+    }).then(function () {
+      location.href = "edit-gui.html";
+    }).catch(function (err) {
+      busy = false;
+      btn.disabled = false;
+      btn.textContent = "删除条目";
+      fail("删除失败：" + err.message);
     });
   });
 })();

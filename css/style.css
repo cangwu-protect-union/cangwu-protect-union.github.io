@@ -950,3 +950,36 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 }
 .btn-danger:hover { background: #fdf2f1; opacity: 1; }
 .btn-danger:disabled { opacity: .5; cursor: default; }
+
+
+/* =============================================================
+   19. 搜索框与操作按钮分两行（小屏幕体验）
+   ============================================================= */
+
+/* 工具条改成纵向：搜索框独占一行，按钮在下面一行 */
+.gui-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.gui-toolbar .gui-search { width: 100%; }
+
+/* 按钮行：自动换行，每个按钮等宽伸展 */
+.gui-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gui-actions .btn {
+  flex: 1 1 auto;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 窄屏下按钮占满整行，点起来更舒服 */
+@media (max-width: 560px) {
+  .gui-actions .btn { flex: 1 1 100%; }
+}
+
+/* 编辑列表顶部的小提示 */
+.gui-note { font-size: .84rem; margin: -8px 0 14px; }

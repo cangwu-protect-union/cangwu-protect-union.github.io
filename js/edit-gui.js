@@ -65,18 +65,29 @@
     }
   }
 
+  /* 编辑列表只显示「已经存入云数据库」的条目。
+     公开图鉴里还有 6 条示例数据（data/gui-entries.js 里的种子），
+     它们不在数据库里，点进来也编辑不了，所以这里不列出来。 */
   function loadEntries() {
-    return window.GuiData.list().then(function (entries) {
-      allEntries = entries;
+    return window.GuiData.listAll().then(function (entries) {
+      allEntries = entries.filter(function (e) { return !e.deleted; });
       render(inputEl.value);
     });
   }
 
-  /* 验证通过 → 显示列表 */
-  window.GuiGate.mount(gateMount, {
+  /* 验证通过（或本会话已验证过）→ 显示列表
+     如果地址上带了 ?next=xxx，说明是从编辑区其他页面跳回来要求验证的，
+     验证完直接送回原页面。 */
+  var nextUrl = new URLSearchParams(location.search).get("next");
+
+  window.GuiGate.require(gateMount, {
     cancelHref: "projects.html",
     failHref: "projects.html",
     onPass: function () {
+      if (nextUrl) {
+        location.replace(nextUrl);
+        return;
+      }
       gateSection.hidden = true;
       editSection.hidden = false;
       loadEntries();
