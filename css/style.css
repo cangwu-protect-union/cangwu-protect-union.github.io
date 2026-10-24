@@ -1137,3 +1137,24 @@ body.has-pick-bar { padding-bottom: 76px; }
   .pick-bar { gap: 10px; padding: 10px 14px; }
   .pick-bar-count { display: none; }
 }
+
+
+/* 恢复草稿后的提示条 */
+.tip-draft-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .88rem;
+  color: #1a5c2a;
+  background: #eef8f0;
+  border: 1px solid #bfe3c7;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 14px;
+}
+.tip-draft-hint .link-btn {
+  color: #1a5c2a;
+  text-decoration: underline;
+  font-size: .88rem;
+}

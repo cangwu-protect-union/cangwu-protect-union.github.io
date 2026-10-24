@@ -127,6 +127,7 @@
       if (IS_TIP) {
         /* 情报没有本地兜底：上传失败就直接告诉用户重试 */
         if (result.remoteSaved) {
+          clearTipDraft();   /* 提交成功，草稿没用了 */
           doneText.textContent = "情报「" + title + "」已提交。成员可以在「查看情报」里看到它。";
         } else {
           doneText.textContent = "提交失败：" + (result.error || "云端没有响应") + "。请稍后重试。";
@@ -215,6 +216,9 @@
   }
 
   function renderThumbs() {
+    /* 图片队列变了就顺手存一次草稿（提供情报模式下才存） */
+    saveTipDraft();
+
     if (!queue.length) { thumbsEl.innerHTML = ""; thumbsEl.hidden = true; return; }
     thumbsEl.hidden = false;
 
@@ -498,4 +502,139 @@
 
   /* 只有增加条目模式才处理引用（提供情报页没有这个流程） */
   if (!IS_TIP) applyPickedTips();
+
+  /* ============================================================
+     投稿草稿（只在「提供情报」模式生效）
+     ------------------------------------------------------------
+     问题：填到一半点「查看情报」再退回来，页面会重新加载，写的内容全丢。
+     办法：边填边把内容存进 sessionStorage，回到本页时自动恢复。
+        · 图片只存已经上传成功的（它们本来就是云端地址，能直接复用）
+        · 提交成功后清掉草稿
+        · 超过 24 小时的草稿不再恢复，免得看到几天前的内容
+     ============================================================ */
+
+  var DRAFT_KEY = "gui_tip_draft";
+  var DRAFT_MAX_AGE = 24 * 60 * 60 * 1000;
+
+  function draftEls() {
+    return {
+      title: document.getElementById("fTitle"),
+      body:  document.getElementById("fBody"),
+      tags:  document.getElementById("fTags"),
+      imageUrl: document.getElementById("fImage")
+    };
+  }
+
+  /* 存草稿 */
+  function saveTipDraft() {
+    if (!IS_TIP) return;
+    var els = draftEls();
+    if (!els.title || !els.body) return;
+
+    /* 只收已经上传完成的图片 */
+    var imgs = queue
+      .filter(function (i) { return i.status === "done" && i.url; })
+      .map(function (i) { return { url: i.url, thumb: i.thumb || "" }; });
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        title: els.title.value,
+        body: els.body.value,
+        tags: els.tags ? els.tags.value : "",
+        imageUrl: els.imageUrl ? els.imageUrl.value : "",
+        images: imgs
+      }));
+    } catch (e) {}
+  }
+
+  function clearTipDraft() {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  }
+
+  /* 把草稿填回表单 */
+  function restoreTipDraft() {
+    if (!IS_TIP) return;
+
+    var raw = null;
+    try { raw = sessionStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+    if (!raw) return;
+
+    var d = null;
+    try { d = JSON.parse(raw); } catch (e) { clearTipDraft(); return; }
+    if (!d) { clearTipDraft(); return; }
+
+    /* 太旧的草稿直接丢掉 */
+    if (!d.savedAt || Date.now() - d.savedAt > DRAFT_MAX_AGE) { clearTipDraft(); return; }
+
+    /* 完全空的草稿没什么可恢复的 */
+    var hasText = (d.title || "").trim() || (d.body || "").trim() ||
+                  (d.tags || "").trim() || (d.imageUrl || "").trim() ||
+                  (d.images && d.images.length);
+    if (!hasText) { clearTipDraft(); return; }
+
+    var els = draftEls();
+    if (els.title && d.title) els.title.value = d.title;
+    if (els.body && d.body) els.body.value = d.body;
+    if (els.tags && d.tags) els.tags.value = d.tags;
+    if (els.imageUrl && d.imageUrl) els.imageUrl.value = d.imageUrl;
+
+    /* 已上传的图片直接放回队列，标记为完成，不需要重传 */
+    (d.images || []).forEach(function (im) {
+      if (!im || !im.url) return;
+      queue.push({
+        key: "img" + (++seq),
+        name: "已上传的图片",
+        file: null,
+        previewUrl: im.thumb || im.url,
+        status: "done",
+        url: im.url,
+        thumb: im.thumb || "",
+        error: ""
+      });
+    });
+    renderThumbs();
+
+    showDraftHint();
+  }
+
+  /* 恢复后给个提示，并提供一键清空，免得用户疑惑 */
+  function showDraftHint() {
+    var err = document.getElementById("formError");
+    if (!err || !err.parentNode || document.getElementById("draftHint")) return;
+
+    var p = document.createElement("p");
+    p.className = "tip-draft-hint";
+    p.id = "draftHint";
+    p.innerHTML = "已恢复上次没提交完的内容。" +
+                  '<button type="button" class="link-btn" id="clearDraftBtn">清空重填</button>';
+
+    err.parentNode.insertBefore(p, err);
+
+    document.getElementById("clearDraftBtn").addEventListener("click", function () {
+      var els = draftEls();
+      if (els.title) els.title.value = "";
+      if (els.body) els.body.value = "";
+      if (els.tags) els.tags.value = "";
+      if (els.imageUrl) els.imageUrl.value = "";
+
+      queue = [];
+      renderThumbs();      /* 这一步会顺手存一次草稿，所以清空要放在它后面 */
+
+      clearTipDraft();     /* 最后再删，确保真的删干净 */
+
+      p.remove();
+    });
+  }
+
+  if (IS_TIP) {
+    /* 边填边存 */
+    ["fTitle", "fBody", "fTags", "fImage"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("input", saveTipDraft);
+    });
+
+    /* 页面载入时恢复 */
+    restoreTipDraft();
+  }
 })();
