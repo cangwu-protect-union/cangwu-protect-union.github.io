@@ -51,16 +51,19 @@
       "Content-Type": "application/json"
     };
 
-    /* 写入类请求必须带令牌，数据库的 RLS 策略会校验它。
-       读请求带上也无害，所以统一加，省得各处遗漏。
-
-       注意头名：不能用自定义的 x-gui-token —— CloudBase 网关的 CORS
-       允许头是固定列表，不在列表里的头会被浏览器预检拦掉。
-       X-Client-Info 在列表里，且不会被 PostgREST 解析，正好用来传令牌。 */
-    var tok = accessToken();
-    if (tok) h["X-Client-Info"] = tok;
-
     if (extra) for (var k in extra) h[k] = extra[k];
+
+    /* 令牌放进 Prefer 头里传。
+       为什么不用自定义头：CloudBase 网关的 CORS 允许头是固定白名单，
+       不在名单里的头（比如 x-gui-token）会被浏览器预检拦掉；
+       而名单里的 X-Client-Info 之类又会被网关吞掉，到不了数据库。
+       只有 Prefer 既在白名单里、又会被转发给 PostgREST，
+       而且 PostgREST 会忽略它不认识的指令，所以借它捎带令牌。 */
+    var tok = accessToken();
+    if (tok) {
+      h["Prefer"] = (h["Prefer"] ? h["Prefer"] + ", " : "") + "gui-token=" + tok;
+    }
+
     return h;
   }
 
