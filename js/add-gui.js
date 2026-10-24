@@ -127,7 +127,7 @@
       if (IS_TIP) {
         /* 情报没有本地兜底：上传失败就直接告诉用户重试 */
         if (result.remoteSaved) {
-          clearTipDraft();   /* 提交成功，草稿没用了 */
+          clearDraft();   /* 提交成功，草稿没用了 */
           doneText.textContent = "情报「" + title + "」已提交。成员可以在「查看情报」里看到它。";
         } else {
           doneText.textContent = "提交失败：" + (result.error || "云端没有响应") + "。请稍后重试。";
@@ -135,6 +135,7 @@
         document.getElementById("doneView").href = "tips-entry.html?id=" + encodeURIComponent(entry.id);
       } else {
         if (result.remoteSaved) {
+          clearDraft();   /* 已经存进云端，草稿没用了 */
           if (failBox) failBox.hidden = true;
           doneText.textContent = "条目「" + title + "」已上传到云端，所有设备都能看到，可以立即搜索。";
         } else {
@@ -217,7 +218,7 @@
 
   function renderThumbs() {
     /* 图片队列变了就顺手存一次草稿（提供情报模式下才存） */
-    saveTipDraft();
+    saveDraft();
 
     if (!queue.length) { thumbsEl.innerHTML = ""; thumbsEl.hidden = true; return; }
     thumbsEl.hidden = false;
@@ -500,20 +501,23 @@
     }
   }
 
-  /* 只有增加条目模式才处理引用（提供情报页没有这个流程） */
-  if (!IS_TIP) applyPickedTips();
+  /* 引用情报的调用挪到文件末尾：必须先恢复草稿，再合并引用，否则合并的内容会被覆盖 */
 
   /* ============================================================
-     投稿草稿（只在「提供情报」模式生效）
+     表单草稿（提供情报 / 增加条目 都生效）
      ------------------------------------------------------------
-     问题：填到一半点「查看情报」再退回来，页面会重新加载，写的内容全丢。
+     问题：填到一半点了别的页面再退回来，页面会重新加载，写的内容全丢。
      办法：边填边把内容存进 sessionStorage，回到本页时自动恢复。
         · 图片只存已经上传成功的（它们本来就是云端地址，能直接复用）
-        · 提交成功后清掉草稿
+        · 提交成功后清掉草稿（条目上传失败时保留，方便重试）
         · 超过 24 小时的草稿不再恢复，免得看到几天前的内容
      ============================================================ */
 
-  var DRAFT_KEY = "gui_tip_draft";
+  /* 两个页面各用各的键，互不干扰 */
+  function draftKey() {
+    return IS_TIP ? "gui_tip_draft" : "gui_entry_draft";
+  }
+
   var DRAFT_MAX_AGE = 24 * 60 * 60 * 1000;
 
   function draftEls() {
@@ -526,8 +530,7 @@
   }
 
   /* 存草稿 */
-  function saveTipDraft() {
-    if (!IS_TIP) return;
+  function saveDraft() {
     var els = draftEls();
     if (!els.title || !els.body) return;
 
@@ -537,47 +540,48 @@
       .map(function (i) { return { url: i.url, thumb: i.thumb || "" }; });
 
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+      sessionStorage.setItem(draftKey(), JSON.stringify({
         savedAt: Date.now(),
         title: els.title.value,
         body: els.body.value,
         tags: els.tags ? els.tags.value : "",
         imageUrl: els.imageUrl ? els.imageUrl.value : "",
-        images: imgs
+        images: imgs,
+        refs: pickedRefs
       }));
     } catch (e) {}
   }
 
-  function clearTipDraft() {
-    try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  function clearDraft() {
+    try { sessionStorage.removeItem(draftKey()); } catch (e) {}
   }
 
   /* 把草稿填回表单 */
-  function restoreTipDraft() {
-    if (!IS_TIP) return;
+  function restoreDraft() {
 
     var raw = null;
-    try { raw = sessionStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+    try { raw = sessionStorage.getItem(draftKey()); } catch (e) { return; }
     if (!raw) return;
 
     var d = null;
-    try { d = JSON.parse(raw); } catch (e) { clearTipDraft(); return; }
-    if (!d) { clearTipDraft(); return; }
+    try { d = JSON.parse(raw); } catch (e) { clearDraft(); return; }
+    if (!d) { clearDraft(); return; }
 
     /* 太旧的草稿直接丢掉 */
-    if (!d.savedAt || Date.now() - d.savedAt > DRAFT_MAX_AGE) { clearTipDraft(); return; }
+    if (!d.savedAt || Date.now() - d.savedAt > DRAFT_MAX_AGE) { clearDraft(); return; }
 
     /* 完全空的草稿没什么可恢复的 */
     var hasText = (d.title || "").trim() || (d.body || "").trim() ||
                   (d.tags || "").trim() || (d.imageUrl || "").trim() ||
-                  (d.images && d.images.length);
-    if (!hasText) { clearTipDraft(); return; }
+                  (d.images && d.images.length) || (d.refs && d.refs.length);
+    if (!hasText) { clearDraft(); return; }
 
     var els = draftEls();
     if (els.title && d.title) els.title.value = d.title;
     if (els.body && d.body) els.body.value = d.body;
     if (els.tags && d.tags) els.tags.value = d.tags;
     if (els.imageUrl && d.imageUrl) els.imageUrl.value = d.imageUrl;
+    if (d.refs && d.refs.length) pickedRefs = d.refs;
 
     /* 已上传的图片直接放回队列，标记为完成，不需要重传 */
     (d.images || []).forEach(function (im) {
@@ -621,20 +625,22 @@
       queue = [];
       renderThumbs();      /* 这一步会顺手存一次草稿，所以清空要放在它后面 */
 
-      clearTipDraft();     /* 最后再删，确保真的删干净 */
+      clearDraft();     /* 最后再删，确保真的删干净 */
 
       p.remove();
     });
   }
 
-  if (IS_TIP) {
-    /* 边填边存 */
-    ["fTitle", "fBody", "fTags", "fImage"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.addEventListener("input", saveTipDraft);
-    });
+  /* 边填边存 */
+  ["fTitle", "fBody", "fTags", "fImage"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("input", saveDraft);
+  });
 
-    /* 页面载入时恢复 */
-    restoreTipDraft();
-  }
+  /* 顺序很重要：
+     1. 先把上次没提交完的草稿填回去
+     2. 再把这次通过「引用情报」选中的内容合并进来
+     反过来的话，恢复草稿会把刚合并的内容覆盖掉。 */
+  restoreDraft();
+  if (!IS_TIP) applyPickedTips();
 })();
