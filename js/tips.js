@@ -28,6 +28,11 @@
   backLink.href = back.href;
   backLink.textContent = back.text;
 
+  /* 从「提供情报」点进来的话，这一页就不要再显示「提供情报」按钮了——
+     否则点回去会把正在填的内容冲掉。 */
+  var actionsEl = document.getElementById("tipsActions");
+  if (actionsEl && from === "provide") actionsEl.hidden = true;
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
