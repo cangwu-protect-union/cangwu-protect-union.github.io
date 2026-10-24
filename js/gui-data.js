@@ -37,13 +37,34 @@
 
   function remoteEnabled() { return cfg() !== null; }
 
+  /* 取组织验证签发的访问令牌（由 js/gui-gate.js 保存） */
+  function accessToken() {
+    if (window.GuiGate && typeof window.GuiGate.token === "function") {
+      return window.GuiGate.token();
+    }
+    return "";
+  }
+
   function headers(c, extra) {
     var h = {
       "Authorization": "Bearer " + c.key,
       "Content-Type": "application/json"
     };
+
+    /* 写入类请求必须带令牌，数据库的 RLS 策略会校验它。
+       读请求带上也无害，所以统一加，省得各处遗漏。 */
+    var tok = accessToken();
+    if (tok) h["x-gui-token"] = tok;
+
     if (extra) for (var k in extra) h[k] = extra[k];
     return h;
+  }
+
+  /* 判断某个错误是不是「没令牌 / 令牌过期」导致的，
+     是的话清掉本地令牌，让用户重新验证一次。 */
+  function isAuthError(err) {
+    var msg = String((err && (err.body || err.message)) || "");
+    return /42501|row-level security|JWT|permission denied/i.test(msg);
   }
 
   function withTimeout(promise, ms) {
@@ -123,6 +144,7 @@
         return {
           id: r.id, title: r.title, image: r.image, images: r.images || [],
           thumbs: r.thumbs || [],
+          refs: r.refs || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at
         };
@@ -251,6 +273,13 @@
           var err = new Error("保存失败 HTTP " + res.status + " " + txt.slice(0, 160));
           err.status = res.status;
           err.body = txt;
+
+          /* 被 RLS 挡下 = 没令牌或令牌过期 → 清掉本地令牌，
+             让用户重新验证一次（页面会跳回验证界面） */
+          if (isAuthError(err)) {
+            if (window.GuiGate && window.GuiGate.clearVerified) window.GuiGate.clearVerified();
+            err.message = "验证已失效，请重新验证后再试。";
+          }
           throw err;
         });
       });
@@ -271,6 +300,7 @@
       image: e.image || "",
       images: e.images || [],
       thumbs: e.thumbs || [],
+      refs: e.refs || [],
       intro: e.intro || "",
       body: e.body || "",
       tags: e.tags || [],
@@ -295,6 +325,7 @@
         return {
           id: r.id, title: r.title, image: r.image, images: r.images || [],
           thumbs: r.thumbs || [],
+          refs: r.refs || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
         };
@@ -424,6 +455,66 @@
     return "gu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   }
 
+  /* ============================================================
+     情报（投稿）—— 独立的 gui_tips 表
+     ------------------------------------------------------------
+     和图鉴彻底分开：图鉴的查询永远不碰这张表，反之亦然。
+     投稿不需要组织验证（开放），所以这里不带令牌也能写。
+     ============================================================ */
+
+  var TIPS_TABLE = "gui_tips";
+
+  function mapTip(r) {
+    return {
+      id: r.id,
+      title: r.title,
+      image: r.image,
+      images: r.images || [],
+      thumbs: r.thumbs || [],
+      intro: r.intro,
+      body: r.body,
+      tags: r.tags || [],
+      date: r.date,
+      created_at: r.created_at
+    };
+  }
+
+  /* 读取全部情报（按提交时间倒序） */
+  function listTips() {
+    var c = cfg();
+    if (!c) return Promise.resolve([]);
+
+    var url = c.base + TIPS_TABLE + "?select=*&order=created_at.desc&limit=1000";
+    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (txt) {
+            throw new Error("读取情报失败 HTTP " + res.status + " " + txt.slice(0, 140));
+          });
+        }
+        return res.json();
+      })
+      .then(function (rows) { return rows.map(mapTip); });
+  }
+
+  /* 提交一条情报 */
+  function addTip(tip) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云服务未配置"));
+
+    var row = {
+      id: tip.id,
+      title: tip.title,
+      image: tip.image || "",
+      images: tip.images || [],
+      thumbs: tip.thumbs || [],
+      intro: tip.intro || "",
+      body: tip.body,
+      tags: tip.tags || [],
+      date: tip.date || ""
+    };
+    return sendWithColumnFallback(c.base + TIPS_TABLE, "POST", row, c);
+  }
   window.GuiData = {
     /* 读 */
     list: list,                     /* 公开列表：只含未删除的 */
@@ -438,6 +529,10 @@
     restoreEntry: restoreEntry,     /* 恢复 */
     archiveVersion: archiveVersion, /* 归档旧版本 */
     markVersionApplied: markVersionApplied, /* 标记版本已应用（从旧图鉴隐藏） */
+
+    /* 情报（投稿） */
+    listTips: listTips,
+    addTip: addTip,
 
     /* 工具 */
     newId: newId,

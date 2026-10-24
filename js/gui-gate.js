@@ -8,33 +8,25 @@
      GuiGate.ask()                     弹模态框再验证一次（保留备用）
 
    ★「只验证一次」的机制：
-     验证通过后把时间戳写进 sessionStorage。之后再进编辑区的任何页面
-     （编辑列表、条目编辑器、旧图鉴、版本页…）都直接放行，不再重复问题目。
-     关闭浏览器标签页后自动失效，下次打开需要重新验证。
-     有效期 60 分钟，避免长时间不操作还留着一个已登录状态。
+     验证通过后，数据库会签发一个令牌（2 小时有效），存在 sessionStorage。
+     之后再进编辑区的任何页面都直接放行，不再重复问题目。
+     关闭标签页后自动失效。
 
-   安全说明：
-     答案不存明文，只存 SHA-256 哈希。但这终究是**纯前端**验证，
-     懂技术的人可以直接调 API 绕过。真正保护数据的是数据库那边：
-     删除只是打标记、版本表只增不删，所以最坏情况也能恢复。
+   ★★ 安全模型（重要）：
+     答案的哈希**不在这个文件里**，而是存在数据库的 gui_secrets 表，
+     网页读不到。验证由数据库函数 gui_verify() 完成，通过后签发令牌。
+     所有写入操作必须带令牌，数据库的 RLS 策略会检查。
+     所以：看源码拿不到密码，也没法绕过网页直接调 API 写数据。
    ============================================================ */
 (function () {
   "use strict";
 
-  /* ---------- 题目与答案哈希 ----------
-     加新题：在数组里加一项，hash 用答案的 SHA-256
-     （答案先 trim、合并空格、转小写再哈希） */
+  /* ---------- 题目（这里只有题干，没有答案） ----------
+     加新题：数组里加一项，再到数据库 gui_secrets 表里加对应哈希。
+     客户端只负责「算哈希 → 提交给数据库函数比对」，拿不到正确答案。 */
   var QUESTIONS = [
-    {
-      key: "q1",
-      label: "CPU远征行动指定前哨站",
-      hash: "fa78f8e5d82ab0277026a636c5eaec7c9069005b7fbc90d60d78443c5ec4cad3"
-    },
-    {
-      key: "q2",
-      label: "CPU远征行动指定驱鬼补给",
-      hash: "13c27adf93f04b70901c4c98a2d8698e8d77e34899d9ee930dad185bf6505bcb"
-    }
+    { key: "q1", label: "CPU远征行动指定前哨站" },
+    { key: "q2", label: "CPU远征行动指定驱鬼补给" }
   ];
 
   /* ---------- 输入规范化 ---------- */
@@ -135,32 +127,90 @@
     return result;
   }
 
-  /* ---------- 会话内的验证状态 ----------
-     验证通过后记下时间戳，60 分钟内同一标签页不再重复验证。 */
-  var SESSION_KEY = "gui_verified_until";
-  var SESSION_TTL = 60 * 60 * 1000;   /* 60 分钟 */
+  /* ---------- 访问令牌 ----------
+     验证通过后数据库会签发一个令牌，写入数据时必须带上。
+     存在 sessionStorage 里：同一标签页内有效，关掉就没了。 */
+  var TOKEN_KEY = "gui_token";
+  var TOKEN_EXP_KEY = "gui_token_exp";
 
-  function isVerified() {
+  /* 云服务地址（和 data/config.js 里一致） */
+  function apiBase() {
+    var cfg = window.GUI_CLOUDBASE;
+    if (!cfg || !cfg.envId) return "";
+    return "https://" + cfg.envId + ".api.tcloudbasegateway.com/v1/rdb/rest";
+  }
+  function apiKey() {
+    var cfg = window.GUI_CLOUDBASE;
+    return (cfg && cfg.publishableKey) ? cfg.publishableKey : "";
+  }
+
+  function saveToken(tok, exp) {
     try {
-      var until = parseInt(sessionStorage.getItem(SESSION_KEY) || "0", 10);
-      return !!until && Date.now() < until;
+      sessionStorage.setItem(TOKEN_KEY, tok);
+      sessionStorage.setItem(TOKEN_EXP_KEY, String(exp || ""));
+    } catch (e) {}
+  }
+
+  /* 取当前令牌；已过期就顺手清掉并返回空串 */
+  function token() {
+    try {
+      var t = sessionStorage.getItem(TOKEN_KEY);
+      if (!t) return "";
+      var exp = sessionStorage.getItem(TOKEN_EXP_KEY);
+      if (exp) {
+        var when = Date.parse(exp);
+        if (!isNaN(when) && Date.now() >= when) { clearVerified(); return ""; }
+      }
+      return t;
     } catch (e) {
-      return false;   /* 隐私模式下 sessionStorage 不可用，就每次验证 */
+      return "";
     }
   }
 
-  function markVerified() {
-    try { sessionStorage.setItem(SESSION_KEY, String(Date.now() + SESSION_TTL)); } catch (e) {}
-  }
+  function isVerified() { return !!token(); }
+
+  /* 兼容旧接口：令牌由 verifyValues 保存，这里不需要额外动作 */
+  function markVerified() {}
 
   function clearVerified() {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+    try {
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_EXP_KEY);
+    } catch (e) {}
   }
-  /* ---------- 校验一组答案 ---------- */
+  /* ---------- 校验一组答案（交给数据库判断） ----------
+     流程：本地算出两个答案的 SHA-256 → 提交给数据库函数 gui_verify()
+           → 数据库拿 gui_secrets 里的哈希比对 → 正确则签发令牌
+     网页自始至终拿不到「正确答案」，只知道自己算出的哈希。 */
   function verifyValues(values) {
+    var base = apiBase();
+    if (!base) return Promise.reject(new Error("云服务未配置"));
+
     return Promise.all(values.map(function (v) { return sha256Hex(normalize(v)); }))
       .then(function (hashes) {
-        return QUESTIONS.every(function (q, i) { return hashes[i] === q.hash; });
+        return fetch(base + "/rpc/gui_verify", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + apiKey(),
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ p_hash1: hashes[0], p_hash2: hashes[1] })
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (txt) {
+            throw new Error("验证服务返回 " + res.status + " " + txt.slice(0, 120));
+          });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        if (data && data.ok && data.token) {
+          saveToken(data.token, data.expires_at);
+          return true;
+        }
+        return false;
       });
   }
 
@@ -253,7 +303,7 @@
       cancelHref: opts.cancelHref,
       failHref: opts.failHref,
       onPass: function () {
-        markVerified();
+        /* 令牌已在 verifyValues 里存好了，这里只需继续流程 */
         if (opts.onPass) opts.onPass();
       }
     });
@@ -353,6 +403,9 @@
     /* 其他用法 */
     mount: mount,
     ask: ask,
+
+    /* 令牌：写入数据时由 gui-data.js 带在请求头里 */
+    token: token,
 
     /* 会话状态（退出编辑区时可以主动清掉） */
     isVerified: isVerified,

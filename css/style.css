@@ -983,3 +983,157 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 
 /* 编辑列表顶部的小提示 */
 .gui-note { font-size: .84rem; margin: -8px 0 14px; }
+
+
+/* =============================================================
+   20. 情报系统（提供 / 查看 / 引用）
+   ============================================================= */
+
+/* 提供情报页的开放提示 */
+.tip-notice {
+  font-size: .88rem;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  border-radius: 6px;
+  margin-bottom: 18px;
+}
+
+.tip-more { margin-top: 22px; }
+
+/* 情报详情页的「未经核实」角标 */
+.tip-badge {
+  display: inline-block;
+  font-size: .78rem;
+  color: #8a5a00;
+  background: #fff4d6;
+  border: 1px solid #f0d9a0;
+  border-radius: 99px;
+  padding: 2px 10px;
+  margin: 0 0 16px;
+}
+
+/* 条目详情页底部的引用列表 */
+.entry-refs {
+  margin: 26px 0 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card);
+}
+.entry-refs-title {
+  margin: 0 0 8px;
+  font-size: .84rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.entry-refs ul { margin: 0; padding-left: 1.2em; }
+.entry-refs li { margin: 4px 0; font-size: .92rem; }
+
+/* ---- 引用情报的勾选列表 ---- */
+.pick-list { display: grid; gap: 10px; }
+
+.pick-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pick-item:hover { border-color: var(--accent); }
+.pick-item.is-on { border-color: var(--accent); background: var(--bg); }
+
+.pick-item-img {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eef1f4;
+}
+.pick-item-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.pick-item-body { flex: 1 1 auto; min-width: 0; }
+.pick-item-title {
+  margin: 0 0 4px;
+  font-size: .98rem;
+  font-weight: 600;
+}
+.pick-item-intro {
+  margin: 0 0 4px;
+  font-size: .86rem;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pick-item-meta { margin: 0; font-size: .78rem; color: var(--muted); }
+
+/* 右侧小方格 */
+.pick-item-check { flex: 0 0 auto; }
+.pick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all .15s;
+}
+.pick-box.is-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---- 底部固定的操作栏 ---- */
+.pick-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, .06);
+}
+.pick-bar-count {
+  margin-right: auto;
+  font-size: .86rem;
+  color: var(--muted);
+}
+.pick-bar .btn { min-width: 96px; }
+.pick-bar .btn:disabled {
+  opacity: 1;
+  background: #d6dbe0;
+  color: #8b939b;
+  cursor: not-allowed;
+}
+
+/* 有固定底栏的页面，正文底部留出空间，避免被遮住 */
+body.has-pick-bar { padding-bottom: 76px; }
+
+@media (max-width: 560px) {
+  .pick-item-img { width: 52px; height: 52px; }
+  .pick-bar .btn { min-width: 0; flex: 1 1 0; }
+  .pick-bar { gap: 10px; padding: 10px 14px; }
+  .pick-bar-count { display: none; }
+}
