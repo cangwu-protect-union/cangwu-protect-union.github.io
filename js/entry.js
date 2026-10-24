@@ -51,11 +51,30 @@
       '</div>';
     }
 
+    /* 引用情报：正文末尾列出跳转链接（引用时只拷贝了文段/图片/标签，标题不拷贝） */
+    var refs = Array.isArray(entry.refs) ? entry.refs : [];
+    var refsHtml = "";
+    if (refs.length) {
+      refsHtml =
+        '<div class="entry-refs">' +
+          '<p class="entry-refs-title">引用情报</p>' +
+          '<ul>' +
+            refs.map(function (r) {
+              var rid = (r && r.id) ? r.id : "";
+              var rtitle = (r && r.title) ? r.title : "（无标题）";
+              return '<li><a href="tips-entry.html?id=' + encodeURIComponent(rid) + '">' +
+                       esc(rtitle) + "</a></li>";
+            }).join("") +
+          "</ul>" +
+        "</div>";
+    }
+
     root.innerHTML =
       '<h1 class="entry-title">' + esc(entry.title) + "</h1>" +
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
+      refsHtml +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
   }).catch(function () { notFound(); });

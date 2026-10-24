@@ -1,11 +1,20 @@
 /* ============================================================
-   add-gui.js —— 增加条目（表单 + 多图上传）
+   add-gui.js —— 增加条目 / 提供情报（表单 + 多图上传）
    ------------------------------------------------------------
-   组织验证交给共享的 js/gui-gate.js 处理：
-   本会话已验证过就直接进表单，没验证过才显示题目。
+   同一个脚本服务两个页面，靠 <body data-mode="…"> 区分：
+     data-mode="entry"（或不写）→ 增加条目，要组织验证，写入 gui_entries
+     data-mode="tip"            → 提供情报，不验证，写入 gui_tips
+   「引用情报」只在增加条目模式下可用。
    ============================================================ */
 (function () {
   "use strict";
+
+  /* 当前页面是「增加条目」还是「提供情报」 */
+  var MODE = (document.body && document.body.getAttribute("data-mode")) || "entry";
+  var IS_TIP = (MODE === "tip");
+
+  /* 引用过的情报：[{id, title}]，随条目一起保存 */
+  var pickedRefs = [];
 
   var gateSection = document.getElementById("gateSection");
   var gateMount   = document.getElementById("gateMount");
@@ -14,22 +23,28 @@
   var entryForm   = document.getElementById("entryForm");
   var formError   = document.getElementById("formError");
 
-  /* ---------- 组织验证 ----------
-     用共享的 GuiGate：如果本会话已经验证过（比如从编辑图鉴点进来），
-     这里会直接放行，不会再问一遍。 */
-  window.GuiGate.require(gateMount, {
-    cancelHref: "edit-gui.html",
-    failHref: "edit-gui.html",
-    onPass: function () {
-      gateSection.hidden = true;
-      formSection.hidden = false;
-      var t = document.getElementById("fTitle");
-      if (t) t.focus();
-    }
-  });
+  function showForm() {
+    if (gateSection) gateSection.hidden = true;
+    formSection.hidden = false;
+    var t = document.getElementById("fTitle");
+    if (t) t.focus();
+  }
+
+  if (IS_TIP) {
+    /* 投稿开放，不需要组织验证，直接进表单 */
+    showForm();
+  } else {
+    /* 增加条目：用共享的 GuiGate 验证（本会话验过就直接放行） */
+    window.GuiGate.require(gateMount, {
+      cancelHref: "edit-gui.html",
+      failHref: "edit-gui.html",
+      onPass: showForm
+    });
+  }
+
   /* ---------- 取消 ---------- */
   document.getElementById("cancelBtn").addEventListener("click", function () {
-    location.href = "edit-gui.html";
+    location.href = IS_TIP ? "projects.html" : "edit-gui.html";
   });
 
   /* ---------- 提交新条目 ---------- */
@@ -81,13 +96,26 @@
       intro: intro,
       body: body,
       tags: tags,
-      date: new Date().toISOString().slice(0, 10)
+      date: new Date().toISOString().slice(0, 10),
+      refs: pickedRefs          /* 引用过的情报 [{id,title}]，仅增加条目模式会有 */
     };
 
     var submitBtn = entryForm.querySelector('button[type="submit"]');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "上传中…"; }
 
-    window.GuiData.add(entry).then(function (result) {
+    /* 情报提交到 gui_tips，条目提交到 gui_entries */
+    var savePromise;
+    if (IS_TIP) {
+      savePromise = window.GuiData.addTip(entry).then(function () {
+        return { remoteSaved: true, error: null };
+      }).catch(function (err) {
+        return { remoteSaved: false, error: err.message };
+      });
+    } else {
+      savePromise = window.GuiData.add(entry);
+    }
+
+    savePromise.then(function (result) {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "确认"; }
 
       formSection.hidden = true;
@@ -96,15 +124,24 @@
       var failBox = document.getElementById("failBox");
       var doneText = document.getElementById("doneText");
 
-      if (result.remoteSaved) {
-        failBox.hidden = true;
-        doneText.textContent = "条目「" + title + "」已上传到云端，所有设备都能看到，可以立即搜索。";
+      if (IS_TIP) {
+        /* 情报没有本地兜底：上传失败就直接告诉用户重试 */
+        if (result.remoteSaved) {
+          doneText.textContent = "情报「" + title + "」已提交。成员可以在「查看情报」里看到它。";
+        } else {
+          doneText.textContent = "提交失败：" + (result.error || "云端没有响应") + "。请稍后重试。";
+        }
+        document.getElementById("doneView").href = "tips-entry.html?id=" + encodeURIComponent(entry.id);
       } else {
-        failBox.hidden = false;
-        doneText.textContent = "条目「" + title + "」已保存在这台设备上。";
+        if (result.remoteSaved) {
+          if (failBox) failBox.hidden = true;
+          doneText.textContent = "条目「" + title + "」已上传到云端，所有设备都能看到，可以立即搜索。";
+        } else {
+          if (failBox) failBox.hidden = false;
+          doneText.textContent = "条目「" + title + "」已保存在这台设备上。";
+        }
+        document.getElementById("doneView").href = "条目.html?id=" + encodeURIComponent(entry.id);
       }
-
-      document.getElementById("doneView").href = "条目.html?id=" + encodeURIComponent(entry.id);
     });
   });
 
@@ -112,7 +149,8 @@
   var copyBtn = document.getElementById("copyBtn");
   var copyState = document.getElementById("copyState");
 
-  copyBtn.addEventListener("click", function () {
+  /* 提供情报页没有这段兜底（情报必须上云才有意义），所以要做存在性判断 */
+  if (copyBtn) copyBtn.addEventListener("click", function () {
     copyState.hidden = true;
     Promise.resolve(window.GuiData.readLocal()).then(function (localEntries) {
       var text = JSON.stringify({ entries: localEntries }, null, 2);
@@ -372,4 +410,92 @@
 
     return { images: images, thumbs: thumbs };
   }
+
+  /* ============================================================
+     引用情报
+     ------------------------------------------------------------
+     流程：
+       1. 点「引用情报」→ 跳到 pick-tips.html 勾选
+       2. pick-tips 把选中的情报写进 sessionStorage（gui_picked_tips）
+       3. 回到本页时读取它，把正文 / 图片 / 标签追加到表单，
+          并记下引用关系（refs），随条目一起保存
+     ============================================================ */
+
+  var PICK_KEY = "gui_picked_tips";
+
+  var pickTipsBtn = document.getElementById("pickTipsBtn");
+  if (pickTipsBtn) {
+    pickTipsBtn.addEventListener("click", function () {
+      location.href = "pick-tips.html?back=" + encodeURIComponent("add-gui.html");
+    });
+  }
+
+  /* 把引用来的情报合并进表单 */
+  function applyPickedTips() {
+    var raw = null;
+    try { raw = sessionStorage.getItem(PICK_KEY); } catch (e) { return; }
+    if (!raw) return;
+
+    /* 立刻清掉，避免下次再进来重复追加 */
+    try { sessionStorage.removeItem(PICK_KEY); } catch (e) {}
+
+    var picks;
+    try { picks = JSON.parse(raw); } catch (e) { return; }
+    if (!Array.isArray(picks) || !picks.length) return;
+
+    pickedRefs = picks.map(function (p) { return { id: p.id, title: p.title }; });
+
+    /* --- 正文：按情报顺序追加段落 --- */
+    var bodyEl = document.getElementById("fBody");
+    var extra = picks.map(function (p) { return (p.body || "").trim(); })
+                     .filter(function (s) { return s !== ""; });
+    if (extra.length && bodyEl) {
+      var cur = bodyEl.value.trim();
+      bodyEl.value = (cur ? cur + "\n\n" : "") + extra.join("\n\n");
+    }
+
+    /* --- 图片：直接放进队列，标记为已完成（它们本来就是云端地址） --- */
+    picks.forEach(function (p) {
+      var urls = p.images || [];
+      var ths = p.thumbs || [];
+      urls.forEach(function (u, i) {
+        queue.push({
+          key: "img" + (++seq),
+          name: "引用的图片",
+          file: null,
+          previewUrl: (ths[i] || u),
+          status: "done",
+          url: u,
+          thumb: ths[i] || "",
+          error: ""
+        });
+      });
+    });
+    renderThumbs();
+
+    /* --- 标签：去重后追加 --- */
+    var tagEl = document.getElementById("fTags");
+    if (tagEl) {
+      var curTags = tagEl.value.split(/[,，]/).map(function (s) { return s.trim(); })
+                            .filter(function (s) { return s !== ""; });
+      picks.forEach(function (p) {
+        (p.tags || []).forEach(function (tg) {
+          if (curTags.indexOf(tg) < 0) curTags.push(tg);
+        });
+      });
+      tagEl.value = curTags.join(", ");
+    }
+
+    /* 提示用户引用了哪些情报 */
+    var hint = document.getElementById("refsHint");
+    if (hint) {
+      hint.className = "gate-error gate-ok";
+      hint.textContent = "已引用 " + picks.length + " 条情报：" +
+        picks.map(function (p) { return "「" + p.title + "」"; }).join("、");
+      hint.hidden = false;
+    }
+  }
+
+  /* 只有增加条目模式才处理引用（提供情报页没有这个流程） */
+  if (!IS_TIP) applyPickedTips();
 })();

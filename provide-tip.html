@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>提供情报 · 鬼图鉴 · CPU</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-mode="tip">
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">CPU及回合制游戏工作室联合组织</a>
+      <nav>
+        <a href="index.html">首页</a>
+        <a href="about.html">关于</a>
+        <a href="projects.html">项目</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <p class="entry-back"><a href="projects.html">← 返回项目</a></p>
+
+    <section id="gateSection" hidden></section>
+
+    <section id="formSection" hidden>
+      <h1>提供情报</h1>
+      <p class="lead">
+        把你掌握的线索提交上来。情报不会进入公开图鉴，只有通过验证的成员在「查看情报」里能看到。
+      </p>
+      <p class="tip-notice">投稿不需要组织验证，任何人填写后即可提交。</p>
+
+      <form id="entryForm" autocomplete="off">
+        <div class="field">
+          <label for="fTitle">标题</label>
+          <input id="fTitle" name="title" type="text" placeholder="例：鬼固山北侧裂隙的目击记录" maxlength="60">
+        </div>
+
+        <div class="field">
+          <label for="fBody">正文 <span class="muted">（段落之间空一行）</span></label>
+          <textarea id="fBody" name="body" rows="12" placeholder="第一段……&#10;&#10;第二段……"></textarea>
+        </div>
+
+        <div class="field">
+          <label>图片 <span class="muted">（可多选、可拖拽、可粘贴；可以留空）</span></label>
+
+          <div class="dropzone" id="dropzone">
+            <div class="dz-emoji">🖼</div>
+            <p class="dz-main">把图片拖到这里，或者 <button type="button" class="link-btn" id="pickImageBtn">选择文件</button></p>
+            <p class="dz-sub">支持多选 · 也可以直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴截图 · 支持 HEIC</p>
+          </div>
+
+          <input id="fImageFile" type="file" accept="image/*" multiple hidden>
+
+          <div class="thumbs" id="thumbs" hidden></div>
+
+          <input id="fImage" name="image" type="url" placeholder="也可以粘贴单张图片网址 https://…">
+        </div>
+
+        <div class="field">
+          <label for="fTags">标签 <span class="muted">（用逗号分隔，可留空）</span></label>
+          <input id="fTags" name="tags" type="text" placeholder="目击, 待核实">
+        </div>
+
+        <p class="gate-error" id="formError" hidden></p>
+
+        <div class="gate-actions">
+          <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+          <button type="submit" class="btn">确认提交</button>
+        </div>
+      </form>
+
+      <p class="tip-more">
+        <a class="btn btn-ghost" href="tips.html?from=provide">查看情报</a>
+      </p>
+    </section>
+
+    <section id="doneSection" hidden>
+      <h1>情报已提交</h1>
+      <p class="lead" id="doneText"></p>
+
+      <p class="gate-actions">
+        <a class="btn" id="doneView" href="tips.html">查看情报</a>
+        <a class="btn btn-ghost" href="projects.html">返回项目</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 CPU及回合制游戏工作室联合组织</p>
+    </div>
+  </footer>
+
+  <script src="data/config.js"></script>
+  <script src="data/gui-entries.js"></script>
+  <script src="js/gui-gate.js"></script>
+  <script src="js/gui-data.js"></script>
+  <script src="js/gui-upload.js"></script>
+  <script src="js/add-gui.js"></script>
+</body>
+</html>
