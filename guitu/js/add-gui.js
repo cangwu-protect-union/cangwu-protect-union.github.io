@@ -44,7 +44,7 @@
 
   /* ---------- 取消 ---------- */
   document.getElementById("cancelBtn").addEventListener("click", function () {
-    location.href = IS_TIP ? "projects.html" : "edit-gui.html";
+    location.href = IS_TIP ? "../projects.html" : "edit-gui.html";
   });
 
   /* ---------- 提交新条目 ---------- */

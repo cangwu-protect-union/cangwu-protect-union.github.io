@@ -24,7 +24,7 @@
     provide: { href: "provide-tip.html", text: "← 返回提供情报" },
     edit:    { href: "edit-gui.html",    text: "← 返回编辑图鉴" }
   };
-  var back = backMap[from] || { href: "projects.html", text: "← 返回项目" };
+  var back = backMap[from] || { href: "../projects.html", text: "← 返回项目" };
   backLink.href = back.href;
   backLink.textContent = back.text;
 

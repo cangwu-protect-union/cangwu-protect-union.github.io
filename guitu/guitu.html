@@ -3,28 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>旧图鉴 · CPU</title>
-  <meta name="robots" content="noindex">
-  <link rel="stylesheet" href="css/style.css">
+  <title>鬼图鉴 · CPU</title>
+  <meta name="description" content="CPU 鬼图鉴：鬼与灵异现象的公开数据库">
+  <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
 
   <header class="site-header">
     <div class="container header-inner">
-      <a class="logo" href="index.html">CPU及回合制游戏工作室联合组织</a>
+      <a class="logo" href="../index.html">CPU及回合制游戏工作室联合组织</a>
       <nav>
-        <a href="index.html">首页</a>
-        <a href="about.html">关于</a>
-        <a href="projects.html">项目</a>
+        <a href="../index.html">首页</a>
+        <a href="../about.html">关于</a>
+        <a href="../projects.html">项目</a>
       </nav>
     </div>
   </header>
 
-  <main class="container">    <p class="entry-back"><a href="edit-gui.html">← 返回编辑图鉴</a></p>
+  <main class="container">
 
     <section class="hero">
-      <h1>旧图鉴</h1>
-      <p class="lead">被修改或删除的条目会归档到这里。白色表示条目仍在图鉴中，灰色表示已删除。</p>
+      <h1>鬼图鉴</h1>
+      <p class="lead">组织观测到的鬼与灵异现象的公开记录。按条目名检索，点击条目查看详情。</p>
     </section>
 
     <section>
@@ -34,14 +34,20 @@
             <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
             <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <input id="oldSearch" type="search" placeholder="搜索旧条目名…" autocomplete="off" aria-label="搜索旧条目名">
+          <input id="guiSearch" type="search" placeholder="搜索条目名…" autocomplete="off" aria-label="搜索条目名">
         </div>
       </div>
 
-      <p class="gui-count muted" id="oldCount">正在载入…</p>
-      <div class="old-grid" id="oldGrid"></div>
-      <div class="gui-empty" id="oldEmpty" hidden><p>旧图鉴还是空的。</p></div>
-    </section>  </main>
+      <p class="gui-count muted" id="guiCount">正在载入…</p>
+
+      <div class="gui-list" id="guiList"></div>
+
+      <div class="gui-empty" id="guiEmpty" hidden>
+        <p>没有找到匹配的条目。</p>
+      </div>
+    </section>
+
+  </main>
 
   <footer class="site-footer">
     <div class="container">
@@ -51,8 +57,7 @@
 
   <script src="data/config.js"></script>
   <script src="data/gui-entries.js"></script>
-  <script src="js/gui-gate.js"></script>
   <script src="js/gui-data.js"></script>
-  <script src="js/old-gui.js"></script>
+  <script src="js/guitu.js"></script>
 </body>
 </html>

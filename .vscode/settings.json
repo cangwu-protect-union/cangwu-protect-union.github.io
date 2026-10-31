@@ -20,5 +20,6 @@
 
   // 自动保存：改完不用按 Ctrl+S，1 秒后自己存。
   // 如果你更想自己按 Ctrl+S，把下面这项改成 "off"。
-  "files.autoSave": "afterDelay"
+  "files.autoSave": "afterDelay",
+  "C_Cpp.default.compilerPath": "D:/mingw64/bin/g++.exe"
 }

@@ -81,8 +81,8 @@
   var nextUrl = new URLSearchParams(location.search).get("next");
 
   window.GuiGate.require(gateMount, {
-    cancelHref: "projects.html",
-    failHref: "projects.html",
+    cancelHref: "../projects.html",
+    failHref: "../projects.html",
     onPass: function () {
       if (nextUrl) {
         location.replace(nextUrl);

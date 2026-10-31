@@ -11,6 +11,7 @@
 - **首页** —— 组织简介、重要活动历史、可公开的行动规划
 - **关于** —— 三个下属组织、公开活动与机密活动、成员代号
 - **项目** —— 正在开发和运营的项目
+- **鬼图鉴** —— 鬼与灵异现象的公开数据库，含编辑、版本、旧图鉴、情报投稿与引用
 
 ---
 
@@ -33,21 +34,59 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 
 ```
 .
-├── index.html        首页
-├── about.html        关于
-├── projects.html     项目
+├── index.html            首页
+├── about.html            关于
+├── projects.html         项目
 ├── css/
-│   └── style.css     全站样式（三个页面共用）
-├── .gitattributes    换行符统一为 LF
-├── .vscode/          编辑器项目设置（UTF-8 + LF）
-└── README.md         本文件
+│   └── style.css         全站样式（所有页面共用）
+├── guitu/                ★ 鬼图鉴（功能自成一块，可单独维护）
+│   ├── guitu.html            公开图鉴列表
+│   ├── 条目.html              条目详情
+│   ├── provide-tip.html      提供情报（开放投稿，无需验证）
+│   ├── tips.html             查看情报列表
+│   ├── tips-entry.html       情报详情
+│   ├── add-gui.html          增加条目（需验证）
+│   ├── edit-gui.html         编辑图鉴列表（需验证）
+│   ├── edit-entry.html       条目编辑器
+│   ├── pick-tips.html        引用情报（勾选界面）
+│   ├── old-gui.html          旧图鉴
+│   ├── old-entry.html        某条目的历史版本
+│   ├── 版本.html              查看单个历史版本
+│   ├── data/
+│   │   ├── config.js         云端环境配置
+│   │   ├── gui-entries.js    示例条目 + 占位图
+│   │   └── entries.json      静态兜底数据
+│   └── js/
+│       ├── gui-data.js       数据层（读写数据库、版本、情报）
+│       ├── gui-gate.js       组织验证（服务端校验 + 会话令牌）
+│       ├── gui-upload.js     图片压缩、缩略图、HEIC 转码、上传
+│       ├── guitu.js          公开图鉴列表
+│       ├── entry.js          条目详情
+│       ├── add-gui.js        增加条目 / 提供情报（两个页面共用）
+│       ├── edit-gui.js       编辑图鉴列表
+│       ├── edit-entry.js     条目编辑器
+│       ├── old-gui.js        旧图鉴
+│       ├── old-entry.js      历史版本列表
+│       ├── version.js        查看版本
+│       ├── tips.js           查看情报列表
+│       ├── tips-entry.js     情报详情
+│       ├── pick-tips.js      引用情报
+│       └── lib/
+│           └── heic2any.min.js   HEIC 转换（仅在需要时加载）
+├── .gitattributes        换行符统一为 LF
+├── .vscode/              编辑器项目设置（UTF-8 + LF）
+└── README.md             本文件
 ```
 
-**纯静态**——没有后端、没有数据库、不需要编译。双击 `index.html` 即可本地预览，
-或在本目录起一个静态服务器：
+**纯静态**——没有后端、没有数据库服务需要自己跑、不需要编译。
+鬼图鉴的数据存在腾讯云 CloudBase（PostgreSQL），页面本身仍是纯静态。
+
+本地预览请用静态服务器（直接用 `file://` 打开会导致图鉴功能受限）：
 
 ```bash
 python -m http.server 8000
+# 主站      http://localhost:8000/
+# 鬼图鉴    http://localhost:8000/guitu/guitu.html
 ```
 
 ---
@@ -77,7 +116,7 @@ python -m http.server 8000
 }
 ```
 
-改这一处，三个页面同时生效。深色模式在 `@media (prefers-color-scheme: dark)` 里自动适配，
+改这一处，所有页面同时生效。深色模式在 `@media (prefers-color-scheme: dark)` 里自动适配，
 窄屏适配在文件末尾的 `@media (max-width: 560px)` 里。
 
 ---
