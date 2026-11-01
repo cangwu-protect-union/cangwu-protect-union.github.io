@@ -34,49 +34,33 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 
 ```
 .
-├── index.html            首页
-├── about.html            关于
-├── projects.html         项目
+├── index.html          首页          ┐
+├── about.html          关于          │ 主站（三页 + 共用样式）
+├── projects.html       项目          ┘
 ├── css/
-│   └── style.css         全站样式（所有页面共用）
-├── guitu/                ★ 鬼图鉴（功能自成一块，可单独维护）
-│   ├── guitu.html            公开图鉴列表
-│   ├── 条目.html              条目详情
-│   ├── provide-tip.html      提供情报（开放投稿，无需验证）
-│   ├── tips.html             查看情报列表
-│   ├── tips-entry.html       情报详情
-│   ├── add-gui.html          增加条目（需验证）
-│   ├── edit-gui.html         编辑图鉴列表（需验证）
-│   ├── edit-entry.html       条目编辑器
-│   ├── pick-tips.html        引用情报（勾选界面）
-│   ├── old-gui.html          旧图鉴
-│   ├── old-entry.html        某条目的历史版本
-│   ├── 版本.html              查看单个历史版本
-│   ├── data/
-│   │   ├── config.js         云端环境配置
-│   │   ├── gui-entries.js    示例条目 + 占位图
-│   │   └── entries.json      静态兜底数据
-│   └── js/
-│       ├── gui-data.js       数据层（读写数据库、版本、情报）
-│       ├── gui-gate.js       组织验证（服务端校验 + 会话令牌）
-│       ├── gui-upload.js     图片压缩、缩略图、HEIC 转码、上传
-│       ├── guitu.js          公开图鉴列表
-│       ├── entry.js          条目详情
-│       ├── add-gui.js        增加条目 / 提供情报（两个页面共用）
-│       ├── edit-gui.js       编辑图鉴列表
-│       ├── edit-entry.js     条目编辑器
-│       ├── old-gui.js        旧图鉴
-│       ├── old-entry.js      历史版本列表
-│       ├── version.js        查看版本
-│       ├── tips.js           查看情报列表
-│       ├── tips-entry.js     情报详情
-│       ├── pick-tips.js      引用情报
-│       └── lib/
-│           └── heic2any.min.js   HEIC 转换（仅在需要时加载）
-├── .gitattributes        换行符统一为 LF
-├── .vscode/              编辑器项目设置（UTF-8 + LF）
-└── README.md             本文件
+│   └── style.css       全站样式（主站和鬼图鉴共用）
+│
+├── guitu/              ★ 鬼图鉴模块（自成一块，详见 guitu/README.md）
+│   ├── README.md           模块说明：页面职责、数据流、安全设计
+│   ├── *.html              12 个页面（公开 5 个 + 编辑区 7 个）
+│   ├── data/               配置、示例数据、静态兜底
+│   └── js/                 数据层、验证、上传 + 各页面逻辑 + HEIC 库
+│
+├── _local/             ★ 本地工作区（不推送，详见 _local/README.md）
+│   ├── sql/                数据库迁移脚本
+│   ├── docs/               任务文档、更新记录
+│   ├── notes/              说明文档、私人笔记
+│   ├── assets/             本地素材
+│   └── preview/            页面截图
+│
+├── .gitattributes      换行符统一为 LF
+├── .gitignore          忽略清单（_local/ 整个目录被排除）
+├── .vscode/            编辑器项目设置（UTF-8 + LF）
+└── README.md           本文件
 ```
+
+划分原则很简单：**能公开的按模块放，不能公开的统一进 `_local/`**。
+根目录只留主站三页和共用样式，打开文件夹一眼就能看出结构。
 
 **纯静态**——没有后端、没有数据库服务需要自己跑、不需要编译。
 鬼图鉴的数据存在腾讯云 CloudBase（PostgreSQL），页面本身仍是纯静态。
