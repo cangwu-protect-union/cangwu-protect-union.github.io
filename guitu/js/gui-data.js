@@ -176,27 +176,28 @@
 
   /* ---------------- 对外：读 ---------------- */
   function list() {
-    var seed = window.GUI_SEED_ENTRIES || [];
-    var local = readLocal();
     var c = cfg();
 
-    var repoTask = fetchRepoEntries();
-
-    if (!c || isDown()) {
-      return repoTask.then(function (repo) {
-        return merge(seed, repo, local);
+    /* 云端不可用时的兜底：代码里的种子条目 + 仓库文件 + 本机未同步条目。
+       只在这条路径上才会用到代码内嵌的数据。 */
+    function fallback() {
+      return fetchRepoEntries().then(function (repo) {
+        return merge(window.GUI_SEED_ENTRIES || [], repo, readLocal());
       });
     }
 
-    return Promise.all([
-      repoTask,
-      fetchCloud(c).catch(function (err) {
-        markDown();
-        console.warn("[鬼图鉴] 云端读取失败，改用仓库+本地数据（5 分钟内不再重试）：", err.message);
-        return [];
-      })
-    ]).then(function (parts) {
-      return merge(seed, parts[0], parts[1], local);
+    /* 没配置云端，或者刚失败过（5 分钟冷却）：直接走兜底 */
+    if (!c || isDown()) return fallback();
+
+    /* 数据库是唯一数据源。
+       读成功就只用数据库内容，不再合并 data/gui-entries.js 里的种子，
+       否则种子和数据库里的同名条目会重复显示。 */
+    return fetchCloud(c).then(function (rows) {
+      return merge(rows, readLocal());
+    }).catch(function (err) {
+      markDown();
+      console.warn("[鬼图鉴] 云端读取失败，改用种子数据兜底（5 分钟内不再重试）：", err.message);
+      return fallback();
     });
   }
 
