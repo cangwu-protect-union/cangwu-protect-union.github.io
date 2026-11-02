@@ -29,9 +29,9 @@
     <section id="formSection" hidden>
       <h1>提供情报</h1>
       <p class="lead">
-        把你掌握的线索提交上来。情报不会进入公开图鉴，只有通过验证的成员在「查看情报」里能看到。
+        提交任何可能的线索。情报不会进入公开图鉴。
       </p>
-      <p class="tip-notice">投稿不需要组织验证，任何人填写后即可提交。</p>
+      <p class="tip-notice">你对组织做出的每一份贡献，都可能拯救无数将被鬼吞噬的生命。</p>
 
       <form id="entryForm" autocomplete="off">
         <div class="field">
@@ -45,19 +45,19 @@
         </div>
 
         <div class="field">
-          <label>图片 <span class="muted">（可多选、可拖拽、可粘贴；可以留空）</span></label>
+          <label>图片</label>
 
           <div class="dropzone" id="dropzone">
             <div class="dz-emoji">🖼</div>
             <p class="dz-main">把图片拖到这里，或者 <button type="button" class="link-btn" id="pickImageBtn">选择文件</button></p>
-            <p class="dz-sub">支持多选 · 也可以直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴截图 · 支持 HEIC</p>
+            <p class="dz-sub">（任何相关图像都会显著加强情报价值）</p>
           </div>
 
           <input id="fImageFile" type="file" accept="image/*" multiple hidden>
 
           <div class="thumbs" id="thumbs" hidden></div>
 
-          <input id="fImage" name="image" type="url" placeholder="也可以粘贴单张图片网址 https://…">
+          <input id="fImage" name="image" type="url" placeholder="允许粘贴单张图片网址 https://…">
         </div>
 
         <div class="field">
@@ -80,6 +80,7 @@
 
     <section id="doneSection" hidden>
       <h1>情报已提交</h1>
+      <p class="lead">感谢你对组织的贡献</p>
       <p class="lead" id="doneText"></p>
 
       <p class="gate-actions">

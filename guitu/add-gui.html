@@ -27,7 +27,7 @@
     <!-- ===== 第一关：组织验证 ===== -->
     <section id="gateSection" class="gate">
       <h1>组织验证</h1>
-      <p class="lead">编纂者需通过验证才能增加条目。请回答以下问题，答案需完全一致。</p>
+      <p class="lead">回答以下问题，以验证身份。</p>
 
       <div id="gateMount"></div>
     </section>
@@ -35,7 +35,7 @@
     <!-- ===== 第二关：增加条目表单 ===== -->
     <section id="formSection" hidden>
       <h1>增加条目</h1>
-      <p class="lead">填写完毕后点击「确认」，条目会立即进入图鉴，可被搜索和查看。</p>
+      <p class="lead">填写完毕后点击「确认」，将条目增加至图鉴。</p>
 
       <form id="entryForm" autocomplete="off">
         <div class="field">
@@ -49,12 +49,12 @@
         </div>
 
         <div class="field">
-          <label>图片 <span class="muted">（可多选、可拖拽、可粘贴；留空会自动生成占位图）</span></label>
+          <label>图片</label>
 
           <div class="dropzone" id="dropzone">
             <div class="dz-emoji">🖼</div>
             <p class="dz-main">把图片拖到这里，或者 <button type="button" class="link-btn" id="pickImageBtn">选择文件</button></p>
-            <p class="dz-sub">支持多选 · 也可以直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴截图 · 支持 HEIC</p>
+            <p class="dz-sub">留空会自动生成占位图</p>
           </div>
 
           <input id="fImageFile" type="file" accept="image/*" multiple hidden>
@@ -65,7 +65,7 @@
         </div>
 
         <div class="field">
-          <label for="fTags">标签 <span class="muted">（用逗号分隔，可留空）</span></label>
+          <label for="fTags">标签 <span class="muted">（用逗号分隔）</span></label>
           <input id="fTags" name="tags" type="text" placeholder="异次元, 已镇压">
         </div>
 
@@ -95,8 +95,8 @@
       <div class="submit-box" id="failBox" hidden>
         <h2>云端保存失败</h2>
         <p class="muted">
-          条目已经保存在这台设备上，但没能上传到云端，所以其他设备暂时看不到。
-          你可以稍后重试，或者用下面的方式手动提交。
+          条目已经保存在这台设备上，但没能上传到云端，无法共享至其他设备。
+          请稍后重试，或者用下面的方式手动提交。
         </p>
         <p class="gate-actions">
           <button type="button" class="btn" id="copyBtn">复制 JSON</button>
