@@ -178,6 +178,14 @@
       sessionStorage.removeItem(TOKEN_EXP_KEY);
     } catch (e) {}
   }
+  /* 连不上验证服务时的提示。
+     最常见的原因是「双击 HTML 文件」用 file:// 打开：
+     这种页面的来源是 null，不在云端跨域白名单里，请求会被浏览器直接拦掉，
+     跟答案是否正确、数据库是否正常都无关。 */
+  var NET_ERROR_TEXT = (location.protocol === "file:")
+    ? "无法连接验证服务：当前是用 file:// 直接打开的本文件，浏览器会拦截跨域请求。请改用 http:// 地址访问。"
+    : "无法连接验证服务，请检查网络后重试。";
+
   /* ---------- 校验一组答案（交给数据库判断） ----------
      流程：本地算出两个答案的 SHA-256 → 提交给数据库函数 gui_verify()
            → 数据库拿 gui_secrets 里的哈希比对 → 正确则签发令牌
@@ -195,6 +203,8 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ p_hash1: hashes[0], p_hash2: hashes[1] })
+        }).catch(function () {
+          throw new Error(NET_ERROR_TEXT);
         });
       })
       .then(function (res) {
@@ -252,6 +262,13 @@
     var form = container.querySelector(".gate-form");
     var errEl = container.querySelector(".gate-error");
 
+    if (location.protocol === "file:") {
+      var fileWarn = document.createElement("p");
+      fileWarn.className = "gate-error";
+      fileWarn.textContent = "当前是用 file:// 直接打开的本地文件，浏览器会拦截对云端的请求，验证必然失败。请改用 http:// 地址访问（线上网址，或本地启动静态服务器后用 http://localhost 访问）。";
+      container.insertBefore(fileWarn, container.firstChild);
+    }
+
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       errEl.hidden = true;
@@ -278,9 +295,9 @@
             setTimeout(function () { location.href = opts.failHref; }, 1600);
           }
         }
-      }).catch(function () {
+      }).catch(function (err) {
         btn.disabled = false;
-        errEl.textContent = "验证出错，请刷新页面重试。";
+        errEl.textContent = (err && err.message) ? err.message : "验证出错，请重试。";
         errEl.hidden = false;
       });
     });
