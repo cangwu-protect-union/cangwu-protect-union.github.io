@@ -1,22 +1,24 @@
 # 鬼图鉴 · 预览图
 
-开发过程中的界面截图与架构图，按文件名可搜索。
+开发过程中的界面截图与生成的图，按文件名可搜索。
 
-架构图的矢量版本见 [../架构.md](../架构.md)，这里只是渲染好的 PNG。
+矢量版本见 [../架构.md](../架构.md) 与 [../访客流程图.md](../访客流程图.md)，这里只是渲染好的 PNG。
 
-重新生成架构图：
+全部由脚本生成，不要手改：
 
 ```
-node _local/tools/gen-arch-diagram.js
-node _local/tools/render-diagram.js
+node _local/tools/build-docs.js
 ```
 
 ## 清单
 
-共 30 张，合计 1841 KB。
+共 31 张，合计 1913 KB。
 
 | 文件 | 内容 |
 |---|---|
+| `架构图-1.png` | 架构图一：页面 与 页面脚本 |
+| `架构图-2.png` | 架构图二：脚本依赖 与 后端 |
+| `访客流程图.png` | 界面跳转（访客视角） |
 | `gui-guitu.png` | 公开图鉴列表（示例数据时期） |
 | `cb-test.png` | 公开图鉴列表（云端连通后的早期样子，6 条） |
 | `device-other.png` | 公开图鉴列表（换设备访问验证） |
@@ -45,5 +47,3 @@ node _local/tools/render-diagram.js
 | `live-final.png` | 线上最终效果 |
 | `live-cloud-ok.png` | 云端连通验证（图鉴 7 条） |
 | `supabase-result.png` | 已弃用：早期 Supabase 连通测试失败 |
-| `架构图-1.png` | 架构图一：页面 与 页面脚本 |
-| `架构图-2.png` | 架构图二：脚本依赖 与 后端 |
