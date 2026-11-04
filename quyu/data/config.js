@@ -19,6 +19,7 @@ window.GUI_CLOUDBASE = {
 
 /* 仓库里的静态兜底（云端不可用时用）；云端读取成功时不参与合并 */
 window.ZONE_APP = {
+  table: "gui_zones",
   entriesFile: "data/zones.json"
 };
 

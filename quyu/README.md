@@ -135,6 +135,14 @@ gui_zones?select=id,title,region,level,status&ghost_ids=cs.{gu-gushan}&deleted=e
 ## 上线前要做的事
 
 1. 在 CloudBase 控制台执行 `_local/sql/zone-setup.sql`（建三张表 + RLS 策略）。
-2. 用编辑区录入正式区域；示例的 2 条只作兜底，不要当成正式内容。
-3. 申请天地图 key 并按上面的步骤切换底图。
-4. 跑校验：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
+2. 执行 `_local/sql/zone-seed-data.sql` 导入 2 条试验区域，否则公开列表是空的
+   —— 数据库是唯一数据源，`data/zone-seeds.js` 只在云端连不上时兜底。
+3. 用编辑区录入正式区域，再把 2 条试验数据删掉。
+4. 申请天地图 key 并按上面的步骤切换底图。
+5. 跑校验：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
+
+## 一个容易踩的点：表名不在共享配置里
+
+`zone-data.js` 从 `window.ZONE_APP.table` 取表名，不从 `GUI_CLOUDBASE.table` 取。
+因为鬼详情页加载的是 `guitu/data/config.js`，那份配置里的 `table` 是 `gui_entries`；
+表名跟着共享配置走，反查会打到鬼表上（实测 400，然后静默退回种子数据）。

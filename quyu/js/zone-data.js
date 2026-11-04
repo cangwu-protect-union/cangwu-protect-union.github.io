@@ -24,14 +24,17 @@
   function isDown() { return Date.now() < downUntil; }
   function markDown() { downUntil = Date.now() + BREAK_MS; }
 
-  /* ---------------- 云端配置 ---------------- */
+  /* ---------------- 云端配置 ----------------
+     envId / publishableKey 来自共享的 GUI_CLOUDBASE（与鬼图鉴同一套），
+     但表名必须由本模块的 ZONE_APP 决定：鬼详情页加载的是 guitu/data/config.js，
+     那份配置里的 table 是 gui_entries。表名跟着共享配置走会查错表（实测 400）。 */
   function cfg() {
     var c = window.GUI_CLOUDBASE || {};
     if (!c.envId || !c.publishableKey) return null;
     return {
       base: "https://" + String(c.envId).trim() + ".api.tcloudbasegateway.com/v1/rdb/rest/",
       key: String(c.publishableKey).trim(),
-      table: c.table || "gui_zones"
+      table: (window.ZONE_APP && window.ZONE_APP.table) || "gui_zones"
     };
   }
 
@@ -1032,7 +1035,9 @@
     var id = String(ghostId || "").trim();
     if (!id) return Promise.resolve([]);
 
-    /* 云端不可用时退回种子数据里反查，保证鬼详情页不会因为没迁移而空着 */
+    /* 云端不可用（没配置 / 请求失败）时才退回种子反查；
+       查询成功但结果为空，就是「这只鬼没有出没区域」，不能再拿种子顶上
+       —— 否则会出现「区域列表是空的、鬼详情却列着出没区域」。 */
     function fallback() {
       return (window.ZONE_SEED_ZONES || []).filter(function (z) {
         return (z.ghost_ids || []).indexOf(id) !== -1 && !z.deleted;
@@ -1052,17 +1057,15 @@
         if (!res.ok) throw new Error("反查失败 HTTP " + res.status);
         return res.json();
       })
-      .then(function (rows) {
-        var list = mapRows(rows);
-        return list.length ? list : fallback();
-      })
+      .then(function (rows) { return mapRows(rows); })
       .catch(function (err) {
         console.warn("[异常区域档案] 出没区域反查失败：", err.message);
         return fallback();
       });
   }
 
-  /* 所有地区（筛选下拉用）：从数据库取不重复值，取不到就退回种子里的地区 */
+  /* 所有地区（筛选下拉用）。成功但为空 → 返回空数组（下拉置灰），
+     只有云端连不上才退回种子里的地区，理由同上。 */
   function listRegions() {
     function fromSeeds() {
       var seen = {}, out = [];
@@ -1088,7 +1091,7 @@
           var v = String((r && r.region) || "").trim();
           if (v && !seen[v]) { seen[v] = 1; out.push(v); }
         });
-        return out.length ? out.sort() : fromSeeds();
+        return out.sort();
       })
       .catch(function () { return fromSeeds(); });
   }
