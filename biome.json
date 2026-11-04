@@ -1,0 +1,72 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/_local/**",
+      "!**/node_modules/**",
+      "!**/.pnpm-store/**",
+      "!**/js/lib/**",
+      "!**/preview/**",
+      "!**/*.min.js"
+    ]
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": {
+        "noConstAssign": "error",
+        "noConstantCondition": "warn",
+        "noDuplicateVariableNames": "error",
+        "noInnerDeclarations": "off",
+        "noInvalidConstructorSuper": "error",
+        "noPrecisionLoss": "warn",
+        "noSelfAssign": "error",
+        "noSwitchDeclarations": "warn",
+        "noUnreachable": "error",
+        "noUnsafeFinally": "error",
+        "noUnusedFunctionParameters": "warn",
+        "noUnusedVariables": "warn",
+        "useIsNan": "warn",
+        "useValidTypeof": "error"
+      },
+      "suspicious": {
+        "noAsyncPromiseExecutor": "error",
+        "noControlCharactersInRegex": "off",
+        "noDebugger": "error",
+        "noDoubleEquals": "warn",
+        "noDuplicateCase": "error",
+        "noDuplicateElseIf": "error",
+        "noDuplicateObjectKeys": "error",
+        "noFallthroughSwitchClause": "error",
+        "noFunctionAssign": "error",
+        "noGlobalIsNan": "warn",
+        "noImportAssign": "error",
+        "noIrregularWhitespace": "error",
+        "noPrototypeBuiltins": "warn",
+        "noRedeclare": "error",
+        "noShadowRestrictedNames": "error",
+        "noSparseArray": "warn",
+        "noUnsafeNegation": "error"
+      },
+      "security": {
+        "noBlankTarget": "warn",
+        "noGlobalEval": "error",
+        "noScriptUrl": "error",
+        "noSecrets": "off"
+      }
+    }
+  },
+  "javascript": {
+    "globals": ["GUI_CLOUDBASE", "GUI_APP", "GuiData", "GuiGate", "GuiUpload", "GuiTips"]
+  }
+}

@@ -8,6 +8,11 @@
 # 全部收纳在这个目录里，一律不推送到 GitHub。
 _local/
 
+# 依赖与包管理器的本地缓存。仓库里不放 node_modules，
+# pnpm 的 store 会把上千个文件写进工作区根目录，一旦被 git add -A 带进去就发到网上了。
+node_modules/
+.pnpm-store/
+
 # Windows 的缩略图缓存
 Thumbs.db
 

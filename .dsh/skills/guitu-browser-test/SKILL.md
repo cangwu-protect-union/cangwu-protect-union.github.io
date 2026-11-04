@@ -1,6 +1,6 @@
 ---
 name: guitu-browser-test
-description: 给 CPU 官网/鬼图鉴做本地端到端验证时用：起静态服务器、Edge headless 加 CDP 脚本模板、常用断言、截图、网络与 JS 错误捕获。改完页面需要实测时加载。
+description: 给 CPU 官网/鬼图鉴做本地端到端验证时用：起静态服务器、用 _local/pw 里的 Playwright（连系统 Edge）写断言、截图、网络与 JS 错误捕获。改完页面需要实测时加载。
 ---
 
 # 浏览器端到端验证
@@ -27,7 +27,43 @@ $proc = Start-Process -FilePath $py -ArgumentList "-m","http.server","9300","--b
 
 地址用 `http://localhost:PORT/...`。**不要用 `file://`**：来源为 `null`，云端 CORS 直接拦掉，验证类页面必然失败。
 
-## CDP 脚本模板
+## Playwright（首选，已装在 `_local/pw`）
+
+`_local/pw` 里有 playwright 1.64.1（pnpm，hoisted 布局），用系统 Edge，不下载 Chromium。
+
+**浏览器必须在全权限（full access）下启动**：Edge/Playwright 的启动/通信走命名管道，
+workspace-write 沙箱里 Edge 直接
+`FATAL: mojo\public\cpp\platform\platform_channel.cc: Check failed: 拒绝访问 (0x5)` 退出，
+Playwright 自带 `chromium.launch()` 则是 `spawn EPERM`。所以**要跑浏览器的那条命令必须带
+`sandbox_permissions: danger-full-access`**，并把理由写成「浏览器进程必须能创建命名管道才能启动」。
+
+现成工具（`$node` = load_workspace_dependencies 返回的 node）：
+
+```powershell
+& $node check.mjs "http://localhost:9300/index.html" "..\preview\index.png"
+# 打印：浏览器版本 / 地址 / 标题 / JS 异常 / 控制台报错 / HTTP 4xx-5xx / 截图路径
+```
+
+写自己的用例：
+
+```js
+import { openBrowser, watchPage } from './browser.mjs';
+
+const { browser, close } = await openBrowser();
+const page = await (browser.contexts()[0] || await browser.newContext()).newPage();
+const w = watchPage(page);
+await page.goto('http://localhost:9300/guitu/guitu.html');
+await page.waitForSelector('#guiCount');
+console.log(await page.textContent('#guiCount'), w.errors);
+await page.screenshot({ path: 'D:\\CPU\\关于CPU的网页\\_local\\preview\\x.png', fullPage: true });
+await close();
+```
+
+`openBrowser()` 自己 spawn Edge 开 `--remote-debugging-port`，再 `connectOverCDP`。
+拿到的是真浏览器，locator/断言/`page.evaluate`/截图全可用；CDP 连接下部分 `newContext` 选项无效。
+细节见 `_local/pw/README.md`。
+
+## CDP 脚本模板（不想装 Playwright 时的退路）
 
 用 `load_workspace_dependencies` 返回的 `node` 执行。每次换 `PORT`（≥10000）。
 

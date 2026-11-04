@@ -31,8 +31,19 @@
 |---|---|
 | 读或改项目文件 | `guitu-project`（目录结构、PowerShell 陷阱、校验命令） |
 | 改完页面要实测 | `guitu-browser-test`（起服务 + 无头浏览器脚本模板） |
+| 改样式或调整视觉 | `guitu-design`（`DESIGN.md` 取值、体检脚本、去 AI 味清单） |
 | 准备上线 | `guitu-deploy`（提交、推送重试、部署轮询、核对清单） |
 | 动数据库或权限 | `cloudbase-pg`（表结构、RLS、CORS 白名单、令牌传递） |
+
+## 改完必跑校验
+
+改完任何文件，跑这一条，不要临时拼脚本：
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
+```
+
+它检查编码（BOM/CRLF/非法 UTF-8）、JS 语法、HTML 标签栈与重复 id、本地引用是否存在、CSS 配平、密钥与凭据、以及 git 里有没有混进 `_local/` 一类文件。退出码 0 才算过。细节见 `tools/README.md`。
 
 ## 文档与配图
 

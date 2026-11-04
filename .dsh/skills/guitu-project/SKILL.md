@@ -58,19 +58,13 @@ UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码。`.gitatt
 
 ## 改完必做校验
 
-运行时路径用 `load_workspace_dependencies` 取（`node` / `python`），不要写死。
+一条命令，不要临时拼脚本：
 
-```javascript
-// 逐文件语法检查：new Function 只解析不执行
-const fs = require("fs"), path = require("path");
-for (const f of fs.readdirSync(DIR)) {
-  if (!f.endsWith(".js")) continue;
-  try { new Function(fs.readFileSync(path.join(DIR, f), "utf8")); }
-  catch (e) { console.log("ERR " + f + ": " + e.message); }
-}
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-HTML 用标签栈校验，跳过 void 元素（area base br col embed hr img input link meta source track wbr）；CSS 校验大括号配平。
+覆盖编码（BOM / CRLF / 非法 UTF-8）、JS 语法、HTML 标签栈与重复 id、本地引用、CSS 配平、密钥与凭据、git 跟踪卫生。退出码 0 才算过。加 `-Staged` 会额外检查暂存区。检查项清单与已知误报见 `tools/README.md`。
 
 ## 文档与配图
 
