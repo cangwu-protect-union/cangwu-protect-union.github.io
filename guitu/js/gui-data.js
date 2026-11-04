@@ -126,6 +126,70 @@
       .catch(function () { return []; });
   }
 
+  /* ============================================================
+     条目字段：唯一来源
+     ------------------------------------------------------------
+     字段名、类型、必填都写在 ENTRY_FIELDS 里，表单校验、摘要截断、
+     标签解析都从这里取。不要再在别的文件里重复一份字段清单。
+     新增一个类似图鉴的模块时，复制这张表就是它的数据模型。
+     ============================================================ */
+  var INTRO_MAX = 90;
+
+  var ENTRY_FIELDS = [
+    { key: "id", label: "编号", type: "string", required: true },
+    { key: "title", label: "标题", type: "string", required: true },
+    { key: "image", label: "封面图", type: "string" },
+    { key: "images", label: "图片", type: "array" },
+    { key: "thumbs", label: "缩略图", type: "array" },
+    { key: "refs", label: "引用情报", type: "array" },
+    { key: "intro", label: "摘要", type: "string" },
+    { key: "body", label: "正文", type: "string", required: true },
+    { key: "tags", label: "标签", type: "array" },
+    { key: "date", label: "日期", type: "string", format: "date" }
+  ];
+
+  function isEmptyValue(v) {
+    if (v == null) return true;
+    if (typeof v === "string") return v.trim() === "";
+    if (Array.isArray(v)) return v.length === 0;
+    return false;
+  }
+
+  /* 校验一条条目，返回人话的问题列表；空数组表示通过。
+     只查「必填」和「类型」，不设长度上限——长度上限会挡掉已经存在的内容。
+     对象里没有的字段跳过，所以表单可以只传自己管的那几个字段。 */
+  function validateEntry(entry) {
+    var problems = [];
+    if (!entry) return problems;
+    for (var i = 0; i < ENTRY_FIELDS.length; i++) {
+      var f = ENTRY_FIELDS[i];
+      if (!(f.key in entry)) continue;
+      var v = entry[f.key];
+      if (f.required && isEmptyValue(v)) { problems.push(f.label + "不能为空"); continue; }
+      if (v == null) continue;
+      if (f.type === "array" && !Array.isArray(v)) problems.push(f.label + "格式不对");
+      else if (f.type === "string" && typeof v !== "string") problems.push(f.label + "格式不对");
+      else if (f.format === "date" && v !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        problems.push("日期要写成 YYYY-MM-DD");
+      }
+    }
+    return problems;
+  }
+
+  /* 正文压成一行，取前 INTRO_MAX 个字当摘要（列表页不读全文） */
+  function buildIntro(body) {
+    var flat = String(body == null ? "" : body).replace(/\s+/g, " ");
+    return flat.length > INTRO_MAX ? flat.slice(0, INTRO_MAX) + "…" : flat;
+  }
+
+  /* 「甲, 乙，丙」→ ["甲","乙","丙"]；中英文逗号都认 */
+  function parseTags(text) {
+    return String(text == null ? "" : text)
+      .split(/[,，]/)
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s !== ""; });
+  }
+
   /* ---------------- 云数据库 ---------------- */
 
   /* 数据库行 → 前端条目对象（列表、详情、检索共用同一套映射） */
@@ -808,6 +872,13 @@
     /* 工具 */
     newId: newId,
     remoteEnabled: remoteEnabled,
-    readLocal: readLocal
+    readLocal: readLocal,
+
+    /* 条目字段的单一来源（表单、校验、新模块都从这里取） */
+    ENTRY_FIELDS: ENTRY_FIELDS,
+    INTRO_MAX: INTRO_MAX,
+    validateEntry: validateEntry,
+    buildIntro: buildIntro,
+    parseTags: parseTags
   };
 })();

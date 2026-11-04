@@ -1,30 +1,26 @@
 ---
 name: guitu-deploy
-description: 把 CPU 官网/鬼图鉴的改动提交并发布到 GitHub Pages 时用：中文提交信息、推送重试、轮询部署完成、上线后核对清单、以及 github.com 连不上时的诊断。改完准备上线时加载。
+description: 把 CPU 官网/鬼图鉴的改动提交并发布到 GitHub Pages：中文提交信息、推送重试、轮询部署、上线核对，以及本机连 github.com 的证书处理。准备上线时加载。
 ---
 
 # 提交与发布
 
-仓库 `cangwu-protect-union/cangwu-protect-union.github.io`，`main` 分支根目录直接发布。本地 `D:\CPU\关于CPU的网页`。
+仓库 `cangwu-protect-union/cangwu-protect-union.github.io`，`main` 根目录直接发布；本地 `D:\CPU\关于CPU的网页`。
 
 ## 提交
 
-中文提交信息用文件传入，避免引号和换行被 shell 吃掉：
+提交信息用文件传入，避免引号和换行被 shell 吃掉：
 
 ```powershell
 $env:Path = "C:\Program Files\Git\cmd;$env:Path"
 Set-Location "D:\CPU\关于CPU的网页"
 git add -A
-git status --short          # 先看清单，确认没有 _local/ 的东西被带进来
-# 提交信息写进 $env:TEMP\msg.txt（UTF-8 无 BOM），再 git commit -F
+git status --short          # 确认没有 _local/、*.docx、*.sql 被带进来
+# 信息写进 $env:TEMP\msg.txt（UTF-8 无 BOM），再提交
 git commit -q -F $f
 ```
 
-提交前必查：`git status` 里不应出现 `_local/`、`*.docx`、`*.sql`。
-
 ## 推送
-
-GitHub 经常抖动，用重试循环：
 
 ```powershell
 $env:GIT_TERMINAL_PROMPT = "0"
@@ -35,11 +31,11 @@ for ($i=1; $i -le 20; $i++) {
 }
 ```
 
-超过几分钟不行就转后台 job 继续重试，不要堵在那里。
+几分钟还不行就转后台 job 继续重试，不要堵在那里。
 
 ## 等部署
 
-Pages 有 30–90 秒延迟。轮询一个**本次改动特有的字符串**判断是否生效，不要只看状态码：
+Pages 有 30–90 秒延迟。轮询**本次改动特有的字符串**判断生效，不要只看状态码：
 
 ```powershell
 for ($i=1; $i -le 12; $i++) {
@@ -51,25 +47,54 @@ for ($i=1; $i -le 12; $i++) {
 
 ## 上线后核对
 
-1. 改动的页面 200 且内容包含新文案
-2. 页面依赖的脚本/样式 200
-3. 旧路径按预期 404（迁移时）
-4. 用 guitu-browser-test 跑一次真实浏览器验证，确认无 JS 异常、无资源 404
-5. 涉及 `_local/` 的，确认 `/ _local/...` 返回 404（密码哈希未泄露）
+1. 改动的页面 200、含新文案；依赖的脚本样式 200。
+2. 旧路径按预期 404（迁移时）。
+3. `guitu-browser-test` 跑一次真浏览器验证，无 JS 异常、无资源 404。
+4. 涉及 `_local/` 的，确认 `/_local/...` 返回 404。
 
-## github.com 连不上
+## 从会话里访问 github.com（实测）
 
-现象：`git push` 报 `Recv failure: Connection was reset`，但 `*.github.io` 正常。
+`git push` 报 `Recv failure: Connection was reset`、`*.github.io` 正常时，根因不是网络，是 hosts 加自签 CA：
 
-先看解析：
+- hosts 把 `github.com` / `api.github.com` / `raw.githubusercontent.com` 指到 127.0.0.1，由 Steam++ 或 UU 加速器的本地代理转发 TLS，用的是自签 CA（`SteamTools Certificate`、`UU Game Booster CA`，在 Windows 根存储里，浏览器认）。
+- 沙箱里 schannel 拿不到凭据：`curl`/`git` 报 `AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`；node 报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`。
+
+node 下载：加 `--use-system-ca` 读 Windows 根存储。
 
 ```powershell
-Resolve-DnsName github.com -Type A        # 若返回 127.0.0.1，就是 hosts 被改
+& $node --use-system-ca -e "fetch('https://api.github.com/rate_limit').then(r=>console.log(r.status))"
+```
+
+git 走 HTTPS：`.git/config` 在工作区不可写，用环境变量注入，只对当前进程生效。
+
+```powershell
+$env:GIT_CONFIG_COUNT='2'
+$env:GIT_CONFIG_KEY_0='http.sslBackend';  $env:GIT_CONFIG_VALUE_0='openssl'
+$env:GIT_CONFIG_KEY_1='http.sslCAInfo';   $env:GIT_CONFIG_VALUE_1='D:/CPU/关于CPU的网页/_local/certs/ca-bundle.pem'
+git ls-remote --heads origin
+```
+
+`ca-bundle.pem` = Git 自带 `mingw64/etc/ssl/certs/ca-bundle.crt` 拼上两个自签 CA；只拼自签 CA 会让其他仓库校验失败。换机后重新导出：
+
+```powershell
+Get-ChildItem Cert:\CurrentUser\Root, Cert:\LocalMachine\Root |
+  Where-Object { $_.Subject -match 'SteamTools|UU Game Booster' } |
+  ForEach-Object { "-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($_.RawData, 'InsertLineBreaks') + "`n-----END CERTIFICATE-----" }
+```
+
+**这条链路等于信任加速器厂商的 CA**，它能解密并改写去 GitHub 的流量。所以从 GitHub 下的可执行文件，校验和只防传输损坏，防不了代理本身；装 gitleaks 这类安全工具时要意识到这点。
+
+下 Release 用 `tools/get-tool.js`，自动核对 API 返回的 sha256：
+
+```powershell
+& $node --use-system-ca tools/get-tool.js gitleaks/gitleaks windows_x64 _local/bin
+```
+
+先查解析，确认是 hosts 而不是 DNS：
+
+```powershell
+Resolve-DnsName github.com -Type A        # 返回 127.0.0.1 就是 hosts 被改
 Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String github
 ```
 
-若末尾有 `# Steam++ End`，说明是 Steam++ 写入的加速记录：它把 github.com 指向 127.0.0.1，再由本地代理转发。**Steam++ 没运行时这些域名就全部失效**。
-
-处理：让用户打开 Steam++ 的加速，或临时注释掉这些行。不要自行改 hosts，先说明原因让用户决定。
-
-`cangwu-protect-union.github.io` 一直能访问，因为 hosts 里写的是裸域 `github.io`，不匹配子域。
+改 hosts 前先说明原因让用户决定，不要自行修改。`cangwu-protect-union.github.io` 一直能访问，因为 hosts 里写的是裸域 `github.io`，不匹配子域。

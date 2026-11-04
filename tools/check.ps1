@@ -58,8 +58,9 @@ try {
     $gitleaks = Find-Tool 'gitleaks'
     if ($gitleaks) {
         Write-Host '--- gitleaks ---' -ForegroundColor Cyan
-        if ($Staged) { & $gitleaks protect --staged --redact }
-        else { & $gitleaks git --redact --log-opts '-n 1' }
+        # 只扫 git 历史，不扫工作区：_local/ 里本来就有密码，dir 模式必然报一堆无关的
+        if ($Staged) { & $gitleaks git --pre-commit --staged --redact --no-banner }
+        else { & $gitleaks git --redact --no-banner }
         if ($LASTEXITCODE -ne 0) { $failed++ }
     } else {
         Write-Host '--- gitleaks: not installed, skipped ---' -ForegroundColor DarkGray

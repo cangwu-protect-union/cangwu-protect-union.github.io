@@ -40,7 +40,7 @@ node tools/check.js <目录>
 node tools/get-biome.js 2.6.4 _local\bin
 ```
 
-本机 github.com 被 hosts 指向 127.0.0.1，拿不到 GitHub Releases，所以脚本从 npm 镜像取 `@biomejs/cli-win32-x64`，并用 registry 返回的 sha512 校验后再解包。校验不通过会直接放弃安装。
+Biome 走 npm 镜像而不是 GitHub Releases：镜像 34 MB 只要几秒，GitHub 走代理要几分钟。要改走 GitHub 就 `node --use-system-ca tools/get-tool.js biomejs/biome`。
 
 `check.ps1` 查找顺序：`PATH` → `_local\bin\biome.exe`。
 
@@ -57,12 +57,34 @@ node tools/get-biome.js 2.6.4 _local\bin
 
 当前基线：0 error、23 warning（`noUnusedVariables` 17、`noGlobalIsNan` 4、`noPrototypeBuiltins` 1、`noUnusedFunctionParameters` 1）。warning 不阻断。
 
-## 3. gitleaks（可选，未安装）
+## 3. gitleaks（已安装）
 
-没装时跳过。它比 `check.js` 多的是**扫 git 历史**和一百多条云厂商密钥规则。
-安装要访问 github.com，本机被 hosts 指向 127.0.0.1（见 `guitu-deploy` skill），恢复后再装。
+版本 8.30.1，在 `_local\bin\gitleaks.exe`，配置是仓库根的 `.gitleaks.toml`。
 
-## 4. `design-audit.js`（体检报告，不进 `check.ps1`）
+只扫 **git 历史**，不扫工作区：`_local/` 里本来就有密码和测试用 JWT，`gitleaks dir` 模式必然报 4 条无关的。判据是「有没有进过 git」——没进过就没事，进过一次就必须处理历史。
+
+```powershell
+powershell -File tools\check.ps1            # 全历史扫描，38 个提交约 1 秒
+powershell -File tools\check.ps1 -Staged    # 只扫暂存区
+```
+
+`.gitleaks.toml` 用默认规则集全开，只按行内容放行 `publishableKey`（CloudBase 签给匿名访问的 JWT，payload 里 `role=anon`）。**不要改成放行整个 `guitu/data/config.js`**，那样有人把 `service_role` 写进去也扫不出来。
+
+重装（GitHub 访问方式见 `guitu-deploy` skill）：
+
+```powershell
+node --use-system-ca tools/get-tool.js gitleaks/gitleaks windows_x64 _local/bin
+```
+
+## 4. 其他单文件工具
+
+```powershell
+node --use-system-ca tools/get-tool.js <owner/repo> <资源名正则> _local\bin
+```
+
+自动取 latest release、挑匹配的资源、按 API 给的 sha256 校验、解包、把可执行文件放进 `_local\bin`。zip / tar / tgz 都走 Windows 自带的 `tar`。
+
+## 5. `design-audit.js`（体检报告，不进 `check.ps1`）
 
 ```powershell
 node tools/design-audit.js           # 人看的报告

@@ -1,0 +1,15 @@
+# gitleaks 配置
+#
+# 默认规则集全开（extend.useDefault），只放行本项目里设计上可公开的那一个键。
+# 不用 global 白名单放行整个 config.js 文件：那样一旦有人把 service_role 写进去，
+# 也扫不出来了。
+
+[extend]
+useDefault = true
+
+# publishableKey 是 CloudBase 签发给匿名访问的 JWT（payload 里 role=anon），
+# 设计上就要出现在前端。只按行内容放行 "publishableKey" 这一行。
+[[allowlists]]
+description = "publishableKey 是设计上可公开的匿名 JWT"
+regexTarget = "line"
+regexes = ['''publishableKey''']

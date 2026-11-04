@@ -59,9 +59,8 @@
     var body  = document.getElementById("fBody").value.trim();
     var media = collectedMedia();
     var images = media.images;
-    var tags  = document.getElementById("fTags").value
-      .split(/[,，]/).map(function (s) { return s.trim(); })
-      .filter(function (s) { return s !== ""; });
+    var tags  = window.GuiData.parseTags(document.getElementById("fTags").value);
+    var today = new Date().toISOString().slice(0, 10);
 
     if (anyUploading()) {
       formError.textContent = "还有图片正在上传，请等全部完成后再点确认。";
@@ -76,13 +75,10 @@
       return;
     }
 
-    if (!title) {
-      formError.textContent = "标题不能为空。";
-      formError.hidden = false;
-      return;
-    }
-    if (!body) {
-      formError.textContent = "正文不能为空。";
+    /* 必填项交给 GuiData.validateEntry 判断，字段清单只有一份 */
+    var problems = window.GuiData.validateEntry({ title: title, body: body, tags: tags, date: today });
+    if (problems.length) {
+      formError.textContent = problems[0] + "。";
       formError.hidden = false;
       return;
     }
@@ -119,8 +115,7 @@
       return;
     }
 
-    var intro = body.replace(/\s+/g, " ").slice(0, 90);
-    if (body.replace(/\s+/g, " ").length > 90) intro += "…";
+    var intro = window.GuiData.buildIntro(body);
 
     var entry = {
       id: window.GuiData.newId(),
@@ -131,7 +126,7 @@
       intro: intro,
       body: body,
       tags: tags,
-      date: new Date().toISOString().slice(0, 10),
+      date: today,
       refs: pickedRefs          /* 引用过的情报 [{id,title}]，仅增加条目模式会有 */
     };
 

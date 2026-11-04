@@ -185,18 +185,16 @@
     clearFail();
 
     var title = document.getElementById("fTitle").value.trim();
-    if (!title) { fail("标题不能为空。"); return; }
+    var problems = window.GuiData.validateEntry({ title: title, date: entry.date });
+    if (problems.length) { fail(problems[0] + "。"); return; }
 
     var paras = collectParagraphs();
     if (!paras.length) { fail("至少要有一段正文。"); return; }
 
-    var tags = document.getElementById("fTags").value
-      .split(/[,，]/).map(function (s) { return s.trim(); })
-      .filter(function (s) { return s !== ""; });
+    var tags = window.GuiData.parseTags(document.getElementById("fTags").value);
 
     var body = paras.join("\n\n");
-    var intro = body.replace(/\s+/g, " ").slice(0, 90);
-    if (body.replace(/\s+/g, " ").length > 90) intro += "…";
+    var intro = window.GuiData.buildIntro(body);
 
     var updated = {
       id: entry.id,
