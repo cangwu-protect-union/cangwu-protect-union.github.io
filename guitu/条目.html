@@ -27,6 +27,9 @@
       <p class="muted">正在载入…</p>
     </article>
 
+    <!-- 出没区域：由 entry.js 反查异常区域档案填充，查不到就保持空白 -->
+    <section id="entryZones"></section>
+
   </main>
 
   <footer class="site-footer">
@@ -38,6 +41,9 @@
   <script src="data/config.js"></script>
   <script src="data/gui-entries.js"></script>
   <script src="js/gui-data.js"></script>
+  <!-- 反查「出没区域」：复用异常区域档案的数据层与兜底种子，不重复写一套查询 -->
+  <script src="../quyu/data/zone-seeds.js"></script>
+  <script src="../quyu/js/zone-data.js"></script>
   <script src="js/entry.js"></script>
 </body>
 </html>

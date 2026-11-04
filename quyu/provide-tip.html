@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>提供区域情报 · 异常区域档案 · CPU</title>
+  <meta name="description" content="提交你所在地区出现的异常区域情报，无需验证">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="css/quyu.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="../index.html">CPU及回合制游戏工作室联合组织</a>
+      <nav>
+        <a href="../index.html">首页</a>
+        <a href="../about.html">关于</a>
+        <a href="../projects.html">项目</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <p class="entry-back"><a href="quyu.html">← 返回档案</a></p>
+
+    <section id="formSection">
+      <h1>提供区域情报</h1>
+      <p class="lead">
+        告诉我们你在哪里遇到过异常现象。提交不需要验证，内容会先进入投稿列表，
+        由编辑核实后再决定是否收进正式档案。
+      </p>
+
+      <form id="tipForm" autocomplete="off">
+        <div id="formMount"></div>
+
+        <div class="gate-actions">
+          <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+          <button type="submit" class="btn" id="submitBtn">提交</button>
+        </div>
+      </form>
+
+      <p class="muted field-hint">
+        投稿会公开显示，请不要填写真实姓名、住址或联系方式。
+      </p>
+    </section>
+
+    <section id="doneSection" hidden>
+      <h1>已收到</h1>
+      <p class="lead">投稿已保存。编辑会核实内容，采纳后会出现在正式档案里。</p>
+      <p class="gate-actions">
+        <a class="btn" href="tips.html">查看投稿列表</a>
+        <a class="btn btn-ghost" href="quyu.html">返回档案</a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 CPU及回合制游戏工作室联合组织</p>
+    </div>
+  </footer>
+
+  <script src="data/config.js"></script>
+  <script src="data/zone-seeds.js"></script>
+  <script src="js/zone-data.js"></script>
+  <script src="js/zone-upload.js"></script>
+  <script src="js/zone-form.js"></script>
+  <script src="js/provide-tip.js"></script>
+</body>
+</html>

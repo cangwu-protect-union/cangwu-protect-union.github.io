@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>区域情报 · 异常区域档案 · CPU</title>
+  <meta name="description" content="访客提交的异常区域情报">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="css/quyu.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="../index.html">CPU及回合制游戏工作室联合组织</a>
+      <nav>
+        <a href="../index.html">首页</a>
+        <a href="../about.html">关于</a>
+        <a href="../projects.html">项目</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <p class="entry-back"><a href="quyu.html">← 返回档案</a></p>
+
+    <section class="hero">
+      <h1>区域情报</h1>
+      <p class="lead">访客提交的异常区域线索。被采纳的会标上「已采纳」，并链接到正式档案。</p>
+    </section>
+
+    <p class="gui-actions">
+      <a class="btn" href="provide-tip.html">提供情报</a>
+    </p>
+
+    <p class="gui-count muted" id="tipCount">正在载入…</p>
+
+    <div class="gui-list" id="tipList"></div>
+
+    <div class="gui-empty" id="tipEmpty" hidden>
+      <p>还没有投稿。你可以是第一个。</p>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 CPU及回合制游戏工作室联合组织</p>
+    </div>
+  </footer>
+
+  <script src="data/config.js"></script>
+  <script src="data/zone-seeds.js"></script>
+  <script src="js/zone-data.js"></script>
+  <script src="js/tips.js"></script>
+</body>
+</html>

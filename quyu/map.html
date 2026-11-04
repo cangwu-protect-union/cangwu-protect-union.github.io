@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>异常区域地图 · CPU</title>
+  <meta name="description" content="CPU 异常区域档案地图：鬼频繁出没的异常区域分布">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/quyu.css">
+</head>
+<body class="map-page">
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="../index.html">CPU及回合制游戏工作室联合组织</a>
+      <nav>
+        <a href="../index.html">首页</a>
+        <a href="../about.html">关于</a>
+        <a href="../projects.html">项目</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="hero">
+      <h1>异常区域地图</h1>
+      <p class="lead">每个点是一个已被记录的区域，圆圈表示已测定的影响范围。</p>
+    </section>
+
+    <nav class="zone-tabs" aria-label="浏览方式">
+      <a href="quyu.html">列表</a>
+      <a class="is-on" href="map.html">地图</a>
+    </nav>
+
+    <div class="map-layout">
+
+      <aside class="map-side" aria-label="区域列表">
+        <p class="map-side__head" id="mapSideHead">正在载入…</p>
+        <ul class="map-side__list" id="mapSideList"></ul>
+      </aside>
+
+      <div>
+        <div class="map-canvas" id="mapCanvas"></div>
+        <p class="map-fallback-note" id="mapFallbackNote" hidden>底图瓦片加载失败，已切换为坐标网格；点位与范围仍然准确。</p>
+        <ul class="map-legend">
+          <li><i style="background:#b42318"></i>A 级</li>
+          <li><i style="background:#9a6700"></i>B 级</li>
+          <li><i style="background:#0969da"></i>C 级</li>
+          <li><i style="background:#656d76"></i>D 级 / 未定级</li>
+        </ul>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 CPU及回合制游戏工作室联合组织</p>
+    </div>
+  </footer>
+
+  <script src="data/config.js"></script>
+  <script src="data/zone-seeds.js"></script>
+  <script src="js/zone-data.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/zone-map.js"></script>
+  <script src="js/map-page.js"></script>
+</body>
+</html>

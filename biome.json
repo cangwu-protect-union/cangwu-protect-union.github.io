@@ -12,6 +12,7 @@
       "!**/node_modules/**",
       "!**/.pnpm-store/**",
       "!**/js/lib/**",
+      "!**/vendor/**",
       "!**/preview/**",
       "!**/*.min.js"
     ]
@@ -67,6 +68,20 @@
     }
   },
   "javascript": {
-    "globals": ["GUI_CLOUDBASE", "GUI_APP", "GuiData", "GuiGate", "GuiUpload", "GuiTips"]
+    "globals": [
+      "GUI_CLOUDBASE",
+      "GUI_APP",
+      "GuiData",
+      "GuiGate",
+      "GuiUpload",
+      "GuiTips",
+      "ZoneData",
+      "ZoneForm",
+      "ZoneMap",
+      "ZoneUpload",
+      "ZONE_APP",
+      "ZONE_MAP",
+      "ZONE_SEED_ZONES"
+    ]
   }
 }

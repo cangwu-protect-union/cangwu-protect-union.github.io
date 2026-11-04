@@ -76,5 +76,32 @@
       refsHtml +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
+
+    /* 出没区域：反查异常区域档案里 ghost_ids 含本条目 id 的区域。
+       用 ZoneData.getZonesByGhost（复用区域模块的查询），没有结果就不显示。 */
+    if (window.ZoneData && typeof window.ZoneData.getZonesByGhost === "function") {
+      window.ZoneData.getZonesByGhost(entry.id).then(function (zones) {
+        var host = document.getElementById("entryZones");
+        if (!host || !zones.length) return;
+
+        host.innerHTML =
+          '<div class="entry-refs">' +
+            '<p class="entry-refs-title">出没区域</p>' +
+            "<ul>" +
+              zones.map(function (z) {
+                var meta = [z.region, z.level ? z.level + " 级" : "", z.status]
+                  .filter(Boolean).join(" · ");
+                return '<li><a href="../quyu/zone.html?id=' + encodeURIComponent(z.id) + '">' +
+                       esc(z.title) + "</a>" +
+                       (meta ? ' <span class="muted">（' + esc(meta) + "）</span>" : "") + "</li>";
+              }).join("") +
+            "</ul>" +
+          "</div>";
+
+        /* 容器默认在正文外面，挪到「返回图鉴」按钮之前，读起来更顺 */
+        var foot = root.querySelector(".entry-foot");
+        if (foot && foot.parentNode) foot.parentNode.insertBefore(host, foot);
+      }).catch(function () { /* 反查失败不影响正文 */ });
+    }
   }).catch(function () { notFound(); });
 })();
