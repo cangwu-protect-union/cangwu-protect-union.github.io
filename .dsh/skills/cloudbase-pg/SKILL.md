@@ -24,11 +24,11 @@ RPC         /v1/rdb/rest/rpc/{function}
 |---|---|
 | `gui_entries` | 条目。`deleted` 软删除，`refs` 引用情报，`thumbs` 与 `images` 一一对应 |
 | `gui_entry_versions` | 版本归档，只增不改不删，`applied` 标记已应用 |
-| `gui_tips` | 情报投稿，与图鉴隔离，写入不要求令牌 |
+| `gui_tips` | 情报投稿，与图鉴隔离。`status` ∈ pending / approved / rejected / adopted，`reviewed_at`、`review_note` 记录审核 |
 | `gui_secrets` | 答案哈希，**无 RLS 策略，anon 读不到** |
 | `gui_tokens` | 验证签发的令牌，同样读不到 |
 
-函数：`gui_verify(p_hash1, p_hash2)` 校验并签发令牌；`gui_token_ok()` 供 RLS 判断令牌有效性。
+函数：`gui_verify(p_hash1, p_hash2)` 校验并签发令牌；`gui_token_ok()` 供 RLS 判断令牌有效性；`gui_dup_check(p_text)` 按标题相似度查重，只比对 `approved` / `adopted` 的情报和未删除的条目（用它绕开 RLS 读待审行会泄露投稿标题，所以故意限制）。
 
 ## CORS
 
@@ -61,7 +61,26 @@ CORS 白名单是付费功能（个人版 ¥19.9/月），到期降级后前端�
 
 ## 写入权限
 
-`gui_entries`、`gui_entry_versions` 的 INSERT/UPDATE 要 `gui_token_ok()`；`gui_tips` 开放写入。版本表没有 DELETE 策略，删除必须用 SQL。令牌失效时前端收到 `42501 row-level security`，代码会清本地令牌并提示重新验证。
+`gui_entries`、`gui_entry_versions` 的 INSERT/UPDATE 要 `gui_token_ok()`；`gui_tips` 开放写入，但 INSERT 策略强制 `status = 'pending'`，改状态要令牌。版本表没有 DELETE 策略，删除必须用 SQL。令牌失效时前端收到 `42501 row-level security`，代码会清本地令牌并提示重新验证。
+
+## 返回形态会反过来改判策略
+
+`Prefer: return=representation` 不是纯输出选项：数据库会拿 **SELECT 策略**去筛返回行。如果写的是「当前身份看不见」的行（`gui_tips` 的 pending / rejected），INSERT / UPDATE 会直接报 `42501 new row violates row-level security policy`，看着像写入权限没配好，其实是读策略挡的。
+
+| 表 | representation | 说明 |
+|---|---|---|
+| `gui_entries` | 可用 | 读策略是 `using (true)`，返回行不受可见性影响 |
+| `gui_tips` | **不要用** | 读策略按 status 过滤，pending / rejected 连写都会失败 |
+
+判「PATCH 到底有没有生效」改成三步：`return=minimal` 写入 → 带令牌把这条读回来 → 比对状态。这样 RLS 静默影响 0 行也能发现。
+
+## RLS 可见性 ≠ 页面过滤
+
+策略只保证「越权拿不到」，不保证「页面只显示该显示的」。带令牌的成员读 `gui_tips` 会拿到全部状态，公开页面必须显式传 `status=in.(approved,adopted)`，否则待审和已驳回会漏到公开列表里。
+
+## 延迟
+
+冷启动（全新浏览器配置第一次连网关）TLS 握手实测 **12.3 秒**，热连接后单次查询约 120ms。前端读超时是 6 秒，超时会触发 5 分钟熔断降级到种子数据，所以读请求带一次重试（`retryOnceOnTimeout`）。验收性能时必须说明是冷启动还是热连接，别把 12 秒当回归。
 
 ## 自检矩阵
 
@@ -71,8 +90,16 @@ CORS 白名单是付费功能（个人版 ¥19.9/月），到期降级后前端�
 1 无令牌 INSERT gui_entries    → 42501
 2 伪造令牌 INSERT              → 42501
 3 有效令牌 INSERT              → 201
-4 无令牌 PATCH 已有行          → 0 行（PATCH 不报错，用 Prefer: return=representation 看返回是否 []）
-5 无令牌 INSERT gui_tips       → 201
+4 无令牌 PATCH 已有行          → 204 但不生效；带令牌读回确认状态没变（gui_tips 别用 representation 判，见上文）
+5 无令牌 INSERT gui_tips       → 201（status 为 pending）
+```
+
+有可见性策略的表再加三条：
+
+```
+6 匿名读 pending / rejected    → []
+7 带令牌读同一条               → 有行
+8 匿名伪造 status=approved 插入 → 42501
 ```
 
 再确认 `select * from gui_secrets` 和 `gui_tokens` 对 anon 返回 `[]`。

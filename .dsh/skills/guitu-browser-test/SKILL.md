@@ -73,7 +73,23 @@ await ev(`(async function(){ try { await window.GuiGate.verifyValues(['<问题�
 await ev(`(async function(){ try { await window.GuiData.insertEntry({ id:"t-"+Date.now(), title:"测试", image:"", images:[], thumbs:[], intro:"x", body:"x", tags:[], date:"2026-01-01", refs:[] }); return "ok"; } catch(e){ return "fail: " + e.message; } })()`);
 ```
 
+## 断言时机
+
+不要固定 `sleep` 一段再去读 DOM 下结论：分不清「还在载入」和「已经失败」，而且首次连云端可能要十几秒。
+
+```js
+await page.waitForFunction(() => {
+  const t = document.querySelector('#guiCount');
+  return t && !/载入/.test(t.textContent);
+}, { timeout: 25000 });
+```
+
+同一页面里连续跳转时，切页后要先等目标页的选择器出现再断言。上一个页面的请求还在飞的时候截图或读 DOM，拿到的是空壳，容易被当成渲染回归。
+
+新浏览器 profile 第一次请求 TLS 握手实测 12.3 秒，热连接约 120ms。要测首屏真实体验就保持全新 profile；要测功能就先预热一次，别把冷启动的 12 秒当性能问题报出去。
+
 ## 判读
 
 - 页面里既有隐藏的 `.gate-error` 空元素，也有警告：判断「是否显示警告」看 `textContent` 非空，不能只看元素存在。
-- 测试后清理自建数据；条目只能软删除，彻底清除要 SQL。
+- 结果对不上时先做最小差异对照：只改一个变量（换身份、换 profile、换 curl 与应用代码），确认是产品问题还是测量方式问题。
+- 测试后清理自建数据；条目只能软删除，彻底清除要 SQL。`gui_tips` 可以先置 `rejected` 让它从公开面消失，再让用户跑一句 delete。

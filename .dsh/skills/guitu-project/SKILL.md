@@ -45,6 +45,18 @@ UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码；`.gitatt
 
 数据库是唯一数据源，`data/gui-entries.js` 的种子只作云端不可用时的兜底。`list()` 云端读成功就只用数据库，失败才合并种子 + `entries.json` + 本机未同步条目。两边同时参与合并会让同一条显示两份。
 
+## 条目字段的唯一来源
+
+字段名、类型、必填只在 `guitu/js/gui-data.js` 的 `window.GuiData.ENTRY_FIELDS` 里定义一次。配套导出：
+
+| 方法 | 用途 |
+|---|---|
+| `validateEntry(obj)` | 返回问题列表（人话），空数组表示通过；对象里没传的字段跳过 |
+| `buildIntro(body)` | 正文压成一行，取前 `INTRO_MAX`（90）个字，超长加省略号 |
+| `parseTags(text)` | `"甲, 乙，丙"` → `["甲","乙","丙"]`，中英文逗号都认 |
+
+新表单、新模块、新脚本一律用这三个，不要再自己写 `split(/[,，]/)` 或 `slice(0, 90)`。加字段时改 `ENTRY_FIELDS` 一处，`mapRow` / `toRow` / 表单 / 文档会跟着走。
+
 ## 改完必跑
 
 ```
