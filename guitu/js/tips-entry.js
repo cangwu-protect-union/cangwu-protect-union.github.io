@@ -58,7 +58,7 @@
       '<p class="entry-foot"><a class="btn btn-ghost" id="backFoot" href="' + back.href + '">' + back.text + "</a></p>";
   }
 
-  window.GuiData.listTips().then(function (tips) {
+  window.GuiData.listTips(["approved", "adopted"]).then(function (tips) {
     var t = tips.filter(function (x) { return x.id === id; })[0];
     if (!t) {
       rootEl.innerHTML = '<h1>情报不存在</h1><p class="lead">链接无效，或者这条情报已被清理。</p>' +

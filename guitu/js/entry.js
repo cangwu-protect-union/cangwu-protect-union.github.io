@@ -22,8 +22,7 @@
 
   var id = new URLSearchParams(location.search).get("id");
 
-  window.GuiData.list().then(function (entries) {
-    var entry = entries.filter(function (e) { return e.id === id; })[0];
+  window.GuiData.getEntry(id).then(function (entry) {
     if (!entry) { notFound(); return; }
 
     document.title = entry.title + " · 鬼图鉴 · CPU";

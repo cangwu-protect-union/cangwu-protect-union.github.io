@@ -74,7 +74,7 @@
     else countEl.textContent = "共 " + allTips.length + " 条情报";
   }
 
-  window.GuiData.listTips().then(function (tips) {
+  window.GuiData.listTips(["approved", "adopted"]).then(function (tips) {
     allTips = tips;
     render(inputEl.value);
   }).catch(function (err) {
@@ -82,4 +82,15 @@
   });
 
   inputEl.addEventListener("input", function () { render(inputEl.value); });
+
+  /* 已验证身份的成员才看到「审核投稿」入口，顺便把待审数量写进按钮 */
+  if (window.GuiGate && window.GuiGate.isVerified()) {
+    var reviewLink = document.getElementById("reviewLink");
+    if (reviewLink) {
+      reviewLink.hidden = false;
+      window.GuiData.listTips(["pending"]).then(function (list) {
+        reviewLink.textContent = list.length ? "审核投稿（" + list.length + " 待审）" : "审核投稿";
+      }).catch(function () {});
+    }
+  }
 })();

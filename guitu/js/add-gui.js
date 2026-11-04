@@ -16,6 +16,9 @@
   /* 引用过的情报：[{id, title}]，随条目一起保存 */
   var pickedRefs = [];
 
+  /* 查重提示已经确认过（避免第二次提交又被拦一次） */
+  var dupAcknowledged = false;
+
   var gateSection = document.getElementById("gateSection");
   var gateMount   = document.getElementById("gateMount");
   var formSection = document.getElementById("formSection");
@@ -81,6 +84,38 @@
     if (!body) {
       formError.textContent = "正文不能为空。";
       formError.hidden = false;
+      return;
+    }
+
+    /* 查重：标题和已有条目/情报相似度够高就先拦一次，确认后才继续。
+       查重本身失败不会阻塞提交（GuiData.dupCheck 内部吞掉错误）。 */
+    if (!dupAcknowledged) {
+      var dupBtn = entryForm.querySelector('button[type="submit"]');
+      var dupLabel = dupBtn ? dupBtn.textContent : "";
+      if (dupBtn) { dupBtn.disabled = true; dupBtn.textContent = "查重中…"; }
+
+      window.GuiData.dupCheck(title).then(function (hits) {
+        if (dupBtn) { dupBtn.disabled = false; dupBtn.textContent = dupLabel || "确认提交"; }
+
+        var close = (hits || []).filter(function (h) { return h.score >= 0.5; });
+        var goOn = true;
+
+        if (close.length) {
+          var lines = close.slice(0, 3).map(function (h) {
+            return "· " + h.title + "（" + (h.kind === "entry" ? "已有条目" : "已有情报") +
+                   "，相似度 " + h.score + "）";
+          });
+          goOn = window.confirm(
+            "已经存在相似的内容：\n" + lines.join("\n") +
+            "\n\n如果这是同一起事件，请改为补充已有条目；确实是新内容就点确定继续提交。"
+          );
+        }
+
+        if (!goOn) return;
+        dupAcknowledged = true;
+        if (entryForm.requestSubmit) entryForm.requestSubmit();
+        else entryForm.dispatchEvent(new Event("submit", { cancelable: true }));
+      });
       return;
     }
 

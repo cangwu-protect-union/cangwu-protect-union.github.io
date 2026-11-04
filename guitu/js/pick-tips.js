@@ -123,7 +123,7 @@
     location.href = backUrl;
   });
 
-  window.GuiData.listTips().then(function (tips) {
+  window.GuiData.listTips(["approved", "adopted"]).then(function (tips) {
     allTips = tips;
     render(inputEl.value);
   }).catch(function (err) {

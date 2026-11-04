@@ -411,6 +411,22 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
   color: var(--muted);
 }
 
+/* 分页条：条目多于一页时才出现 */
+.gui-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 24px 0 8px;
+}
+.gui-pager .btn { min-width: 88px; }
+.gui-pager .btn:disabled { opacity: .45; cursor: default; transform: none; }
+.gui-pager-info {
+  font-size: .88rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 
 /* =============================================================
    12. 鬼图鉴 —— 条目详情页
@@ -1157,4 +1173,95 @@ body.has-pick-bar { padding-bottom: 76px; }
   color: #1a5c2a;
   text-decoration: underline;
   font-size: .88rem;
+}
+
+/* =============================================================
+   17. 投稿审核页
+   ============================================================= */
+
+.review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 6px;
+}
+.review-tabs .btn.is-on {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.review-list { display: grid; gap: 14px; }
+
+.review-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.review-item-img {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.review-item-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.review-item-body { flex: 1 1 auto; min-width: 0; }
+
+.review-item-title { margin: 2px 0 6px; font-size: 1.02rem; line-height: 1.4; }
+.review-item-meta { margin: 0 0 8px; font-size: .84rem; }
+
+.review-details summary {
+  cursor: pointer;
+  font-size: .88rem;
+  color: var(--muted);
+}
+.review-body {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: .92rem;
+  line-height: 1.7;
+}
+.review-body p { margin: 0 0 10px; }
+.review-body p:last-child { margin-bottom: 0; }
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.review-note {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: .9rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+.review-note:focus { border-color: var(--accent); }
+
+.review-meta { margin: 12px 0 0; font-size: .84rem; }
+
+@media (max-width: 560px) {
+  .review-item { flex-direction: column; }
+  .review-item-img { width: 100%; height: 160px; flex: 0 0 auto; }
+  .review-actions .btn { flex: 1 1 0; }
 }
