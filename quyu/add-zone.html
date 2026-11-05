@@ -6,6 +6,7 @@
   <title>增加区域 · 异常区域档案 · CPU</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/quyu.css">
 </head>
 <body>
@@ -33,23 +34,14 @@
 
     <section id="formSection" hidden>
       <h1>增加区域</h1>
-      <p class="lead">填写完毕后点「确认」，区域会直接写入档案。</p>
+      <p class="lead">位置必填。关联条目与引用情报可以留空，之后再补。</p>
 
-      <form id="zoneForm" autocomplete="off">
-        <div id="formMount"></div>
+      <div id="editorMount"></div>
 
-        <div class="picked-box" id="pickedBox" hidden>
-          <p class="picked-box__title">已引用的投稿</p>
-          <ul class="picked-list" id="pickedList"></ul>
-          <p class="muted field-hint">保存后这些投稿会被标记为「已采纳」并链接到本区域。</p>
-        </div>
-
-        <div class="gate-actions">
-          <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
-          <button type="button" class="btn btn-ghost" id="pickTipsBtn">引用投稿</button>
-          <button type="submit" class="btn" id="submitBtn">确认</button>
-        </div>
-      </form>
+      <div class="gate-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+        <button type="button" class="btn" id="submitBtn">确认</button>
+      </div>
     </section>
 
     <section id="doneSection" hidden>
@@ -59,7 +51,6 @@
         <a class="btn" id="doneView" href="quyu.html">查看该区域</a>
         <a class="btn btn-ghost" href="edit-zones.html">返回编辑区</a>
       </p>
-      <p class="gate-error" id="adoptError" hidden></p>
     </section>
 
   </main>
@@ -73,9 +64,16 @@
   <script src="data/config.js"></script>
   <script src="data/zone-seeds.js"></script>
   <script src="js/zone-data.js"></script>
+  <script src="js/relation-utils.js"></script>
+  <script src="js/refs-list.js"></script>
+  <script src="js/relation-box.js"></script>
   <script src="js/gui-gate.js"></script>
   <script src="js/zone-upload.js"></script>
+  <script src="js/location-picker.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/zone-map.js"></script>
   <script src="js/zone-form.js"></script>
+  <script src="js/zone-editor.js"></script>
   <script src="js/add-zone.js"></script>
 </body>
 </html>

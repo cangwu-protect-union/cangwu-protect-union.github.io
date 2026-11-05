@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>选择位置 · 异常区域档案 · CPU</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/quyu.css">
+</head>
+<body class="pick-loc-page">
+
+  <div class="pick-loc-bar">
+    <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+    <div class="pick-loc-bar__center">
+      <p class="pick-loc-bar__hint" id="pickHint">在地图上点一下选择位置</p>
+      <p class="pick-loc-bar__coord" id="pickCoord">未标点</p>
+    </div>
+    <button type="button" class="btn" id="okBtn" disabled>确认</button>
+  </div>
+
+  <div class="pick-loc-map" id="pickMap"></div>
+
+  <script src="data/config.js"></script>
+  <script src="data/zone-seeds.js"></script>
+  <script src="js/location-picker.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/zone-map.js"></script>
+  <script src="js/pick-location.js"></script>
+</body>
+</html>

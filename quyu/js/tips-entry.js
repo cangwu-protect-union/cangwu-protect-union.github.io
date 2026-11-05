@@ -57,9 +57,7 @@
 
     root.innerHTML =
       '<h1 class="entry-title">' + esc(tip.title) + "</h1>" +
-      (tip.region ? '<p class="entry-date muted">' + esc(tip.region) + "</p>" : "") +
       '<table class="zone-info"><tbody>' +
-        '<tr><th>编号</th><td>' + esc(tip.id) + "</td></tr>" +
         (tip.date ? "<tr><th>报告日期</th><td>" + esc(tip.date) + "</td></tr>" : "") +
         (typeof tip.lng === "number" && typeof tip.lat === "number"
           ? "<tr><th>坐标</th><td>" + tip.lng.toFixed(4) + ", " + tip.lat.toFixed(4) +

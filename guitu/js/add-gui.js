@@ -16,6 +16,9 @@
   /* 引用过的情报：[{id, title}]，随条目一起保存 */
   var pickedRefs = [];
 
+  /* 关联条目框（只在增加条目模式用，提供情报页隐藏） */
+  var relBox = null;
+
   /* 查重提示已经确认过（避免第二次提交又被拦一次） */
   var dupAcknowledged = false;
 
@@ -127,6 +130,7 @@
       body: body,
       tags: tags,
       date: today,
+      related: relBox ? relBox.tokens() : [],
       refs: pickedRefs          /* 引用过的情报 [{id,title}]，仅增加条目模式会有 */
     };
 
@@ -577,7 +581,8 @@
         tags: els.tags ? els.tags.value : "",
         imageUrl: els.imageUrl ? els.imageUrl.value : "",
         images: imgs,
-        refs: pickedRefs
+        refs: pickedRefs,
+        related: relBox ? relBox.tokens() : []
       }));
     } catch (e) {}
   }
@@ -612,6 +617,7 @@
     if (els.tags && d.tags) els.tags.value = d.tags;
     if (els.imageUrl && d.imageUrl) els.imageUrl.value = d.imageUrl;
     if (d.refs && d.refs.length) pickedRefs = d.refs;
+    if (d.related && relBox) relBox.setTokens(d.related);
 
     /* 已上传的图片直接放回队列，标记为完成，不需要重传 */
     (d.images || []).forEach(function (im) {
@@ -668,9 +674,33 @@
   });
 
   /* 顺序很重要：
-     1. 先把上次没提交完的草稿填回去
-     2. 再把这次通过「引用情报」选中的内容合并进来
+     1. 先把关联条目框建起来（草稿恢复要往里塞 token）
+     2. 再把上次没提交完的草稿填回去
+     3. 最后把这次通过「引用情报 / 引用条目」选中的内容合并进来
      反过来的话，恢复草稿会把刚合并的内容覆盖掉。 */
+  if (!IS_TIP && window.RelationBox) {
+    relBox = window.RelationBox.mount(document.getElementById("relBox"), {
+      selfType: "ghost",
+      selfId: "",
+      pickUrl: "../quyu/pick-relation.html",
+      listUrl: function (it) {
+        return it.type === "ghost"
+          ? "条目.html?id=" + encodeURIComponent(it.id)
+          : "../quyu/zone.html?id=" + encodeURIComponent(it.id);
+      }
+    });
+  }
+
   restoreDraft();
+
+  /* 从「引用条目」页回来：这次选的覆盖草稿里的旧选择 */
+  if (!IS_TIP && relBox) {
+    var pickedRel = window.ZoneRelations.peekPick();
+    if (pickedRel && pickedRel.done) {
+      window.ZoneRelations.takePicked();
+      relBox.setTokens(pickedRel.selected || []);
+    }
+  }
+
   if (!IS_TIP) applyPickedTips();
 })();

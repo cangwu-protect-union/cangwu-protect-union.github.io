@@ -65,8 +65,13 @@
         </div>
 
         <div class="field">
-          <label for="fTags">标签 <span class="muted">（用逗号分隔）</span></label>
+          <label for="fTags">标签 <span class="muted">（用逗号分隔，每个不超过 8 字）</span></label>
           <input id="fTags" name="tags" type="text" placeholder="异次元, 已镇压">
+        </div>
+
+        <div class="field" id="relField">
+          <label>关联条目 <span class="muted">（鬼与区域可以互相引用）</span></label>
+          <div id="relBox"></div>
         </div>
 
         <p class="gate-error" id="formError" hidden></p>
@@ -118,6 +123,8 @@
   <script src="js/gui-gate.js"></script>
   <script src="js/gui-data.js"></script>
   <script src="js/gui-upload.js"></script>
+  <script src="../quyu/js/relation-utils.js"></script>
+  <script src="../quyu/js/relation-box.js"></script>
   <script src="js/add-gui.js"></script>
 </body>
 </html>

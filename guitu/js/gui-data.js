@@ -134,6 +134,7 @@
      新增一个类似图鉴的模块时，复制这张表就是它的数据模型。
      ============================================================ */
   var INTRO_MAX = 90;
+  var TAG_MAX = 8;
 
   var ENTRY_FIELDS = [
     { key: "id", label: "编号", type: "string", required: true },
@@ -173,6 +174,15 @@
         problems.push("日期要写成 YYYY-MM-DD");
       }
     }
+
+    if (Array.isArray(entry.tags)) {
+      entry.tags.forEach(function (t) {
+        if (String(t).trim().length > TAG_MAX) {
+          problems.push("标签「" + String(t).trim() + "」超过 " + TAG_MAX + " 个字");
+        }
+      });
+    }
+
     return problems;
   }
 
@@ -198,6 +208,7 @@
       id: r.id, title: r.title, image: r.image, images: r.images || [],
       thumbs: r.thumbs || [],
       refs: r.refs || [],
+      related: r.related || [],
       intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
       deleted: !!r.deleted, updated_at: r.updated_at
     };
@@ -463,6 +474,8 @@
       image: entry.image,
       images: entry.images || [],
       thumbs: entry.thumbs || [],
+      related: entry.related || [],
+      refs: entry.refs || [],
       intro: entry.intro,
       body: entry.body,
       tags: entry.tags || [],
@@ -547,6 +560,7 @@
       images: e.images || [],
       thumbs: e.thumbs || [],
       refs: e.refs || [],
+      related: e.related || [],
       intro: e.intro || "",
       body: e.body || "",
       tags: e.tags || [],
@@ -574,6 +588,7 @@
           id: r.id, title: r.title, image: r.image, images: r.images || [],
           thumbs: r.thumbs || [],
           refs: r.refs || [],
+          related: r.related || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
         };
@@ -877,6 +892,7 @@
     /* 条目字段的单一来源（表单、校验、新模块都从这里取） */
     ENTRY_FIELDS: ENTRY_FIELDS,
     INTRO_MAX: INTRO_MAX,
+    TAG_MAX: TAG_MAX,
     validateEntry: validateEntry,
     buildIntro: buildIntro,
     parseTags: parseTags

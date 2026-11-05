@@ -1,5 +1,8 @@
 /* ============================================================
    entry.js —— 条目详情页逻辑：按 ?id=... 找到并渲染该条目
+   ------------------------------------------------------------
+   底部两块：关联条目（鬼 / 区域两段，含别人引用过来的）、引用情报（折叠）。
+   两块都复用区域档案模块的组件，查询逻辑只有一份。
    ============================================================ */
 (function () {
   "use strict";
@@ -50,58 +53,58 @@
       '</div>';
     }
 
-    /* 引用情报：正文末尾列出跳转链接（引用时只拷贝了文段/图片/标签，标题不拷贝） */
-    var refs = Array.isArray(entry.refs) ? entry.refs : [];
-    var refsHtml = "";
-    if (refs.length) {
-      refsHtml =
-        '<div class="entry-refs">' +
-          '<p class="entry-refs-title">引用情报</p>' +
-          '<ul>' +
-            refs.map(function (r) {
-              var rid = (r && r.id) ? r.id : "";
-              var rtitle = (r && r.title) ? r.title : "（无标题）";
-              return '<li><a href="tips-entry.html?id=' + encodeURIComponent(rid) + '">' +
-                       esc(rtitle) + "</a></li>";
-            }).join("") +
-          "</ul>" +
-        "</div>";
-    }
-
     root.innerHTML =
       '<h1 class="entry-title">' + esc(entry.title) + "</h1>" +
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
-      refsHtml +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
 
-    /* 出没区域：反查异常区域档案里 ghost_ids 含本条目 id 的区域。
-       用 ZoneData.getZonesByGhost（复用区域模块的查询），没有结果就不显示。 */
-    if (window.ZoneData && typeof window.ZoneData.getZonesByGhost === "function") {
-      window.ZoneData.getZonesByGhost(entry.id).then(function (zones) {
-        var host = document.getElementById("entryZones");
-        if (!host || !zones.length) return;
+    var foot = root.querySelector(".entry-foot");
 
-        host.innerHTML =
-          '<div class="entry-refs">' +
-            '<p class="entry-refs-title">出没区域</p>' +
+    /* 关联条目 */
+    var relHost = document.getElementById("entryRelations");
+    if (relHost && window.ZoneRelations) {
+      window.ZoneRelations.listFor("ghost", entry.id).then(function (items) {
+        if (!items || !items.length) return;
+
+        var ghosts = items.filter(function (x) { return x.type === "ghost"; });
+        var zones = items.filter(function (x) { return x.type === "zone"; });
+
+        function block(title, list, href) {
+          if (!list.length) return "";
+          return '<div class="entry-refs">' +
+            '<p class="entry-refs-title">' + title + "（" + list.length + "）</p>" +
             "<ul>" +
-              zones.map(function (z) {
-                var meta = [z.region, z.level ? z.level + " 级" : "", z.status]
-                  .filter(Boolean).join(" · ");
-                return '<li><a href="../quyu/zone.html?id=' + encodeURIComponent(z.id) + '">' +
-                       esc(z.title) + "</a>" +
-                       (meta ? ' <span class="muted">（' + esc(meta) + "）</span>" : "") + "</li>";
+              list.map(function (it) {
+                return '<li><a href="' + href(it) + '">' + esc(it.title) + "</a></li>";
               }).join("") +
             "</ul>" +
           "</div>";
+        }
 
-        /* 容器默认在正文外面，挪到「返回图鉴」按钮之前，读起来更顺 */
-        var foot = root.querySelector(".entry-foot");
-        if (foot && foot.parentNode) foot.parentNode.insertBefore(host, foot);
-      }).catch(function () { /* 反查失败不影响正文 */ });
+        relHost.innerHTML =
+          block("关联的鬼", ghosts, function (it) {
+            return "条目.html?id=" + encodeURIComponent(it.id);
+          }) +
+          block("关联的区域", zones, function (it) {
+            return "../quyu/zone.html?id=" + encodeURIComponent(it.id);
+          });
+
+        if (foot && foot.parentNode) foot.parentNode.insertBefore(relHost, foot);
+      }).catch(function () { /* 关联失败不影响正文 */ });
+    }
+
+    /* 引用情报 */
+    var refsHost = document.getElementById("entryRefs");
+    if (refsHost && window.RefsList && (entry.refs || []).length) {
+      window.RefsList.mount(refsHost, {
+        refs: entry.refs,
+        editable: false,
+        href: function (r) { return "tips-entry.html?id=" + encodeURIComponent(r.id); }
+      });
+      if (foot && foot.parentNode) foot.parentNode.insertBefore(refsHost, foot);
     }
   }).catch(function () { notFound(); });
 })();

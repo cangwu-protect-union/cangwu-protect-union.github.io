@@ -27,8 +27,9 @@
       <p class="muted">正在载入…</p>
     </article>
 
-    <!-- 出没区域：由 entry.js 反查异常区域档案填充，查不到就保持空白 -->
-    <section id="entryZones"></section>
+    <!-- 关联条目与引用情报由 entry.js 填充，渲染后会被挪到「返回图鉴」之前 -->
+    <section id="entryRelations"></section>
+    <section id="entryRefs"></section>
 
   </main>
 
@@ -41,9 +42,10 @@
   <script src="data/config.js"></script>
   <script src="data/gui-entries.js"></script>
   <script src="js/gui-data.js"></script>
-  <!-- 反查「出没区域」：复用异常区域档案的数据层与兜底种子，不重复写一套查询 -->
+  <!-- 关联条目与引用情报复用区域档案模块的组件，查询逻辑只有一份 -->
   <script src="../quyu/data/zone-seeds.js"></script>
-  <script src="../quyu/js/zone-data.js"></script>
+  <script src="../quyu/js/relation-utils.js"></script>
+  <script src="../quyu/js/refs-list.js"></script>
   <script src="js/entry.js"></script>
 </body>
 </html>

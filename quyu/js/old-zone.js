@@ -31,7 +31,7 @@
       '<div class="gui-card">' +
         '<div class="gui-card-body">' +
           '<h3 class="gui-card-title">' + esc(v.title || "（无标题）") + "</h3>" +
-          '<p class="zone-where">' + esc(v.region || "") + "</p>" +
+
           '<p class="zone-badges">' +
             '<span class="zone-badge">' + (v.reason === "delete" ? "删除前存档" : "编辑前存档") + "</span>" +
             (v.applied ? '<span class="zone-badge zone-status" data-status="已清除">已应用</span>' : "") +
@@ -55,7 +55,7 @@
     }
 
     editLink.href = "edit-zone.html?id=" + encodeURIComponent(zoneId);
-    oldSub.textContent = "区域编号 " + zoneId;
+    oldSub.textContent = "";
 
     window.ZoneData.listVersionsForZone(zoneId).then(function (versions) {
       listEl.innerHTML = versions.map(cardHtml).join("");

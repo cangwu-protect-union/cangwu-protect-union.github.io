@@ -33,7 +33,6 @@
         (img ? '<div class="gui-card-img"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : "") +
         '<div class="gui-card-body">' +
           '<h3 class="gui-card-title">' + esc(t.title) + "</h3>" +
-          (t.region ? '<p class="zone-where">' + esc(t.region) + "</p>" : "") +
           '<p class="gui-card-intro">' + esc(t.intro) + "</p>" +
           '<p class="zone-badges">' + badge +
             (t.date ? '<span class="muted">' + esc(t.date) + "</span>" : "") +

@@ -1,22 +1,18 @@
 /* ============================================================
    zone-form.js —— 区域表单（新增 / 编辑 / 投稿 三处共用）
    ------------------------------------------------------------
-   为什么做成一个模块：三张页面要填的是同一套字段，
-   字段清单一变就得改三处，迟早不一致。这里从 ZoneData.ZONE_FIELDS
-   和三个枚举里取，页面只管「什么时候显示、提交给谁」。
+   字段：区域名、位置（必填，小地图 + 坐标）、描述、图片、标签、日期。
+   位置通过 pick-location.html 标点；跳走前把已填内容存进 sessionStorage，
+   回来后原样恢复——不然标一次点，上面写的东西全没了。
 
    对外：
      var form = ZoneForm.mount(rootEl, { mode: "create"|"edit"|"tip", value: zone })
-     form.collect()       → 字段对象
-     form.validate()      → 人话的问题数组，空数组表示通过
-     form.media()         → { image, images, thumbs }
-     form.isUploading()   → 还有图片在上传就返回 true
-     form.setValue(zone)  → 回填
-     form.reset()         → 清空
+     form.collect() / validate() / media() / isUploading() / setValue() / reset()
    ============================================================ */
 (function () {
   "use strict";
 
+  var DRAFT_KEY = "quyu_form_draft";
   var seq = 0;
 
   function esc(s) {
@@ -31,10 +27,9 @@
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
   }
 
-  function options(list, current) {
-    return '<option value="">（未定）</option>' + list.map(function (v) {
-      return '<option value="' + esc(v) + '"' + (v === current ? " selected" : "") + ">" + esc(v) + "</option>";
-    }).join("");
+  function coordText(lng, lat) {
+    if (typeof lng !== "number" || typeof lat !== "number") return "未标点";
+    return lng.toFixed(4) + ", " + lat.toFixed(4);
   }
 
   function mount(root, opts) {
@@ -42,7 +37,6 @@
     var value = opts.value || {};
     var mode = opts.mode || "create";
     var isTip = mode === "tip";
-
     var D = window.ZoneData;
 
     root.innerHTML = "" +
@@ -51,41 +45,14 @@
         '<input id="zfTitle" type="text" maxlength="60" placeholder="例：苍梧西门旧糖厂">' +
       "</div>" +
 
-      '<div class="field-row">' +
-        '<div class="field">' +
-          '<label for="zfRegion">所属地区</label>' +
-          '<input id="zfRegion" type="text" maxlength="60" placeholder="例：苍梧 · 城西">' +
-        "</div>" +
-        '<div class="field">' +
-          '<label for="zfTerrain">地形</label>' +
-          '<select id="zfTerrain">' + options(D.TERRAIN, "") + "</select>" +
-        "</div>" +
-      "</div>" +
-
-      '<div class="field-row">' +
-        '<div class="field">' +
-          '<label for="zfLng">经度 <span class="muted">（可留空）</span></label>' +
-          '<input id="zfLng" type="number" step="0.000001" placeholder="120.583">' +
-        "</div>" +
-        '<div class="field">' +
-          '<label for="zfLat">纬度</label>' +
-          '<input id="zfLat" type="number" step="0.000001" placeholder="31.313">' +
-        "</div>" +
-      "</div>" +
-      '<p class="field-hint">坐标用 WGS-84，与天地图一致；渲染高德过渡底图时会自动换算，不用自己改。</p>' +
-
-      '<div class="field-row" data-admin>' +
-        '<div class="field">' +
-          '<label for="zfLevel">危险等级</label>' +
-          '<select id="zfLevel">' + options(D.LEVELS, "") + "</select>" +
-        "</div>" +
-        '<div class="field">' +
-          '<label for="zfStatus">状态</label>' +
-          '<select id="zfStatus">' + options(D.STATUSES, "") + "</select>" +
-        "</div>" +
-        '<div class="field">' +
-          '<label for="zfRadius">范围半径（米）</label>' +
-          '<input id="zfRadius" type="number" min="0" step="10" placeholder="0 表示未测定">' +
+      '<div class="field">' +
+        '<label>位置 <span class="muted">' + (isTip ? "（可留空）" : "（必填）") + "</span></label>" +
+        '<div class="loc-box" id="zfLocBox" role="button" tabindex="0" aria-label="选择位置">' +
+          '<div class="loc-box__map" id="zfLocMap"></div>' +
+          '<div class="loc-box__side">' +
+            '<p class="loc-box__text" id="zfLocText">未标点</p>' +
+            '<button type="button" class="btn btn-ghost" id="zfLocBtn">选择位置</button>' +
+          "</div>" +
         "</div>" +
       "</div>" +
 
@@ -108,7 +75,7 @@
 
       '<div class="field-row">' +
         '<div class="field">' +
-          '<label for="zfTags">标签 <span class="muted">（逗号分隔）</span></label>' +
+          '<label for="zfTags">标签 <span class="muted">（逗号分隔，每个不超过 ' + D.TAG_MAX + ' 字）</span></label>' +
           '<input id="zfTags" type="text" placeholder="城市异常, 有影像记录">' +
         "</div>" +
         '<div class="field">' +
@@ -121,13 +88,10 @@
 
     var el = {
       title: root.querySelector("#zfTitle"),
-      region: root.querySelector("#zfRegion"),
-      terrain: root.querySelector("#zfTerrain"),
-      lng: root.querySelector("#zfLng"),
-      lat: root.querySelector("#zfLat"),
-      level: root.querySelector("#zfLevel"),
-      status: root.querySelector("#zfStatus"),
-      radius: root.querySelector("#zfRadius"),
+      locBox: root.querySelector("#zfLocBox"),
+      locMap: root.querySelector("#zfLocMap"),
+      locText: root.querySelector("#zfLocText"),
+      locBtn: root.querySelector("#zfLocBtn"),
       body: root.querySelector("#zfBody"),
       image: root.querySelector("#zfImage"),
       tags: root.querySelector("#zfTags"),
@@ -139,14 +103,72 @@
       error: root.querySelector("#zfError")
     };
 
-    /* 投稿页看不到「等级 / 状态 / 半径」，那些由组织在采纳时补 */
-    if (isTip) {
-      root.querySelectorAll("[data-admin]").forEach(function (n) { n.hidden = true; });
+    var coords = { lng: null, lat: null };
+    var mini = null;
+
+    /* ---------------- 位置：小地图 + 跳转标点 ---------------- */
+
+    function renderLoc() {
+      el.locText.textContent = coordText(coords.lng, coords.lat);
+      el.locBox.classList.toggle("is-empty", coords.lng == null);
+
+      if (!window.ZoneMap) return;
+
+      if (!mini) {
+        mini = window.ZoneMap.create(el.locMap, {
+          center: [coords.lat == null ? 30.9 : coords.lat, coords.lng == null ? 120.2 : coords.lng],
+          zoom: coords.lng == null ? 5 : 11,
+          interactive: false
+        });
+        if (coords.lng != null) mini.addZone({ lng: coords.lng, lat: coords.lat });
+      } else {
+        mini.setPosition(coords.lng, coords.lat);
+      }
     }
+
+    function saveDraft() {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+          title: el.title.value,
+          body: el.body.value,
+          tags: el.tags.value,
+          date: el.date.value,
+          image: el.image.value,
+          images: queue.filter(function (i) { return i.status === "done"; }).map(function (i) { return i.url; }),
+          thumbs: queue.filter(function (i) { return i.status === "done"; }).map(function (i) { return i.thumb || i.url; })
+        }));
+      } catch (e) {}
+    }
+
+    function readDraft() {
+      try {
+        var v = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+        sessionStorage.removeItem(DRAFT_KEY);
+        return v && typeof v === "object" ? v : null;
+      } catch (e) { return null; }
+    }
+
+    function gotoPicker() {
+      if (opts.onBeforeNavigate) { try { opts.onBeforeNavigate(); } catch (_e) {} }
+      saveDraft();
+      window.ZonePicker.open(coords.lng, coords.lat, location.pathname + location.search);
+    }
+
+    el.locBox.addEventListener("click", function (ev) {
+      if (ev.target.closest("button")) return;
+      gotoPicker();
+    });
+    el.locBox.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); gotoPicker(); }
+    });
+    el.locBtn.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      gotoPicker();
+    });
 
     /* ---------------- 图片队列 ---------------- */
 
-    var queue = [];      /* { key, file, previewUrl, status, url, thumb } */
+    var queue = [];
     var running = 0;
     var MAX_CONCURRENT = 2;
 
@@ -247,7 +269,7 @@
       }
     });
 
-    /* ---------------- 对外 ---------------- */
+    /* ---------------- 取值 / 校验 ---------------- */
 
     function media() {
       var done = queue.filter(function (i) { return i.status === "done"; });
@@ -259,19 +281,10 @@
 
     function collect() {
       var m = media();
-      var lng = el.lng.value.trim();
-      var lat = el.lat.value.trim();
-      var radius = el.radius.value.trim();
-
       return {
         title: el.title.value.trim(),
-        region: el.region.value.trim(),
-        lng: lng === "" ? null : Number(lng),
-        lat: lat === "" ? null : Number(lat),
-        radius_m: radius === "" ? 0 : Math.round(Number(radius)),
-        terrain: el.terrain.value,
-        level: el.level.value,
-        status: el.status.value,
+        lng: coords.lng,
+        lat: coords.lat,
         image: el.image.value.trim() || m.images[0] || "",
         images: m.images,
         thumbs: m.thumbs,
@@ -285,13 +298,11 @@
     function validate() {
       var v = collect();
       var problems = window.ZoneData.validateZone({
-        title: v.title, region: v.region, body: v.body, date: v.date
+        title: v.title, body: v.body, tags: v.tags, date: v.date
       });
 
       if (v.title && v.title.length > 60) problems.push("区域名不要超过 60 个字");
-      if ((v.lng == null) !== (v.lat == null)) problems.push("经度和纬度要同时填，或者都留空");
-      if (v.lng != null && (v.lng < -180 || v.lng > 180)) problems.push("经度要在 -180 到 180 之间");
-      if (v.lat != null && (v.lat < -90 || v.lat > 90)) problems.push("纬度要在 -90 到 90 之间");
+      if (!isTip && (v.lng == null || v.lat == null)) problems.push("还没标位置，点「选择位置」在地图上点一下");
       if (v.body && v.body.trim().length < 10) problems.push("描述太短了，至少写一两句话");
       if (isUploading()) problems.push("还有图片在上传，等一会儿再保存");
 
@@ -305,19 +316,14 @@
     function setValue(zone) {
       zone = zone || {};
       el.title.value = zone.title || "";
-      el.region.value = zone.region || "";
-      el.terrain.value = zone.terrain || "";
-      el.lng.value = typeof zone.lng === "number" ? zone.lng : "";
-      el.lat.value = typeof zone.lat === "number" ? zone.lat : "";
-      el.level.value = zone.level || "";
-      el.status.value = zone.status || "";
-      el.radius.value = zone.radius_m ? zone.radius_m : "";
       el.body.value = zone.body || "";
       el.image.value = zone.image || "";
       el.tags.value = (zone.tags || []).join(", ");
       el.date.value = zone.date || today();
 
-      /* 已有图片直接放进队列，显示成已上传状态 */
+      coords.lng = typeof zone.lng === "number" ? zone.lng : null;
+      coords.lat = typeof zone.lat === "number" ? zone.lat : null;
+
       queue = (zone.images || []).map(function (url, i) {
         return {
           key: "zimg" + (++seq),
@@ -330,6 +336,7 @@
         };
       });
       renderThumbs();
+      renderLoc();
     }
 
     function reset() {
@@ -342,8 +349,44 @@
       el.error.hidden = !text;
     }
 
+    function setCoords(lng, lat) {
+      coords.lng = typeof lng === "number" ? lng : null;
+      coords.lat = typeof lat === "number" ? lat : null;
+      renderLoc();
+    }
+
+    /* ---------------- 初始化 ---------------- */
+
     setValue(value);
     if (!el.date.value) el.date.value = today();
+
+    /* 从标点页回来：先取坐标，再恢复跳走前存的草稿 */
+    if (window.ZonePicker) {
+      var picked = window.ZonePicker.take();
+      if (picked) {
+        setCoords(picked.lng, picked.lat);
+
+        var draft = readDraft();
+        if (draft) {
+          el.title.value = draft.title || el.title.value;
+          el.body.value = draft.body || el.body.value;
+          el.tags.value = draft.tags || el.tags.value;
+          el.date.value = draft.date || el.date.value;
+          el.image.value = draft.image || el.image.value;
+          if (draft.images && draft.images.length) {
+            queue = draft.images.map(function (url, i) {
+              return {
+                key: "zimg" + (++seq), file: null,
+                previewUrl: (draft.thumbs && draft.thumbs[i]) || url,
+                status: "done", url: url, thumb: (draft.thumbs && draft.thumbs[i]) || url, error: ""
+              };
+            });
+            renderThumbs();
+          }
+        }
+        window.ZonePicker.clear();
+      }
+    }
 
     return {
       collect: collect,
@@ -353,6 +396,8 @@
       setValue: setValue,
       reset: reset,
       showError: showError,
+      setCoords: setCoords,
+      coords: function () { return { lng: coords.lng, lat: coords.lat }; },
       el: el,
       isTip: isTip
     };

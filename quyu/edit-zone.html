@@ -6,6 +6,7 @@
   <title>编辑区域 · 异常区域档案 · CPU</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/quyu.css">
 </head>
 <body>
@@ -35,23 +36,21 @@
       <h1 id="editTitle">编辑区域</h1>
       <p class="lead muted" id="editSub"></p>
 
-      <p class="gui-actions" id="topActions">
+      <p class="gui-actions">
         <a class="btn btn-ghost" id="viewLink" href="quyu.html">查看公开页</a>
-        <a class="btn btn-ghost" id="historyLink" href="old-zones.html">旧档案</a>
+        <a class="btn btn-ghost" id="historyLink" href="old-zones.html">历史版本</a>
       </p>
 
-      <form id="zoneForm" autocomplete="off">
-        <div id="formMount"></div>
+      <div id="editorMount"></div>
 
-        <p class="gate-error" id="saveError" hidden></p>
+      <p class="gate-error" id="saveError" hidden></p>
 
-        <div class="gate-actions">
-          <button type="button" class="btn btn-ghost" id="cancelBtn">放弃修改</button>
-          <button type="button" class="btn btn-danger" id="deleteBtn">删除区域</button>
-          <button type="button" class="btn btn-ghost" id="restoreBtn" hidden>恢复区域</button>
-          <button type="submit" class="btn" id="saveBtn">保存</button>
-        </div>
-      </form>
+      <div class="gate-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+        <button type="button" class="btn btn-danger" id="deleteBtn">删除区域</button>
+        <button type="button" class="btn btn-ghost" id="restoreBtn" hidden>恢复区域</button>
+        <button type="button" class="btn" id="saveBtn">保存</button>
+      </div>
     </section>
 
   </main>
@@ -65,9 +64,16 @@
   <script src="data/config.js"></script>
   <script src="data/zone-seeds.js"></script>
   <script src="js/zone-data.js"></script>
+  <script src="js/relation-utils.js"></script>
+  <script src="js/refs-list.js"></script>
+  <script src="js/relation-box.js"></script>
   <script src="js/gui-gate.js"></script>
   <script src="js/zone-upload.js"></script>
+  <script src="js/location-picker.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/zone-map.js"></script>
   <script src="js/zone-form.js"></script>
+  <script src="js/zone-editor.js"></script>
   <script src="js/edit-zone.js"></script>
 </body>
 </html>

@@ -1,24 +1,23 @@
 /* ============================================================
-   zone-map.js —— 地图基础设施（地图页与详情页缩略图共用）
+   zone-map.js —— 地图基础设施（地图页、详情页缩略图、表单缩略图共用）
    ------------------------------------------------------------
-   职责只有三件：
+   职责：
      1. 按 data/config.js 的 provider 建底图（天地图 / 高德过渡）
      2. 坐标换算：数据库统一存 WGS-84；高德瓦片是 GCJ-02，需要转换
      3. 瓦片连续失败时降级成纯色底，标记照常显示
 
-   为什么坐标要换算：高德瓦片底图用的是 GCJ-02（火星坐标），
-   直接把 WGS-84 的经纬度画上去，点位会偏 200~600 米。
-   天地图是 CGCS2000，与 WGS-84 只差厘米级，不需要转换。
+   标记不再按等级上色（等级字段已删），统一用一个强调色。
    ============================================================ */
 (function () {
   "use strict";
 
-  var TILE_ERROR_LIMIT = 6;    /* 连续这么多个瓦片失败就降级 */
+  var TILE_ERROR_LIMIT = 6;
+  var MARKER_COLOR = "#0969da";
 
   /* ---------------- 坐标换算：WGS-84 → GCJ-02 ---------------- */
 
   var PI = Math.PI;
-  var A = 6378245.0;           /* 克拉索夫斯基椭球长半轴 */
+  var A = 6378245.0;
   var EE = 0.00669342162296594323;
 
   function outOfChina(lng, lat) {
@@ -54,11 +53,25 @@
     return [lng + dLng, lat + dLat];
   }
 
+  /* 反算：高德地图上点出来的坐标是 GCJ-02，要存成 WGS-84。
+     没有解析解，用迭代逼近，十次内收敛到 1e-9 度（约 0.1 毫米）。 */
+  function gcj02ToWgs84(lng, lat) {
+    if (outOfChina(lng, lat)) return [lng, lat];
+    var wgs = [lng, lat];
+    for (var i = 0; i < 10; i++) {
+      var g = wgs84ToGcj02(wgs[0], wgs[1]);
+      var dLng = g[0] - lng;
+      var dLat = g[1] - lat;
+      if (Math.abs(dLng) < 1e-9 && Math.abs(dLat) < 1e-9) break;
+      wgs = [wgs[0] - dLng, wgs[1] - dLat];
+    }
+    return wgs;
+  }
+
   /* ---------------- 底图 ---------------- */
 
   function mapCfg() { return window.ZONE_MAP || {}; }
 
-  /* 实际生效的服务商：天地图没填 key 就退回高德过渡底图 */
   function activeProvider() {
     var cfg = mapCfg();
     if (cfg.provider === "tianditu" && cfg.tiandituKey) return "tianditu";
@@ -69,6 +82,7 @@
     var cfg = mapCfg();
     var provider = activeProvider();
     var failed = 0;
+    var layers = [];
 
     function watch(layer) {
       layer.on("tileerror", function () {
@@ -76,6 +90,7 @@
         if (failed >= TILE_ERROR_LIMIT && onFail) onFail();
       });
       layer.on("tileload", function () { failed = 0; });
+      layers.push(layer);
       return layer;
     }
 
@@ -84,15 +99,12 @@
       var key = cfg.tiandituKey;
       var subs = td.subdomains || ["0", "1", "2", "3", "4", "5", "6", "7"];
 
-      var vec = L.tileLayer(String(td.vec).replace("{key}", key), {
-        subdomains: subs, maxZoom: 18,
-        attribution: "© 天地图"
-      });
-      var cva = L.tileLayer(String(td.cva).replace("{key}", key), {
+      map.addLayer(watch(L.tileLayer(String(td.vec).replace("{key}", key), {
+        subdomains: subs, maxZoom: 18, attribution: "© 天地图"
+      })));
+      map.addLayer(watch(L.tileLayer(String(td.cva).replace("{key}", key), {
         subdomains: subs, maxZoom: 18
-      });
-      map.addLayer(watch(vec));
-      map.addLayer(watch(cva));
+      })));
     } else {
       var am = cfg.amap || {};
       map.addLayer(watch(L.tileLayer(am.url, {
@@ -102,12 +114,24 @@
       })));
     }
 
+    /* 高德偶尔会漏掉个别瓦片（换一张也许就成功）。两秒半后检查一次，
+       还有空白的就整层重绘一次，不要让它一直空着。 */
+    var retried = false;
+    setTimeout(function () {
+      if (retried) return;
+      var imgs = map.getContainer().querySelectorAll("img.leaflet-tile");
+      for (var i = 0; i < imgs.length; i++) {
+        if (imgs[i].complete && imgs[i].naturalWidth === 0) {
+          retried = true;
+          layers.forEach(function (l) { l.redraw(); });
+          return;
+        }
+      }
+    }, 2500);
+
     return provider;
   }
 
-  /* ---------------- 建图 ---------------- */
-
-  /* C(lng, lat) → Leaflet 的 [lat, lng]，并处理高德底图的坐标偏移 */
   function toLatLng(lng, lat, provider) {
     if (typeof lng !== "number" || typeof lat !== "number") return null;
     var p = provider === "amap" ? wgs84ToGcj02(lng, lat) : [lng, lat];
@@ -116,9 +140,8 @@
 
   /**
    * 建一张地图。
-   * el      容器元素
-   * opts    { center: [纬度, 经度], zoom, interactive, onTilesFailed }
-   * 返回    { map, provider, toLatLng(lng, lat), addZone(zone, opts) }
+   * opts: { center: [纬度, 经度], zoom, interactive, onTilesFailed }
+   * 返回: { map, provider, toLatLng, addZone(zone), setPosition(lng, lat) }
    */
   function create(el, opts) {
     opts = opts || {};
@@ -144,43 +167,45 @@
       if (opts.onTilesFailed) opts.onTilesFailed();
     });
 
-    /* 容器尺寸在脚本执行时可能还没定下来（详情页的地图是刚插进 DOM 的），
-       量错尺寸会让瓦片只铺一角。两帧之后再量一次。 */
     function resize() { try { map.invalidateSize(); } catch (_e) {} }
     requestAnimationFrame(resize);
     setTimeout(resize, 300);
 
-    function addZone(zone) {
-      var ll = toLatLng(zone.lng, zone.lat, provider);
-      if (!ll) return null;
+    var selfMarker = null;
 
-      var color = levelColor(zone.level);
-      var marker = L.circleMarker(ll, {
+    function style() {
+      return {
         radius: 8,
         color: "#ffffff",
         weight: 2,
-        fillColor: color,
+        fillColor: MARKER_COLOR,
         fillOpacity: 0.95,
         opacity: 1
-      }).addTo(map);
+      };
+    }
 
-      /* 鼠标移上去放大一点，方便在小屏上点中 */
+    function addZone(zone) {
+      var ll = toLatLng(zone && zone.lng, zone && zone.lat, provider);
+      if (!ll) return null;
+
+      var marker = L.circleMarker(ll, style()).addTo(map);
       marker.on("mouseover", function () { marker.setStyle({ radius: 11 }); });
       marker.on("mouseout", function () { marker.setStyle({ radius: 8 }); });
 
-      if (zone.radius_m > 0) {
-        L.circle(ll, {
-          radius: Number(zone.radius_m),
-          color: color,
-          weight: 1,
-          opacity: 0.5,
-          fillColor: color,
-          fillOpacity: 0.1,
-          interactive: false
-        }).addTo(map);
-      }
-
       return { marker: marker, latlng: ll };
+    }
+
+    /* 表单缩略图用：坐标变了就挪标记，没有标记就建一个 */
+    function setPosition(lng, lat) {
+      var ll = toLatLng(lng, lat, provider);
+      if (!ll) return;
+
+      if (!selfMarker) {
+        selfMarker = L.circleMarker(ll, style()).addTo(map);
+      } else {
+        selfMarker.setLatLng(ll);
+      }
+      map.setView(ll, map.getZoom(), { animate: false });
     }
 
     return {
@@ -188,20 +213,22 @@
       provider: provider,
       tilesFailed: function () { return tilesFailed; },
       toLatLng: function (lng, lat) { return toLatLng(lng, lat, provider); },
-      addZone: addZone
+      /* 地图上点出来的 latlng → 要存进数据库的 WGS-84 经纬度 */
+      fromMapLatLng: function (latlng) {
+        if (provider !== "amap") return { lng: latlng.lng, lat: latlng.lat };
+        var w = gcj02ToWgs84(latlng.lng, latlng.lat);
+        return { lng: w[0], lat: w[1] };
+      },
+      addZone: addZone,
+      setPosition: setPosition,
+      markerColor: function () { return MARKER_COLOR; }
     };
-  }
-
-  var LEVEL_COLORS = { A: "#b42318", B: "#9a6700", C: "#0969da", D: "#656d76" };
-
-  function levelColor(level) {
-    return LEVEL_COLORS[String(level || "").trim()] || "#656d76";
   }
 
   window.ZoneMap = {
     create: create,
-    levelColor: levelColor,
     wgs84ToGcj02: wgs84ToGcj02,
+    gcj02ToWgs84: gcj02ToWgs84,
     activeProvider: activeProvider
   };
 })();

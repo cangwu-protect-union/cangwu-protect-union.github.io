@@ -40,14 +40,8 @@
             <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
             <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <input id="zoneSearch" type="search" placeholder="搜索区域名或正文…" autocomplete="off" aria-label="搜索区域">
+          <input id="zoneSearch" type="search" placeholder="搜索区域名、正文或标签…" autocomplete="off" aria-label="搜索区域">
         </div>
-        <label class="zone-filter">
-          <span class="visually-hidden">按地区筛选</span>
-          <select id="zoneRegion" aria-label="按地区筛选">
-            <option value="">全部地区</option>
-          </select>
-        </label>
       </div>
 
       <p class="gui-count muted" id="zoneCount">正在载入…</p>
@@ -59,17 +53,6 @@
       </div>
 
       <nav class="gui-pager" id="zonePager" hidden aria-label="分页"></nav>
-    </section>
-
-    <section class="zone-legend">
-      <h2>等级与状态</h2>
-      <p class="muted">危险等级沿用《灵异现象等级划分》，与鬼图鉴一致。</p>
-      <ul class="zone-legend-list">
-        <li><span class="zone-badge zone-level" data-level="A">A 级</span>已确认存在实体，对人类构成直接威胁</li>
-        <li><span class="zone-badge zone-level" data-level="B">B 级</span>存在间歇性实体显现，威胁可控</li>
-        <li><span class="zone-badge zone-level" data-level="C">C 级</span>仅观测到异常现象，未见实体</li>
-        <li><span class="zone-badge zone-level" data-level="D">D 级</span>无法排除误报，需二次核实</li>
-      </ul>
     </section>
 
   </main>

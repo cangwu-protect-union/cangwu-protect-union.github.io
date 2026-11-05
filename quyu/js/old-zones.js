@@ -33,8 +33,6 @@
       '<div class="gui-card">' +
         '<div class="gui-card-body">' +
           '<h3 class="gui-card-title">' + esc(v.title || "（无标题）") + "</h3>" +
-          '<p class="zone-where">' + esc(v.zone_id) +
-            (v.region ? " · " + esc(v.region) : "") + "</p>" +
           '<p class="zone-badges">' +
             '<span class="zone-badge">' + esc(reasonText(v.reason)) + "</span>" +
             '<span class="muted">' + esc(when(v)) + "</span>" +

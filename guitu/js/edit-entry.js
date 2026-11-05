@@ -27,6 +27,12 @@
   var thumbs = [];           /* 与 images 一一对应的缩略图地址 */
   var busy = false;
 
+  /* 关联条目与引用情报 */
+  var DRAFT_KEY = "guitu_entry_draft";
+  var relBox = null;
+  var refsView = null;
+  var refs = [];
+
   var id = new URLSearchParams(location.search).get("id");
 
   /* 没通过组织验证就不该待在这一页：跳回编辑列表去验证，
@@ -163,10 +169,129 @@
 
     loadingEl.hidden = true;
     editArea.hidden = false;
+
+    mountExtras();
   }).catch(function () {
     loadingEl.hidden = true;
     notFoundEl.hidden = false;
   });
+
+  /* ---------- 关联条目 / 引用情报 ---------- */
+
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        id: entry ? entry.id : id,
+        title: document.getElementById("fTitle").value,
+        tags: document.getElementById("fTags").value,
+        paras: collectParagraphs(),
+        images: images,
+        thumbs: thumbs,
+        refs: refsView ? refsView.refs() : [],
+        related: relBox ? relBox.tokens() : []
+      }));
+    } catch (e) {}
+  }
+
+  function takeDraft() {
+    try {
+      var v = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+      sessionStorage.removeItem(DRAFT_KEY);
+      return (v && v.id === id) ? v : null;
+    } catch (e) { return null; }
+  }
+
+  function syncRefCount() {
+    if (refsView) refs = refsView.refs();
+    var el = document.getElementById("refCount");
+    if (el) el.textContent = "共 " + refs.length + " 条";
+  }
+
+  /* 从「引用情报」页回来：把新选的情报追加成文段 */
+  function absorbPickedTips() {
+    var picked = [];
+    try {
+      picked = JSON.parse(sessionStorage.getItem("gui_picked_tips") || "null") || [];
+    } catch (e) { picked = []; }
+    if (!picked.length) return;
+    sessionStorage.removeItem("gui_picked_tips");
+
+    var known = {};
+    (refsView ? refsView.refs() : refs).forEach(function (r) { known[r.id] = 1; });
+
+    picked.forEach(function (t) {
+      if (!t || !t.id || known[t.id]) return;
+      known[t.id] = 1;
+
+      String(t.body || "").split(/\n+/).filter(function (p) { return p.trim() !== ""; })
+        .forEach(function (p) { addPara(p); });
+      addPara("引自：《" + (t.title || "未命名") + "》");
+
+      if (refsView) refsView.add({ id: t.id, title: t.title || t.id });
+    });
+
+    syncRefCount();
+  }
+
+  function mountExtras() {
+    relBox = window.RelationBox.mount(document.getElementById("relBox"), {
+      selfType: "ghost",
+      selfId: entry.id,
+      pickUrl: "../quyu/pick-relation.html",
+      listUrl: function (it) {
+        return it.type === "ghost"
+          ? "条目.html?id=" + encodeURIComponent(it.id)
+          : "../quyu/zone.html?id=" + encodeURIComponent(it.id);
+      }
+    });
+
+    /* 把条目已有的关联灌进框里 */
+    if (relBox) relBox.setTokens((entry.related || []).slice());
+
+    refs = (entry.refs || []).slice();
+    refsView = window.RefsList.mount(document.getElementById("refsHost"), {
+      refs: refs,
+      editable: true,
+      href: function (r) { return "tips-entry.html?id=" + encodeURIComponent(r.id); },
+      onDelete: function (ref) {
+        refs = refs.filter(function (r) { return r.id !== ref.id; });
+        return Promise.resolve();
+      }
+    });
+    syncRefCount();
+
+    var draft = takeDraft();
+    if (draft) {
+      document.getElementById("fTitle").value = draft.title || "";
+      document.getElementById("fTags").value = draft.tags || "";
+      if (draft.images) {
+        images = draft.images.slice();
+        thumbs = (draft.thumbs || []).slice();
+        renderImages();
+      }
+      if (draft.paras && draft.paras.length) {
+        paraList.innerHTML = "";
+        draft.paras.forEach(function (p) { addPara(p); });
+      }
+      if (draft.related && relBox) relBox.setTokens(draft.related);
+      if (draft.refs && refsView) refsView.setRefs(draft.refs);
+      syncRefCount();
+    }
+
+    var pickedRel = window.ZoneRelations.peekPick();
+    if (pickedRel && pickedRel.done) {
+      window.ZoneRelations.takePicked();
+      if (relBox) relBox.setTokens(pickedRel.selected || []);
+    }
+
+    absorbPickedTips();
+
+    document.getElementById("refPickBtn").addEventListener("click", function () {
+      saveDraft();
+      location.href = "pick-tips.html?back=" +
+        encodeURIComponent("edit-entry.html?id=" + encodeURIComponent(entry.id));
+    });
+  }
 
   document.getElementById("addParaBtn").addEventListener("click", function () {
     addPara("");
@@ -202,6 +327,8 @@
       image: images[0] || "",
       images: images,
       thumbs: thumbs,
+      related: relBox ? relBox.tokens() : [],
+      refs: refsView ? refsView.refs() : [],
       intro: intro,
       body: body,
       tags: tags,

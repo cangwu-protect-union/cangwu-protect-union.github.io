@@ -137,27 +137,18 @@
      新增一个类似图鉴的模块时，复制这张表就是它的数据模型。
      ============================================================ */
   var INTRO_MAX = 90;
-
-  /* 三个枚举的单一来源：表单下拉、校验、筛选、图例都从这里取 */
-  var TERRAIN = ["山区", "城市", "沿海", "地下", "异空间", "其他"];
-  var LEVELS = ["A", "B", "C", "D"];
-  var STATUSES = ["活跃", "封锁", "已清除", "待观察"];
+  var TAG_MAX = 8;
 
   var ZONE_FIELDS = [
-    { key: "id", label: "编号", type: "string", required: true },
+    { key: "id", label: "标识", type: "string" },
     { key: "title", label: "区域名", type: "string", required: true },
-    { key: "region", label: "所属地区", type: "string", required: true },
     { key: "lng", label: "经度", type: "number" },
     { key: "lat", label: "纬度", type: "number" },
-    { key: "radius_m", label: "范围半径（米）", type: "number" },
-    { key: "terrain", label: "地形", type: "string", enum: TERRAIN },
-    { key: "level", label: "危险等级", type: "string", enum: LEVELS },
-    { key: "status", label: "状态", type: "string", enum: STATUSES },
     { key: "image", label: "封面图", type: "string" },
     { key: "images", label: "图片", type: "array" },
     { key: "thumbs", label: "缩略图", type: "array" },
-    { key: "ghost_ids", label: "常见鬼", type: "array" },
-    { key: "related_zone_ids", label: "关联区域", type: "array" },
+    { key: "related", label: "关联条目", type: "array" },
+    { key: "refs", label: "引用情报", type: "array" },
     { key: "intro", label: "摘要", type: "string" },
     { key: "body", label: "正文", type: "string", required: true },
     { key: "tags", label: "标签", type: "array" },
@@ -190,6 +181,15 @@
         problems.push("日期要写成 YYYY-MM-DD");
       }
     }
+
+    if (Array.isArray(entry.tags)) {
+      entry.tags.forEach(function (t) {
+        if (String(t).trim().length > TAG_MAX) {
+          problems.push("标签「" + String(t).trim() + "」超过 " + TAG_MAX + " 个字");
+        }
+      });
+    }
+
     return problems;
   }
 
@@ -212,14 +212,12 @@
   /* 数据库行 → 前端区域对象（列表、详情、检索共用同一套映射） */
   function mapRow(r) {
     return {
-      id: r.id, title: r.title, region: r.region,
+      id: r.id, title: r.title,
       lng: numOrNull(r.lng), lat: numOrNull(r.lat),
-      radius_m: numOrNull(r.radius_m),
-      terrain: r.terrain || "", level: r.level || "", status: r.status || "",
       image: r.image, images: r.images || [],
       thumbs: r.thumbs || [],
-      ghost_ids: r.ghost_ids || [],
-      related_zone_ids: r.related_zone_ids || [],
+      related: r.related || [],
+      refs: r.refs || [],
       intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
       deleted: !!r.deleted, updated_at: r.updated_at
     };
@@ -329,7 +327,7 @@
      逗号、括号、星号是表达式语法字符，实测出现即 400，先在客户端剔掉。 */
   function safeKeyword(q) {
     return String(q == null ? "" : q)
-      .replace(/[,()*%"\\\u0000-\u001f]/g, " ")
+      .replace(/[,()*%"\\{}\u0000-\u001f]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -341,17 +339,17 @@
     return m ? parseInt(m[1], 10) : -1;
   }
 
-  function searchCloud(c, kw, page, pageSize, region) {
+  function searchCloud(c, kw, page, pageSize) {
     var tail = "&order=created_at.desc,id.desc&limit=" + pageSize +
                "&offset=" + ((page - 1) * pageSize);
     var or = kw
       ? "&or=(title.ilike.*" + encodeURIComponent(kw) + "*" +
         ",intro.ilike.*" + encodeURIComponent(kw) + "*" +
-        ",body.ilike.*" + encodeURIComponent(kw) + "*)"
+        ",body.ilike.*" + encodeURIComponent(kw) + "*" +
+        ",tags.cs." + encodeURIComponent("{" + kw + "}") + ")"
       : "";
-    var regionQ = region ? "&region=eq." + encodeURIComponent(region) : "";
-    var withDeleted = c.base + c.table + "?select=*&deleted=eq.false" + or + regionQ + tail;
-    var withoutDeleted = c.base + c.table + "?select=*" + or + regionQ + tail;
+    var withDeleted = c.base + c.table + "?select=*&deleted=eq.false" + or + tail;
+    var withoutDeleted = c.base + c.table + "?select=*" + or + tail;
 
     function attempt(url) {
       return withTimeout(
@@ -391,13 +389,12 @@
     });
   }
 
-  function searchLocal(list, kw, page, pageSize, region) {
+  function searchLocal(list, kw, page, pageSize) {
     var low = kw.toLowerCase();
     var shown = list.filter(function (e) {
       if (!e || !e.id || e.deleted) return false;
-      if (region && String(e.region || "") !== region) return false;
       if (!low) return true;
-      var hay = [e.title, e.region, e.intro, e.body].join("\n").toLowerCase();
+      var hay = [e.title, e.intro, e.body].concat(e.tags || []).join("\n").toLowerCase();
       return hay.indexOf(low) !== -1;
     });
     var start = (page - 1) * pageSize;
@@ -412,21 +409,20 @@
   function search(opts) {
     opts = opts || {};
     var kw = safeKeyword(opts.q);
-    var region = String(opts.region == null ? "" : opts.region).trim();
     var page = Math.max(1, parseInt(opts.page, 10) || 1);
     var pageSize = Math.max(1, parseInt(opts.pageSize, 10) || PAGE_SIZE);
     var c = cfg();
 
     function fallback() {
       return localAll().then(function (all) {
-        return searchLocal(all, kw, page, pageSize, region);
+        return searchLocal(all, kw, page, pageSize);
       });
     }
 
     if (!c || isDown()) return fallback();
 
     return retryOnceOnTimeout(function () {
-      return searchCloud(c, kw, page, pageSize, region);
+      return searchCloud(c, kw, page, pageSize);
     }).catch(function (err) {
       markDown();
       console.warn("[异常区域档案] 云端检索失败，改用本地兜底（5 分钟内不再重试）：", err.message);
@@ -442,7 +438,9 @@
     if (!c) return Promise.resolve(null);
 
     var url = c.base + c.table + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1";
-    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
+    return retryOnceOnTimeout(function () {
+      return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS);
+    })
       .then(function (res) {
         if (!res.ok) throw new Error("读取失败 HTTP " + res.status);
         return res.json();
@@ -511,18 +509,13 @@
     var payload = {
       id: entry.id,
       title: entry.title,
-      region: entry.region,
       lng: entry.lng,
       lat: entry.lat,
-      radius_m: entry.radius_m,
-      terrain: entry.terrain || "",
-      level: entry.level || "",
-      status: entry.status || "",
       image: entry.image,
       images: entry.images || [],
       thumbs: entry.thumbs || [],
-      ghost_ids: entry.ghost_ids || [],
-      related_zone_ids: entry.related_zone_ids || [],
+      related: entry.related || [],
+      refs: entry.refs || [],
       intro: entry.intro,
       body: entry.body,
       tags: entry.tags || [],
@@ -603,18 +596,13 @@
   function toRow(e) {
     return {
       title: e.title,
-      region: e.region || "",
       lng: e.lng == null ? null : Number(e.lng),
       lat: e.lat == null ? null : Number(e.lat),
-      radius_m: e.radius_m == null || e.radius_m === "" ? 0 : Math.round(Number(e.radius_m)),
-      terrain: e.terrain || "",
-      level: e.level || "",
-      status: e.status || "",
       image: e.image || "",
       images: e.images || [],
       thumbs: e.thumbs || [],
-      ghost_ids: e.ghost_ids || [],
-      related_zone_ids: e.related_zone_ids || [],
+      related: e.related || [],
+      refs: e.refs || [],
       intro: e.intro || "",
       body: e.body || "",
       tags: e.tags || [],
@@ -639,13 +627,12 @@
     }).then(function (rows) {
       return (Array.isArray(rows) ? rows : []).map(function (r) {
         return {
-          id: r.id, title: r.title, region: r.region,
-          level: r.level || "", status: r.status || "", terrain: r.terrain || "",
+          id: r.id, title: r.title,
           lng: numOrNull(r.lng), lat: numOrNull(r.lat),
           image: r.image, images: r.images || [],
           thumbs: r.thumbs || [],
-          ghost_ids: r.ghost_ids || [],
-          related_zone_ids: r.related_zone_ids || [],
+          related: r.related || [],
+          refs: r.refs || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
           deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
         };
@@ -815,7 +802,14 @@
     return sendWithColumnFallback(c.base + c.table, "POST", row, c);
   }
   function newId() {
-    return "zone-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (ch) {
+      var r = Math.random() * 16 | 0;
+      var v = ch === "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   /* ============================================================
@@ -831,7 +825,6 @@
     return {
       id: r.id,
       title: r.title,
-      region: r.region || "",
       lng: numOrNull(r.lng),
       lat: numOrNull(r.lat),
       image: r.image,
@@ -944,7 +937,6 @@
     var row = {
       id: tip.id,
       title: tip.title,
-      region: tip.region || "",
       lng: tip.lng == null || tip.lng === "" ? null : Number(tip.lng),
       lat: tip.lat == null || tip.lat === "" ? null : Number(tip.lat),
       image: tip.image || "",
@@ -958,147 +950,10 @@
     return sendWithColumnFallback(c.base + TIPS_TABLE, "POST", row, c);
   }
 
-  /* 取一批鬼条目的标题（区域详情页的「常见鬼」用）。
-     只查 id 与 title，不加载鬼图鉴的数据层，避免两个模块的脚本互相依赖。 */
-  function getGhostBriefs(ids) {
-    var c = cfg();
-    var list = (ids || []).filter(function (v) { return v && String(v).trim() !== ""; });
-    if (!list.length) return Promise.resolve([]);
-    if (!c) return Promise.resolve(list.map(function (id) { return { id: id, title: "" }; }));
-
-    var url = c.base + "gui_entries?select=id,title&limit=200&id=in.(" +
-              list.map(function (id) { return encodeURIComponent(id); }).join(",") + ")";
-
-    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
-      .then(function (res) {
-        if (!res.ok) throw new Error("读取鬼条目失败 HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (rows) {
-        var byId = {};
-        (rows || []).forEach(function (r) { byId[r.id] = r.title; });
-        return list.map(function (id) { return { id: id, title: byId[id] || "" }; });
-      })
-      .catch(function () {
-        return list.map(function (id) { return { id: id, title: "" }; });
-      });
-  }
-
-  /* 取一批区域条目的标题（详情页的「关联区域」用） */
-  function getZoneBriefs(ids) {
-    var c = cfg();
-    var list = (ids || []).filter(function (v) { return v && String(v).trim() !== ""; });
-    if (!list.length) return Promise.resolve([]);
-    if (!c) return Promise.resolve([]);
-
-    var url = c.base + c.table + "?select=id,title,region,level,status&limit=200&id=in.(" +
-              list.map(function (id) { return encodeURIComponent(id); }).join(",") + ")";
-
-    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
-      .then(function (res) {
-        if (!res.ok) throw new Error("读取关联区域失败 HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (rows) { return mapRows(rows); })
-      .catch(function () { return []; });
-  }
-
-
-  /* 某个区域「相关的情报」：被采纳到这个区域名下的投稿 */
-  function getTipsForZone(zoneId) {
-    var c = cfg();
-    var id = String(zoneId || "").trim();
-    if (!c || !id) return Promise.resolve([]);
-
-    var url = c.base + TIPS_TABLE + "?select=id,title,intro&adopted_zone_id=eq." +
-              encodeURIComponent(id) + "&limit=50";
-
-    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
-      .then(function (res) {
-        if (!res.ok) throw new Error("读取相关情报失败 HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (rows) { return Array.isArray(rows) ? rows : []; })
-      .catch(function () { return []; });
-  }
-
-
-  /* ============================================================
-     鬼 ↔ 区域反查
-     ------------------------------------------------------------
-     区域表存 ghost_ids 数组，鬼详情页用 PostgREST 的数组包含语法
-       ghost_ids=cs.{gu-gushan}
-     反查「这只鬼出没的区域」，不需要给鬼表加任何字段。
-     ============================================================ */
-  function getZonesByGhost(ghostId) {
-    var c = cfg();
-    var id = String(ghostId || "").trim();
-    if (!id) return Promise.resolve([]);
-
-    /* 云端不可用（没配置 / 请求失败）时才退回种子反查；
-       查询成功但结果为空，就是「这只鬼没有出没区域」，不能再拿种子顶上
-       —— 否则会出现「区域列表是空的、鬼详情却列着出没区域」。 */
-    function fallback() {
-      return (window.ZONE_SEED_ZONES || []).filter(function (z) {
-        return (z.ghost_ids || []).indexOf(id) !== -1 && !z.deleted;
-      });
-    }
-
-    if (!c || isDown()) return Promise.resolve(fallback());
-
-    var url = c.base + c.table + "?select=id,title,region,level,status" +
-              "&ghost_ids=cs." + encodeURIComponent("{" + id + "}") +
-              "&deleted=eq.false&order=created_at.desc&limit=100";
-
-    return retryOnceOnTimeout(function () {
-      return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS);
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error("反查失败 HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (rows) { return mapRows(rows); })
-      .catch(function (err) {
-        console.warn("[异常区域档案] 出没区域反查失败：", err.message);
-        return fallback();
-      });
-  }
-
-  /* 所有地区（筛选下拉用）。成功但为空 → 返回空数组（下拉置灰），
-     只有云端连不上才退回种子里的地区，理由同上。 */
-  function listRegions() {
-    function fromSeeds() {
-      var seen = {}, out = [];
-      (window.ZONE_SEED_ZONES || []).forEach(function (z) {
-        var v = String((z && z.region) || "").trim();
-        if (v && !seen[v]) { seen[v] = 1; out.push(v); }
-      });
-      return out.sort();
-    }
-
-    var c = cfg();
-    if (!c || isDown()) return Promise.resolve(fromSeeds());
-
-    var url = c.base + c.table + "?select=region&deleted=eq.false&limit=1000";
-    return withTimeout(fetch(url, { headers: headers(c) }), TIMEOUT_MS)
-      .then(function (res) {
-        if (!res.ok) throw new Error("读取地区失败 HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (rows) {
-        var seen = {}, out = [];
-        (rows || []).forEach(function (r) {
-          var v = String((r && r.region) || "").trim();
-          if (v && !seen[v]) { seen[v] = 1; out.push(v); }
-        });
-        return out.sort();
-      })
-      .catch(function () { return fromSeeds(); });
-  }
   window.ZoneData = {
     /* 读 */
     list: list,                     /* 公开列表：只含未删除的（地图页用） */
-    search: search,                 /* 分页 + 检索：{ q, region, page, pageSize } */
+    search: search,                 /* 分页 + 检索：{ q, page, pageSize } */
     getEntry: getEntry,             /* 按 id 取单条 */
     getEntryAny: getEntryAny,       /* 按 id 取单条，含已删除的 */
     PAGE_SIZE: PAGE_SIZE,
@@ -1106,11 +961,6 @@
     listVersions: listVersions,     /* 所有历史版本 */
     listVersionsForZone: listVersionsForZone, /* 某个区域的版本 */
     getVersion: getVersion,         /* 单个版本 */
-    listRegions: listRegions,       /* 筛选下拉的地区清单 */
-    getZonesByGhost: getZonesByGhost, /* 鬼详情页反查出没区域 */
-    getGhostBriefs: getGhostBriefs, /* 区域详情页的「常见鬼」标题 */
-    getZoneBriefs: getZoneBriefs,   /* 区域详情页的「关联区域」 */
-    getTipsForZone: getTipsForZone, /* 区域详情页的「相关情报」 */
 
     /* 写 */
     add: add,                       /* 新增（带本地缓冲，增加区域页用） */
@@ -1132,11 +982,9 @@
     remoteEnabled: remoteEnabled,
     readLocal: readLocal,
 
-    /* 区域字段的单一来源（表单、校验、筛选、图例都从这里取） */
+    /* 区域字段的单一来源（表单、校验、检索都从这里取） */
     ZONE_FIELDS: ZONE_FIELDS,
-    TERRAIN: TERRAIN,
-    LEVELS: LEVELS,
-    STATUSES: STATUSES,
+    TAG_MAX: TAG_MAX,
     INTRO_MAX: INTRO_MAX,
     validateZone: validateZone,
     buildIntro: buildIntro,

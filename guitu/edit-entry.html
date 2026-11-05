@@ -52,8 +52,22 @@
       </div>
 
       <div class="field">
-        <label for="fTags">标签 <span class="muted">（用逗号分隔）</span></label>
+        <label for="fTags">标签 <span class="muted">（用逗号分隔，每个不超过 8 字）</span></label>
         <input id="fTags" type="text" placeholder="异次元, 已镇压">
+      </div>
+
+      <div class="field">
+        <label>关联条目 <span class="muted">（鬼与区域可以互相引用）</span></label>
+        <div id="relBox"></div>
+      </div>
+
+      <div class="field">
+        <label>引用情报</label>
+        <div class="rel-box__head">
+          <span class="rel-box__count" id="refCount">共 0 条</span>
+          <button type="button" class="btn btn-ghost" id="refPickBtn">引用情报</button>
+        </div>
+        <div id="refsHost"></div>
       </div>
 
       <p class="gate-error" id="formError" hidden></p>
@@ -90,6 +104,9 @@
   <script src="js/gui-gate.js"></script>
   <script src="js/gui-data.js"></script>
   <script src="js/gui-upload.js"></script>
+  <script src="../quyu/js/relation-utils.js"></script>
+  <script src="../quyu/js/refs-list.js"></script>
+  <script src="../quyu/js/relation-box.js"></script>
   <script src="js/edit-entry.js"></script>
 </body>
 </html>

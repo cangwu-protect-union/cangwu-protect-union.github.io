@@ -245,6 +245,153 @@
   color: var(--muted);
 }
 
+/* 地图底色取高德路网瓦片的纸色：个别瓦片没回来时不会露出灰块 */
+.map-canvas,
+.zone-loc__map,
+.loc-box__map,
+.pick-loc-map { background-color: #f7f6f3; }
+
+@media (prefers-color-scheme: dark) {
+  .map-canvas,
+  .zone-loc__map,
+  .loc-box__map,
+  .pick-loc-map { background-color: #1b1f24; }
+}
+
+/* --- 位置框（表单里的小地图缩略图） ------------------------------ */
+
+.loc-box {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.loc-box:hover { border-color: var(--accent); }
+
+.loc-box.is-empty .loc-box__map {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.loc-box__map {
+  flex: 0 0 220px;
+  height: 132px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.loc-box__side {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.loc-box__text {
+  margin: 0;
+  font-size: .92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.loc-box__side .btn { align-self: flex-start; }
+
+/* --- 详情页的位置块（整块可点，跳到地图页） ---------------------- */
+
+.zone-loc {
+  display: block;
+  margin: 0 0 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card);
+  color: var(--fg);
+}
+
+a.zone-loc:hover { border-color: var(--accent); text-decoration: none; }
+
+.zone-loc__map { height: 200px; }
+
+.zone-loc__text {
+  display: block;
+  padding: 8px 12px;
+  font-size: .82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.zone-loc--empty {
+  padding: 14px 16px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+/* --- 编辑器里的分区 ---------------------------------------------- */
+
+.editor-block { margin-top: 28px; }
+
+/* --- 标点页 ------------------------------------------------------ */
+
+.pick-loc-page { height: 100vh; overflow: hidden; }
+
+.pick-loc-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.pick-loc-bar__center { text-align: center; min-width: 0; }
+
+.pick-loc-bar__hint {
+  margin: 0;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.pick-loc-bar__coord {
+  margin: 2px 0 0;
+  font-size: .95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pick-loc-map {
+  height: 100vh;
+  padding-top: 62px;
+  box-sizing: border-box;
+  background: var(--card);
+}
+
+.pick-loc-map .leaflet-container { height: 100%; }
+
+/* --- 关联条目选择页 ---------------------------------------------- */
+
+.zone-rel-search { margin: 12px 0 6px; max-width: 420px; }
+
+@media (max-width: 560px) {
+  .loc-box { flex-direction: column; }
+  .loc-box__map { flex: 0 0 auto; width: 100%; height: 150px; }
+  .zone-loc__map { height: 160px; }
+}
+
 /* --- 常见鬼 / 相关情报 小列表 ------------------------------------ */
 
 .entry-section-title {

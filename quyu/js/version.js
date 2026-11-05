@@ -62,13 +62,8 @@
 
     var info =
       '<table class="zone-info"><tbody>' +
-        (version.region ? "<tr><th>地区</th><td>" + esc(version.region) + "</td></tr>" : "") +
-        (version.terrain ? "<tr><th>地形</th><td>" + esc(version.terrain) + "</td></tr>" : "") +
-        (version.level ? "<tr><th>等级</th><td>" + esc(version.level) + "</td></tr>" : "") +
-        (version.status ? "<tr><th>状态</th><td>" + esc(version.status) + "</td></tr>" : "") +
         (typeof version.lng === "number" && typeof version.lat === "number"
           ? "<tr><th>坐标</th><td>" + version.lng + ", " + version.lat + "</td></tr>" : "") +
-        (version.radius_m ? "<tr><th>半径</th><td>" + version.radius_m + " 米</td></tr>" : "") +
         (version.date ? "<tr><th>记录日期</th><td>" + esc(version.date) + "</td></tr>" : "") +
       "</tbody></table>";
 
@@ -125,10 +120,9 @@
       return now ? window.ZoneData.archiveVersion(now, "edit") : null;
     }).then(function () {
       return window.ZoneData.updateEntry({ id: version.zone_id, title: version.title,
-        region: version.region, lng: version.lng, lat: version.lat, radius_m: version.radius_m,
-        terrain: version.terrain, level: version.level, status: version.status,
+        lng: version.lng, lat: version.lat,
         image: version.image, images: version.images, thumbs: version.thumbs,
-        ghost_ids: version.ghost_ids, related_zone_ids: version.related_zone_ids,
+        related: version.related, refs: version.refs,
         intro: version.intro, body: version.body, tags: version.tags, date: version.date });
     }).then(function () {
       return window.ZoneData.markVersionApplied(version.version_id);
