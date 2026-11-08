@@ -34,8 +34,8 @@ window.ZONE_APP = {
    tiandituKey 填好后把 provider 改成 "tianditu" 即可，代码不用动。
    ============================================================ */
 window.ZONE_MAP = {
-  provider: "amap",
-  tiandituKey: "",
+  provider: "tianditu",
+  tiandituKey: "94f0b0d18f4917fe12c1e7536bbc6a6e",
 
   /* 初始视野：江浙一带，坐标 [纬度, 经度]（WGS-84 / CGCS2000） */
   center: [30.9, 120.2],

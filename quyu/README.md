@@ -117,20 +117,20 @@ data/
 | 坐标 | 数据库统一存 WGS-84；渲染高德底图时转 GCJ-02，标点页再从 GCJ-02 反算回 WGS-84 |
 | 降级 | 瓦片连续失败 6 次 → 纯色底 + 网格，标记照常显示 |
 
-### 切到天地图
+### 底图现状
 
-1. 在天地图开放平台申请 key（浏览器端），必要时把站点域名加进白名单。
-2. 改 `data/config.js`：
+**已经是天地图官方 WMTS**（`provider: "tianditu"`，key 在 `data/config.js`）。
 
-```js
-window.ZONE_MAP = {
-  provider: "tianditu",
-  tiandituKey: "你的 key",
-  ...
-};
-```
+这个 key 是「浏览器端」类型，只能从浏览器发起请求，而且绑了域名白名单：
+`curl` 或 `localhost` 打开本地页面都会 403（前者报「Key权限类型为:浏览器端」，
+后者被白名单挡掉，浏览器端表现为 `net::ERR_BLOCKED_BY_ORB`）。本地验证时
+给浏览器加一个部署域名的 Referer 就能测通。
 
-代码不用动：`zone-map.js` 会自己叠加 `vec_w`（底图）与 `cva_w`（注记）两层。
+key 会出现在前端源码里，与 `publishableKey` 同类；防护靠白名单，不要换成「服务端」类型的 key。
+
+### 切回高德过渡底图
+
+把 `provider` 改成 `"amap"`，`tiandituKey` 留不留都行。高德端点没有服务承诺，只作应急。
 
 ---
 
