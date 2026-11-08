@@ -13,3 +13,10 @@ useDefault = true
 description = "publishableKey 是设计上可公开的匿名 JWT"
 regexTarget = "line"
 regexes = ['''publishableKey''']
+
+# 天地图 tk 是「浏览器端」类型的 key，只能从浏览器发起请求，靠域名白名单限制来源，
+# 本身就是要写在前端的。同样只按行放行 "tiandituKey"，不放行整个 config.js。
+[[allowlists]]
+description = "天地图浏览器端 tk，设计上出现在前端，靠域名白名单限制"
+regexTarget = "line"
+regexes = ['''tiandituKey''']
