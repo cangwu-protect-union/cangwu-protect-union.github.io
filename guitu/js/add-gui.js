@@ -683,6 +683,7 @@
       selfType: "ghost",
       selfId: "",
       pickUrl: "../quyu/pick-relation.html",
+      onBeforeOpen: saveDraft,
       listUrl: function (it) {
         return it.type === "ghost"
           ? "条目.html?id=" + encodeURIComponent(it.id)

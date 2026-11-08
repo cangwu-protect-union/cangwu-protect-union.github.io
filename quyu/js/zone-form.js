@@ -151,7 +151,7 @@
     function gotoPicker() {
       if (opts.onBeforeNavigate) { try { opts.onBeforeNavigate(); } catch (_e) {} }
       saveDraft();
-      window.ZonePicker.open(coords.lng, coords.lat, location.pathname + location.search);
+      window.ZonePicker.open(coords.lng, coords.lat, location.pathname + location.search, opts.pickerUrl);
     }
 
     el.locBox.addEventListener("click", function (ev) {

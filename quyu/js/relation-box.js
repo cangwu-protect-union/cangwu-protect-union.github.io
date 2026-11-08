@@ -79,6 +79,7 @@
       var btn = host.querySelector("#relPickBtn");
       if (btn) {
         btn.addEventListener("click", function () {
+          if (opts.onBeforeOpen) { try { opts.onBeforeOpen(); } catch (_e) {} }
           window.ZoneRelations.openPicker(pickUrl, {
             selected: tokens,
             selfType: selfType,

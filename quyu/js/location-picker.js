@@ -19,14 +19,14 @@
   }
 
   /* 表单 → 标点页 */
-  function open(lng, lat, returnTo) {
+  function open(lng, lat, returnTo, url) {
     var payload = {
       lng: typeof lng === "number" ? lng : null,
       lat: typeof lat === "number" ? lat : null,
       returnTo: returnTo || location.pathname + location.search
     };
     try { sessionStorage.setItem(KEY, JSON.stringify(payload)); } catch (e) {}
-    location.href = "pick-location.html";
+    location.href = url || "pick-location.html";
   }
 
   function peek() { return readRaw(); }

@@ -52,13 +52,15 @@
     var form = window.ZoneForm.mount(document.getElementById("zoneFormMount"), {
       mode: mode === "edit" ? "edit" : "create",
       value: zoneInput,
+      pickerUrl: opts.pickerUrl,
       onBeforeNavigate: saveDraft
     });
 
     var relBox = window.RelationBox.mount(document.getElementById("zoneRelBox"), {
       selfType: "zone",
       selfId: zoneInput.id || "",
-      pickUrl: "pick-relation.html",
+      pickUrl: opts.pickUrl || "pick-relation.html",
+      onBeforeOpen: saveDraft,
       listUrl: function (it) {
         return it.type === "ghost"
           ? "../guitu/条目.html?id=" + encodeURIComponent(it.id)
@@ -167,7 +169,12 @@
 
     var draft = takeDraft();
     if (draft) {
+      /* 从标点页刚带回来的坐标优先于草稿里的旧坐标 */
+      var freshlyPicked = form.coords ? form.coords() : null;
       if (draft.form) form.setValue(draft.form);
+      if (freshlyPicked && typeof freshlyPicked.lng === "number") {
+        form.setCoords(freshlyPicked.lng, freshlyPicked.lat);
+      }
       if (draft.related && relBox) relBox.setTokens(draft.related);
       if (draft.refs) {
         refs = draft.refs;
