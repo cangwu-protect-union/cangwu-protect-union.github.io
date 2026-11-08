@@ -18,9 +18,6 @@
   var searchEl = document.getElementById("relSearch");
   var okBtn = document.getElementById("okBtn");
   var cancelBtn = document.getElementById("cancelBtn");
-  var backLink = document.getElementById("backLink");
-
-  backLink.href = returnTo;
 
   var chosen = {};
   (ctx.selected || []).forEach(function (s) { chosen[s] = true; });

@@ -14,7 +14,6 @@
   var emptyEl  = document.getElementById("pickEmpty");
   var countEl  = document.getElementById("pickCount");
   var inputEl  = document.getElementById("pickSearch");
-  var backLink = document.getElementById("backLink");
   var barCount = document.getElementById("pickBarCount");
   var okBtn    = document.getElementById("pickConfirm");
   var cancelBtn = document.getElementById("pickCancel");
@@ -24,7 +23,6 @@
   /* 确认后回到哪一页（由调用方通过 ?back= 指定） */
   var params = new URLSearchParams(location.search);
   var backUrl = params.get("back") || "add-gui.html";
-  backLink.href = backUrl;
 
   var allTips = [];
   var selected = {};   /* id → true */

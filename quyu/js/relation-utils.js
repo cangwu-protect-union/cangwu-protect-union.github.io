@@ -48,9 +48,11 @@
   function headers(extra) {
     var c = cfg();
     var h = { Authorization: "Bearer " + c.key, "Content-Type": "application/json" };
-    var t = token();
-    if (t) h.Prefer = "gui-token=" + t;
     if (extra) for (var k in extra) h[k] = extra[k];
+
+    /* 令牌必须最后拼进 Prefer：先写 extra 再拼，否则 return=minimal 会把令牌覆盖掉 */
+    var t = token();
+    if (t) h.Prefer = (h.Prefer ? h.Prefer + ", " : "") + "gui-token=" + t;
     return h;
   }
 

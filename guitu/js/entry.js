@@ -19,8 +19,7 @@
     document.title = "条目不存在 · 鬼图鉴 · CPU";
     root.innerHTML =
       "<h1>条目不存在</h1>" +
-      '<p class="lead">这个条目可能已被移除，或者链接里的编号不正确。</p>' +
-      '<p><a class="btn" href="guitu.html">返回图鉴</a></p>';
+      '<p class="lead">这个条目可能已被移除，或者链接里的编号不正确。</p>';
   }
 
   var id = new URLSearchParams(location.search).get("id");
@@ -58,10 +57,7 @@
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
-      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
-      '<p class="entry-foot"><a class="btn btn-ghost" href="guitu.html">← 返回图鉴</a></p>';
-
-    var foot = root.querySelector(".entry-foot");
+      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "");
 
     /* 关联条目 */
     var relHost = document.getElementById("entryRelations");
@@ -91,8 +87,6 @@
           block("关联的区域", zones, function (it) {
             return "../quyu/zone.html?id=" + encodeURIComponent(it.id);
           });
-
-        if (foot && foot.parentNode) foot.parentNode.insertBefore(relHost, foot);
       }).catch(function () { /* 关联失败不影响正文 */ });
     }
 
@@ -104,7 +98,6 @@
         editable: false,
         href: function (r) { return "tips-entry.html?id=" + encodeURIComponent(r.id); }
       });
-      if (foot && foot.parentNode) foot.parentNode.insertBefore(refsHost, foot);
     }
   }).catch(function () { notFound(); });
 })();

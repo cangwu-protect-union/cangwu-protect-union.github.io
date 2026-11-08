@@ -19,8 +19,7 @@
     document.title = "情报不存在 · 异常区域档案 · CPU";
     root.innerHTML =
       "<h1>情报不存在</h1>" +
-      '<p class="lead">' + esc(msg) + "</p>" +
-      '<p><a class="btn" href="tips.html">返回情报列表</a></p>';
+      '<p class="lead">' + esc(msg) + "</p>";
   }
 
   var id = new URLSearchParams(location.search).get("id");
@@ -67,8 +66,7 @@
       status +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
-      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
-      '<p class="entry-foot"><a class="btn btn-ghost" href="tips.html">← 返回情报列表</a></p>';
+      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "");
   }).catch(function (err) {
     notFound("读取失败：" + (err.message || "请稍后重试"));
   });

@@ -20,8 +20,7 @@
     document.title = "区域不存在 · 异常区域档案 · CPU";
     root.innerHTML =
       "<h1>区域不存在</h1>" +
-      '<p class="lead">这个区域可能已被移除，或者链接不正确。</p>' +
-      '<p><a class="btn" href="quyu.html">返回档案</a></p>';
+      '<p class="lead">这个区域可能已被移除，或者链接不正确。</p>';
   }
 
   var id = new URLSearchParams(location.search).get("id");
@@ -69,8 +68,7 @@
       '<div class="entry-body">' + paras + "</div>" +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
       '<section id="zoneRelations"></section>' +
-      '<section id="zoneRefs"></section>' +
-      '<p class="entry-foot"><a class="btn btn-ghost" href="quyu.html">← 返回档案</a></p>';
+      '<section id="zoneRefs"></section>';
 
     /* 位置缩略图 */
     if (hasCoord && window.ZoneMap) {

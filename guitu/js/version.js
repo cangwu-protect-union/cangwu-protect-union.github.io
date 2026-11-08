@@ -65,11 +65,7 @@
         (v.reason === "delete" ? "（删除前）" : "（修改前）") + "</p>" +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
-      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "") +
-      '<p class="entry-foot"><a class="btn btn-ghost" id="backFoot" href="old-gui.html">← 返回旧图鉴</a></p>';
-
-    var foot = document.getElementById("backFoot");
-    if (foot && v.entry_id) foot.href = "old-entry.html?id=" + encodeURIComponent(v.entry_id);
+      (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "");
   }
 
   Promise.all([window.GuiData.listAll(), window.GuiData.listVersions()])
@@ -80,8 +76,7 @@
       version = all.filter(function (v) { return v.version_id === versionId; })[0];
 
       if (!version) {
-        rootEl.innerHTML = '<h1>版本不存在</h1><p class="lead">链接无效，或该版本已被清理。</p>' +
-                           '<p><a class="btn" href="old-gui.html">返回旧图鉴</a></p>';
+        rootEl.innerHTML = '<h1>版本不存在</h1><p class="lead">链接无效，或该版本已被清理。</p>';
         return;
       }
 
