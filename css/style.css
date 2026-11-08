@@ -455,6 +455,14 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 .entry-body p { line-height: 1.85; }
 .entry-tags { margin: 28px 0 0; }
 
+/* 关联条目的小节标题：条目详情与区域详情共用 */
+.entry-section-title {
+  font-size: 1rem;
+  margin: 32px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
 
 /* =============================================================
    13. 增加条目 —— 验证与表单
@@ -1027,24 +1035,6 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
   padding: 2px 10px;
   margin: 0 0 16px;
 }
-
-/* 条目详情页底部的引用列表 */
-.entry-refs {
-  margin: 26px 0 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  border-radius: 10px;
-  background: var(--card);
-}
-.entry-refs-title {
-  margin: 0 0 8px;
-  font-size: .84rem;
-  color: var(--muted);
-  font-weight: 600;
-}
-.entry-refs ul { margin: 0; padding-left: 1.2em; }
-.entry-refs li { margin: 4px 0; font-size: .92rem; }
 
 /* ---- 引用情报的勾选列表 ---- */
 .pick-list { display: grid; gap: 10px; }

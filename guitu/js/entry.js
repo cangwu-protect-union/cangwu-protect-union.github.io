@@ -70,9 +70,9 @@
 
         function block(title, list, href) {
           if (!list.length) return "";
-          return '<div class="entry-refs">' +
-            '<p class="entry-refs-title">' + title + "（" + list.length + "）</p>" +
-            "<ul>" +
+          return '<div class="rel-block">' +
+            '<h2 class="entry-section-title">' + title + "（" + list.length + "）</h2>" +
+            '<ul class="rel-list">' +
               list.map(function (it) {
                 return '<li><a href="' + href(it) + '">' + esc(it.title) + "</a></li>";
               }).join("") +

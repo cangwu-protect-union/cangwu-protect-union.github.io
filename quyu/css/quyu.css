@@ -392,14 +392,7 @@ a.zone-loc:hover { border-color: var(--accent); text-decoration: none; }
   .zone-loc__map { height: 160px; }
 }
 
-/* --- 常见鬼 / 相关情报 小列表 ------------------------------------ */
-
-.entry-section-title {
-  font-size: 1rem;
-  margin: 32px 0 12px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
+/* --- 相关条目列表 ------------------------------------------------ */
 
 .zone-rel-list {
   list-style: none;
