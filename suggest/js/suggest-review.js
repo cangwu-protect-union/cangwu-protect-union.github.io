@@ -78,8 +78,8 @@
   }
 
   window.GuiGate.require(gateMount, {
-    cancelHref: "projects.html",
-    failHref: "projects.html",
+    cancelHref: "../projects.html",
+    failHref: "../projects.html",
     onPass: showReview
   });
 

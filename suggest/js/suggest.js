@@ -127,7 +127,7 @@
   });
 
   document.getElementById("cancelBtn").addEventListener("click", function () {
-    location.href = "projects.html";
+    location.href = "../projects.html";
   });
 
   document.getElementById("againBtn").addEventListener("click", resetForm);

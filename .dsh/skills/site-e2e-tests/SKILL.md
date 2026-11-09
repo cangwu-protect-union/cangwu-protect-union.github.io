@@ -41,8 +41,9 @@ node _local/tests/run-all.mjs --list                # 只列用例
 环境变量 `QUYU_TK` 等价于 `--token`。服务由脚本自己在 `127.0.0.1:9300` 起，跑完关掉；
 浏览器进程要 `danger-full-access`（命名管道），否则 Edge 起不来。
 
-现有分组：`导航`、`数据源`、`区域 · 公开`、`区域 · 编辑`、`鬼图鉴 · 关联与引用`。
-前两组 + 区域公开都不需要令牌；动了数据层或导航，至少跑 `--group=数据源` 与 `--group=导航`。
+现有分组：`导航`、`数据源`、`区域 · 公开`、`区域 · 编辑`、`鬼图鉴 · 关联与引用`、`站点建议 · 提交与审核`。
+前两组、区域公开、建议的前两条都不需要令牌；动了数据层或导航，至少跑 `--group=数据源` 与 `--group=导航`。
+`--group=` 是子串匹配，`--group=建议` 就够。
 
 ## 硬约束：必须 127.0.0.1
 
@@ -63,7 +64,8 @@ node _local/tests/run-all.mjs --list                # 只列用例
 2. **断言带实际值**：`expect(x, '应为 A，实际 ' + y)`，否则重跑时看不出差在哪。
 3. **每条用例自己说清失败原因**：共享数据走 `t.fixtures`，但断言要能定位到具体一步。
 4. **造数据的都要登记**：`t.cleanup.zones.push(id)`、`t.cleanup.zoneTips.push(id)` 等，
-   `run-all` 结束时生成 `cleanup/cleanup-<时间>.sql`。
+   `run-all` 结束时生成 `cleanup/cleanup-<时间>.sql`。站点建议的 id 由页面自己生成、测试拿不到，
+   所以登记的是标题：`t.cleanup.suggestTitles.push(title)`，清理脚本按标题删。
 5. **一组一个文件**：在 `cases/` 新建文件导出 `{ group, cases }`，再去 `run-all.mjs` 的 `groups`
    数组里 import 进来，否则 `--list` 看不到。
 
@@ -78,6 +80,9 @@ node _local/tests/run-all.mjs --list                # 只列用例
 | Edge 起不来 / 端口占用 | 调试端口用 10011（10000 曾被占）；仍不行先 `Get-Process msedge` 清残留 |
 | 首屏 12 秒 | 冷启动 TLS 握手，不是性能回归；整轮开头先访问一次页面把连接暖热 |
 | 云端返回 0 条却有卡片 | 兜底被合并进正常路径；`cases/data-source.mjs` 用 `page.route` 拦 `**/v1/rdb/rest/**` 断言这条不变量 |
+| 匿名提交「成功」了但查不到 | 站点建议匿名读返回 `[]` 是设计；写没写进去只能靠 `needsToken` 用例到审核列表里核对 |
+| 页面挪进模块目录后导航用例超时 | `cases/nav.mjs` 里按 `a[href="suggest.html"]` 写死了选择器，挪到 `suggest/` 后要同步改 href 与 `waitUrl` 正则 |
+| 控制台一直有 `favicon.ico 404` | 全站没有 favicon，这是既有噪音，不算回归；判断回归只看你自己的资源与 JS 异常 |
 
 ## 收尾
 

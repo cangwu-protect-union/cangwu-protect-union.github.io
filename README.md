@@ -37,18 +37,21 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 ```
 .
 ├── index.html          首页          ┐
-├── about.html          关于          │
-├── projects.html       项目          │ 主站
-├── suggest.html        提供建议      │
-├── suggest-review.html 审核建议      ┘
-├── 架构.md             主站页面/脚本依赖（标记区间自动生成）
-├── 访客流程图.md        主站三页与建议入口的跳转
+├── about.html          关于          │ 主站（不加载脚本）
+├── projects.html       项目          ┘
+├── 架构.md             主站页面依赖（标记区间自动生成）
+├── 访客流程图.md        主站三页之间的跳转
 ├── css/
-│   └── style.css       全站样式（主站、鬼图鉴、站点建议共用）
-├── js/                 主站脚本（站点建议）
-│   ├── suggest-data.js 建议的数据访问
-│   ├── suggest.js      提供建议页
-│   └── suggest-review.js 审核建议页
+│   └── style.css       全站样式（主站、站点建议、鬼图鉴共用）
+│
+├── suggest/            ★ 站点建议模块（详见 suggest/架构.md）
+│   ├── suggest.html           提供建议：访客匿名提交
+│   ├── suggest-review.html    审核建议：验证后查看与删除
+│   ├── 架构.md / 访客流程图.md  自动生成的模块文档
+│   └── js/
+│       ├── suggest-data.js    数据访问，两个页面共用
+│       ├── suggest.js         提供建议页
+│       └── suggest-review.js  审核建议页
 │
 ├── guitu/              ★ 鬼图鉴模块（自成一块，详见 guitu/README.md）
 │   ├── README.md           模块说明：页面职责、数据流、安全设计
@@ -83,9 +86,9 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 ```
 
 划分原则很简单：**能公开的按模块放，不能公开的统一进 `_local/`**。
-根目录只留主站页面、站点建议两页、它们的主站脚本和两份生成文档，打开文件夹一眼就能看出结构。
+根目录只留主站三页、共用样式和生成的模块文档，每个功能开一个目录，打开文件夹一眼就能看出结构。
 
-**站点建议**：项目页第一个卡片上的「提供建议 / 审核建议」。访客匿名提交，数据进 CloudBase 的
+**站点建议**（`suggest/`）：项目页第一个卡片上的「提供建议 / 审核建议」。访客匿名提交，数据进 CloudBase 的
 `site_suggestions` 表；匿名只能插入，读取与删除要组织验证令牌。限频由数据库触发器做：
 全站每分钟 20 条、相同内容 10 分钟内重复直接拒绝，再按 `x-forwarded-for` 做每 IP 每分钟 3 条
 的尽力而为（实测网关转发过来的 IP 每次可能不同，这一条不保证生效）。

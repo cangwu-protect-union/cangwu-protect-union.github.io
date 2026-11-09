@@ -16,17 +16,24 @@ node    C:\Users\L\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\n
 
 ## 起服务
 
-```powershell
-$proc = Start-Process -FilePath "<python>" -ArgumentList "-m","http.server","9300","--bind","127.0.0.1" `
-  -WorkingDirectory "D:\CPU\关于CPU的网页" -WindowStyle Hidden -PassThru
-# 用完 Stop-Process -Id $proc.Id -Force
+`Start-Process` 起的 python 会随那条命令结束被杀掉（实测：下一条命令访问 9300 直接
+`ERR_CONNECTION_REFUSED`）。要用后台 job 占住端口：
+
+```
+pwsh: python -m http.server 9300 --bind 127.0.0.1   （run_in_background）
 ```
 
-必须用 `http://localhost:PORT/...`，**不要 `file://`**：Origin 为 `null`，云端 CORS 直接拦掉。
+`_local/tests/run-all.mjs` 会自己起服务，跑正式用例时不用手工开。
+
+必须用 `http://127.0.0.1:PORT/...`，**不要 `file://`**：Origin 为 `null`，云端 CORS 直接拦掉。
 
 ## 沙箱
 
-Edge / Playwright 靠命名管道启动，在 workspace-write 沙箱里会 `拒绝访问 (0x5)` 或 `spawn EPERM` 退出。**跑浏览器的命令必须带 `sandbox_permissions: danger-full-access`**，理由写「浏览器进程必须能创建命名管道才能启动」。
+Edge / Playwright 靠命名管道启动，在 workspace-write 沙箱里会 `拒绝访问 (0x5)` 或 `spawn EPERM` 退出。**跑浏览器的命令必须带 `sandbox_permissions: danger-full-access`**。
+
+本机 `powershell` 是 5.1，没有 `Invoke-WebRequest -SkipCertificateCheck`，也没有
+`Set-Content -Encoding utf8NoBOM`。要验接口就在浏览器里 `page.evaluate(fetch)`，
+顺带把 CORS 一起验了；测出来的 `400 / 404 / 42501` 比 curl 更接近真实访客。
 
 ## 首选：Playwright
 
@@ -93,3 +100,5 @@ await page.waitForFunction(() => {
 - 页面里既有隐藏的 `.gate-error` 空元素，也有警告：判断「是否显示警告」看 `textContent` 非空，不能只看元素存在。
 - 结果对不上时先做最小差异对照：只改一个变量（换身份、换 profile、换 curl 与应用代码），确认是产品问题还是测量方式问题。
 - 测试后清理自建数据；条目只能软删除，彻底清除要 SQL。`gui_tips` 可以先置 `rejected` 让它从公开面消失，再让用户跑一句 delete。
+- 控制台里的 `favicon.ico 404` 是全站既有噪音（没放 favicon），不当回归；只看自己的资源与 JS 异常。
+- 临时断言脚本放 `_local/pw`，跑完就删；能留下的用例写进 `_local/tests/cases/`，见 skill `site-e2e-tests`。

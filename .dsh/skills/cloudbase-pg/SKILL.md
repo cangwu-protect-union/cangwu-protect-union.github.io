@@ -30,6 +30,8 @@ RPC         /v1/rdb/rest/rpc/{function}
 | `gui_zones` | 区域。主键 `id` 是 **uuid**（界面不显示），`related` 存 `ghost:<id>` / `zone:<uuid>`，`refs` 与 `gui_entries.refs` 同构 |
 | `gui_zone_versions` | 区域版本归档，列与 `gui_entries_versions` 对齐，`zone_id` 存 uuid 字符串 |
 | `gui_zone_tips` | 区域投稿，`adopted` / `adopted_zone_id` 标记是否已转正 |
+| `site_suggestions` | 站点建议：`kind` ∈ bug / feature / content / other，**没有状态列**，成员处理完直接删；匿名只可插入 |
+| `site_suggest_hits` | 站点建议的限频计数：`key` = `left(md5(ip),20)`，`ts`。无策略，anon 与成员都读不到 |
 
 函数：`gui_verify(p_hash1, p_hash2)` 校验并签发令牌；`gui_token_ok()` 供 RLS 判断令牌有效性；`gui_dup_check(p_text)` 按标题相似度查重，只比对 `approved` / `adopted` 的情报和未删除的条目（用它绕开 RLS 读待审行会泄露投稿标题，所以故意限制）。
 
@@ -103,6 +105,7 @@ CORS 白名单是付费功能（个人版 ¥19.9/月），到期降级后前端�
 6 匿名读 pending / rejected    → []
 7 带令牌读同一条               → 有行
 8 匿名伪造 status=approved 插入 → 42501
+9 匿名 INSERT site_suggestions  → 201；匿名 GET → []；匿名 DELETE → 204 但行还在
 ```
 
 再确认 `select * from gui_secrets` 和 `gui_tokens` 对 anon 返回 `[]`。
@@ -157,3 +160,24 @@ alter table public.gui_zones add column if not exists new_id uuid not null defau
 - 浏览器端取令牌不必开 F12：临时页答完两题把令牌显示出来（`_local/tests/lib/token.html`）。
 - 令牌 2 小时有效，存在 sessionStorage 的 `gui_token` / `gui_token_exp`
   （测试里用 `addInitScript` 直接注入即可，不必走验证表单）。
+
+## 站点建议（suggest 模块）的实测结论
+
+脚本：`_local/sql/site-suggestions-setup.sql`。表、策略、触发器都幂等，可以整份重跑。
+
+| 结论 | 细节 |
+|---|---|
+| 匿名只可插入 | INSERT 策略 `with check` 管 `kind` 与 `char_length(title/body)`；`kind` 非法实测 42501 |
+| 读、删要令牌 | SELECT / DELETE 策略都用 `gui_token_ok()` |
+| **匿名 DELETE 返回 204 但删不掉** | RLS 只过滤行、不抛错；改成 42501 的期待是错的。判断删除是否生效必须带令牌读回 |
+| 全站上限有效 | 触发器里 `count(*) from site_suggestions where created_at > now()-1min`，压测第 21 条起 400 `P0001 rate_limited` |
+| 相同内容去重有效 | `kind + title + body` 一致且 10 分钟内，第 2 条即被拒 |
+| **按 IP 限频无效** | 网关转发的 `x-forwarded-for` 每次可能不同（4 次连发全部 201），按 IP 计数永远从 0 开始。IP 分支只能当尽力而为，真正的防线是内容去重 + 全站上限 |
+| `security definer` 的触发器能读写 RLS 表 | 上面两条上限/去重都靠它读 `site_suggestions`、写 `site_suggest_hits`，实测生效，不必再给 hits 表建策略 |
+
+两个容易踩的：
+
+- **`Prefer` 被覆盖**：`{ ...headers, Prefer: 'return=minimal' }` 会把 `gui-token=…` 冲掉，
+  请求 204 却什么也没删。要拼接而不是覆盖：`'return=minimal, gui-token=' + token`。
+- **404 `DATABASE_PGRST205 Could not find the table`** = 表还没建 / schema cache 没刷新。
+  迁移前先打一次 `GET /rest/{table}?select=id&limit=1` 就能确认，不必等页面报错。
