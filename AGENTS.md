@@ -33,11 +33,15 @@
 
 | 场景 | skill |
 |---|---|
-| 读或改项目文件 | `guitu-project` |
+| 读或改任何项目文件（主站 / guitu / quyu / 新模块） | `site-project` |
 | 改完页面要实测 | `guitu-browser-test` |
 | 改样式或调整视觉 | `guitu-design` |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |
+
+## 不确定改哪里时
+
+先看 `改动索引.md`：按「要做的事」列了要动的文件与连带项。
 
 ## 改完必跑校验
 
@@ -45,8 +49,15 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生。退出码 0 才算过，细节见 `tools/README.md`。
+覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生，以及文档是否过期（`build-docs.js --check`）。退出码 0 才算过，细节见 `tools/README.md`。
+
+动了数据层（`list()` 的兜底合并）或导航，再跑对应测试，两组都不需要令牌：
+
+```
+node _local/tests/run-all.mjs --group=数据源
+node _local/tests/run-all.mjs --group=导航
+```
 
 ## 文档与配图
 
-项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成 `guitu/架构.md`、`guitu/访客流程图.md` 与 `guitu/preview/` 的 PNG 索引。
+项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成每个模块（含主站）的 `架构.md`、`访客流程图.md` 与 `preview/` 的 PNG 索引。`check.ps1` 会调 `build-docs.js --check` 比对文档与源码，过期即失败。

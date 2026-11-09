@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>提供建议 · CPU</title>
+  <meta name="description" content="给 CPU 官网的页面问题、功能想法和内容错误提建议。">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">CPU及回合制游戏工作室联合组织</a>
+      <nav>
+        <a href="index.html">首页</a>
+        <a href="about.html">关于</a>
+        <a href="projects.html">项目</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <p class="entry-back"><a href="projects.html">← 返回项目</a></p>
+
+    <section id="formSection">
+      <h1>提供建议</h1>
+      <p class="lead">对本网站的 bug、功能和内容提意见。建议不会公开展示。</p>
+
+      <form id="suggestForm" autocomplete="off" novalidate>
+
+        <div class="field">
+          <label for="fKind">类型</label>
+          <select id="fKind" name="kind">
+            <option value="" selected disabled>请选择</option>
+            <option value="bug">页面 bug</option>
+            <option value="feature">功能建议</option>
+            <option value="content">内容建议</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="fTitle">标题 <span class="muted" id="titleCount">0/25</span></label>
+          <input id="fTitle" name="title" type="text" placeholder="一句话说清问题" maxlength="25">
+        </div>
+
+        <div class="field">
+          <label for="fBody">正文 <span class="muted" id="bodyCount">0/2000</span></label>
+          <textarea id="fBody" name="body" rows="10" placeholder="在哪一页、看到了什么、你期望怎样。"></textarea>
+        </div>
+
+        <div class="hp-field" aria-hidden="true">
+          <label for="fWebsite">网站</label>
+          <input id="fWebsite" name="website" type="text" tabindex="-1" autocomplete="off">
+        </div>
+
+        <p class="gate-error" id="formError" hidden></p>
+
+        <div class="gate-actions">
+          <button type="button" class="btn btn-ghost" id="cancelBtn">取消</button>
+          <button type="submit" class="btn" id="submitBtn">提交建议</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="doneSection" hidden>
+      <h1>建议已收到</h1>
+      <p class="lead">感谢，会有人看到这条建议。</p>
+
+      <p class="gate-actions">
+        <button type="button" class="btn btn-ghost" id="againBtn">再提一条</button>
+        <a class="btn" href="projects.html">返回项目</a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© 2026 CPU及回合制游戏工作室联合组织</p>
+    </div>
+  </footer>
+
+  <script src="guitu/data/config.js"></script>
+  <script src="js/suggest-data.js"></script>
+  <script src="js/suggest.js"></script>
+</body>
+</html>

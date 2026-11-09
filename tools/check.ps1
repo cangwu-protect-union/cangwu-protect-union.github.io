@@ -46,6 +46,16 @@ try {
     & $node @args2
     if ($LASTEXITCODE -ne 0) { $failed++ }
 
+    # Generated docs must match the source. _local/ is gitignored, so skip when absent.
+    $docs = "$root\_local\tools\build-docs.js"
+    if (Test-Path $docs) {
+        Write-Host '--- docs freshness ---' -ForegroundColor Cyan
+        & $node $docs --check
+        if ($LASTEXITCODE -ne 0) { $failed++ }
+    } else {
+        Write-Host '--- docs freshness: build-docs.js not found, skipped ---' -ForegroundColor DarkGray
+    }
+
     $biome = Find-Tool 'biome'
     if ($biome -and (Test-Path "$root\biome.json")) {
         Write-Host '--- biome ---' -ForegroundColor Cyan

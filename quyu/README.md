@@ -17,9 +17,8 @@
 | `provide-tip.html` | 提交区域情报，开放投稿 |
 | `tips.html` | 投稿列表 |
 | `tips-entry.html?id=…` | 投稿详情 |
-| `pick-relation.html` | 引用条目选择器（鬼 / 区域两个页签，与鬼图鉴共用） |
 
-### 编辑区（需要组织验证）
+### 编辑流程内（写库前需要组织验证）
 
 | 文件 | 作用 |
 |---|---|
@@ -27,10 +26,14 @@
 | `add-zone.html` | 增加区域 |
 | `edit-zone.html?id=…` | 编辑器：改字段、改图、改关联、软删除、恢复 |
 | `pick-location.html` | 标点：在地图上点一下选位置 |
+| `pick-relation.html` | 引用条目选择器（鬼 / 区域两个页签，与鬼图鉴共用） |
 | `pick-tips.html` | 勾选要引用的投稿 |
 | `old-zones.html` | 旧档案：所有历史版本 |
 | `old-zone.html?id=…` | 某个区域的全部历史版本 |
 | `version.html?v=…` | 查看单个版本，可应用回去 |
+
+`pick-location.html`、`pick-relation.html` 不加载 `gui-gate.js`，只从编辑页打开，
+本身不做组织验证；其余 7 页进页面前要答验证题。
 
 ---
 

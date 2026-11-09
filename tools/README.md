@@ -7,7 +7,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
 ```
 
-退出码 0 表示全过。三条检查按顺序跑，任何一条不过都算失败。
+退出码 0 表示全过。四步检查按顺序跑，任何一步不过都算失败。
 
 ## 1. `check.js`（零依赖，只用 node 内置模块）
 
@@ -55,7 +55,7 @@ Biome 走 npm 镜像而不是 GitHub Releases：镜像 34 MB 只要几秒，GitH
 | `suspicious/noAssignInExpressions` | `while ((m = re.exec(s)))` 是项目惯用写法 |
 | `preset: recommended` 整体 | 默认集在这个代码库上有 598 条，其中 447 条是风格偏好 |
 
-当前基线：0 error、23 warning（`noUnusedVariables` 17、`noGlobalIsNan` 4、`noPrototypeBuiltins` 1、`noUnusedFunctionParameters` 1）。warning 不阻断。
+当前基线：0 error、53 warning（`noUnusedVariables` 42、`noGlobalIsNan` 6、`noPrototypeBuiltins` 3、`noUnusedFunctionParameters` 1、`noPrecisionLoss` 1）。warning 不阻断。
 
 ## 3. gitleaks（已安装）
 
@@ -76,7 +76,20 @@ powershell -File tools\check.ps1 -Staged    # 只扫暂存区
 node --use-system-ca tools/get-tool.js gitleaks/gitleaks windows_x64 _local/bin
 ```
 
-## 4. 其他单文件工具
+## 4. 文档新鲜度（`_local/tools/build-docs.js --check`）
+
+主站与每个模块的 `架构.md`、`访客流程图.md`（当前六份）由 `_local/tools/docgen.js` 从源码生成，
+模块清单在 `_local/tools/docgen.config.js`；新增模块只加一条配置。
+`--check` 只在内存里生成一遍，与磁盘上的文件逐字比对，不写盘、不渲染 PNG；不一致就退出 1，并报出文件名和第一个不同的行号。
+
+```powershell
+node _local\tools\build-docs.js --check
+```
+
+`_local/` 被 gitignore，所以 `check.ps1` 找不到这个脚本时跳过并打一行提示。
+生成前还会自检：有页面的目录都登记过模块、每个 `.html` 都登记了访问级别、标为需要验证的页面确实加载了 `gui-gate.js`、跨模块引用的文件存在、流程图覆盖全部页面且边的端点存在。
+
+## 5. 其他单文件工具
 
 ```powershell
 node --use-system-ca tools/get-tool.js <owner/repo> <资源名正则> _local\bin
@@ -84,7 +97,7 @@ node --use-system-ca tools/get-tool.js <owner/repo> <资源名正则> _local\bin
 
 自动取 latest release、挑匹配的资源、按 API 给的 sha256 校验、解包、把可执行文件放进 `_local\bin`。zip / tar / tgz 都走 Windows 自带的 `tar`。
 
-## 5. `design-audit.js`（体检报告，不进 `check.ps1`）
+## 6. `design-audit.js`（体检报告，不进 `check.ps1`）
 
 ```powershell
 node tools/design-audit.js           # 人看的报告

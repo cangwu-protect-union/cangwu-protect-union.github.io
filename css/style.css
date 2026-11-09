@@ -481,8 +481,18 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
 }
 .field label .muted { font-weight: 400; }
 
+/* 蜜罐字段：真人看不见，自动填表的脚本会填 */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .field input[type="text"],
 .field input[type="url"],
+.field select,
 .field textarea {
   width: 100%;
   padding: 11px 13px;
@@ -497,6 +507,7 @@ pre code { background: none; border: none; padding: 0; font-size: 1em; }
   resize: vertical;
 }
 .field input:focus,
+.field select:focus,
 .field textarea:focus {
   border-color: var(--accent);
   background: var(--bg);
