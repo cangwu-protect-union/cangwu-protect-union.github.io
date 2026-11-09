@@ -34,6 +34,7 @@ $t = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8).Replace($ol
 | here-string 结束符不在行首 → 整段被吞、替换静默失败 | `'@` 独占一行 |
 | `.Replace()` 报「参数计数为 3」 | 只传两个纯字符串 |
 | `Set-Content -NoNewline` 吞换行 | 用 `WriteAllText` |
+| `WriteAllLines` 写出 CRLF，`check.js` 报「有 CRLF 换行，项目要求 LF」 | 用 `WriteAllText($p, ($lines -join "`n"), $enc)`，或写完统一转换 |
 | 多行文本靠猜空白改 | 先 `IndexOf` 定位，再花括号配对 |
 
 一次改三个以上文件，先备份或用 `git checkout HEAD -- <路径>` 兜底。
@@ -41,6 +42,18 @@ $t = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8).Replace($ol
 ## 编码
 
 UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码；`.gitattributes` 与 `.vscode/settings.json` 已强制。
+
+## 提交前
+
+`git add -A` 会把工作区里**所有**改动一次带走，包括不是这次任务产生的：
+
+- 用户自己没提交的界面改动（可能改到一半）
+- 误建的空文件、临时导出
+
+所以每次提交前先 `git status --short` 过一遍。发现不属于本次任务的改动，
+要么先单独提交并说明，要么在提交信息里写清楚；不要让它躺在你的提交里却只字未提。
+
+`_local/` 已被忽略，但 `*.docx`、`*.sql`、编辑器锁文件仍要看一眼。
 
 ## 跨模块共用与复制（最容易踩）
 
@@ -69,6 +82,10 @@ UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码；`.gitatt
 
 密钥：`publishableKey` 可公开，service_role 绝不能进前端。`_local/` 永不推送。
 
+浏览器端 key（天地图 tk）也是设计上要出现在前端的，需要用 `.gitleaks.toml` **按行**放行
+（`regexTarget = "line"` + 只匹配 `tiandituKey` 这一行），不要放行整个文件——那样 service_role
+被误写进去也扫不出来。
+
 天地图 key 是浏览器端类型且绑部署域名白名单：`curl` 与 `localhost` 打开都会 403（浏览器表现为 `net::ERR_BLOCKED_BY_ORB`）。本地验证用 `127.0.0.1` 并加部署域名的 Referer，不要换成服务端类型 key。
 
 ## 文档生成
@@ -82,6 +99,8 @@ node _local/tools/build-docs.js --check  # 只比对，不写盘（check.ps1 会
 - `docgen.config.js` 是唯一的人工入口：模块、访问级别、角色名、后端节点、访客流程图。
 - 生成物：每个模块（含主站）的 `架构.md` 与 `访客流程图.md`；有 `preview/` 的模块再出 PNG。
 - 别手改 `AUTO-GENERATED` 区间；区间外的手写说明保留。
+- 渲染 mermaid 用的是 `_local/tools/vendor/mermaid.min.js`（本地文件）。**不要改回 unpkg/CDN**：
+  本机连不上 unpkg，会卡在「等待 mermaid 加载」好几分钟然后整批渲染失败。
 
 ## 新增模块
 

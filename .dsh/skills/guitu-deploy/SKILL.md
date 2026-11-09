@@ -20,6 +20,10 @@ git status --short          # 确认没有 _local/、*.docx、*.sql 被带进来
 git commit -q -F $f
 ```
 
+`git add -A` 会把工作区里所有改动一次带走。提交前逐行看 `git status --short`：
+出现不属于本次任务的改动（用户没提交的界面调整、误建的空文件），先单独提交或至少分开说明，
+别让它混进本次提交却不在提交信息里。
+
 ## 推送
 
 ```powershell
@@ -49,8 +53,10 @@ for ($i=1; $i -le 12; $i++) {
 
 1. 改动的页面 200、含新文案；依赖的脚本样式 200。
 2. 旧路径按预期 404（迁移时）。
-3. `guitu-browser-test` 跑一次真浏览器验证，无 JS 异常、无资源 404。
+3. `guitu-browser-test` / `site-e2e-tests` 跑一次真浏览器验证，无 JS 异常、无资源 404。
 4. 涉及 `_local/` 的，确认 `/_local/...` 返回 404。
+5. 提交前跑过 `check.ps1`；如果改了页面结构、脚本或数据，`check.ps1` 里的
+   `build-docs.js --check` 会比对六份文档是否过期，过期就重跑一次生成器再提交。
 
 ## 从会话里访问 github.com（实测）
 

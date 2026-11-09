@@ -35,6 +35,7 @@
 |---|---|
 | 读或改任何项目文件（主站 / guitu / quyu / 新模块） | `site-project` |
 | 改完页面要实测 | `guitu-browser-test` |
+| 跑或写端到端测试（`_local/tests`） | `site-e2e-tests` |
 | 改样式或调整视觉 | `guitu-design` |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |

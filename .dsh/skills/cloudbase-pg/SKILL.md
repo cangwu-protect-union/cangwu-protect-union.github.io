@@ -22,11 +22,14 @@ RPC         /v1/rdb/rest/rpc/{function}
 
 | 表 | 说明 |
 |---|---|
-| `gui_entries` | 条目。`deleted` 软删除，`refs` 引用情报，`thumbs` 与 `images` 一一对应 |
+| `gui_entries` | 条目。`deleted` 软删除，`refs` 引用情报，`thumbs` 与 `images` 一一对应，`related` 关联条目 |
 | `gui_entry_versions` | 版本归档，只增不改不删，`applied` 标记已应用 |
 | `gui_tips` | 情报投稿，与图鉴隔离。`status` ∈ pending / approved / rejected / adopted，`reviewed_at`、`review_note` 记录审核 |
 | `gui_secrets` | 答案哈希，**无 RLS 策略，anon 读不到** |
 | `gui_tokens` | 验证签发的令牌，同样读不到 |
+| `gui_zones` | 区域。主键 `id` 是 **uuid**（界面不显示），`related` 存 `ghost:<id>` / `zone:<uuid>`，`refs` 与 `gui_entries.refs` 同构 |
+| `gui_zone_versions` | 区域版本归档，列与 `gui_entries_versions` 对齐，`zone_id` 存 uuid 字符串 |
+| `gui_zone_tips` | 区域投稿，`adopted` / `adopted_zone_id` 标记是否已转正 |
 
 函数：`gui_verify(p_hash1, p_hash2)` 校验并签发令牌；`gui_token_ok()` 供 RLS 判断令牌有效性；`gui_dup_check(p_text)` 按标题相似度查重，只比对 `approved` / `adopted` 的情报和未删除的条目（用它绕开 RLS 读待审行会泄露投稿标题，所以故意限制）。
 
@@ -112,3 +115,45 @@ CORS 白名单是付费功能（个人版 ¥19.9/月），到期降级后前端�
 4. 前端写入走 `sendWithColumnFallback()`，缺字段自动去掉重试，所以「先发代码后跑 SQL」不会崩。
 
 改函数用 `create or replace`；改策略先 `drop policy if exists` 再建。
+
+### 控制台按批原子执行
+
+一次粘贴多条语句，**任何一条报错整批回滚**。实测：一批十几条在 `drop column` 处失败后，
+先前 `add column` / `update` 的结果全部不存在，`select=related` 仍然 400。
+所以重跑前先用 PostgREST 查一次实际状态，别按「前面的应该已经执行」去写增量脚本。
+脚本尽量写成幂等：`add column if not exists`、`drop policy if exists`、`on conflict do nothing`。
+
+### 删列会被依赖对象挡住
+
+策略里引用了要删的列时，`drop column` 直接失败：
+
+```
+cannot drop column region of table gui_zones because other objects depend on it (SQLSTATE 2BP01)
+```
+
+顺序必须是：先 `drop policy if exists` 掉引用了这些列的策略 → 删列 / 改列 → 用新字段重建策略。
+建表时把校验写进策略（如 `char_length(region) between 1 and 60`）就会埋下这个坑，
+以后删字段时要一起改策略。
+
+### 主键从 text 换成 uuid
+
+`gui_zones` 这套迁移的固定套路，重跑前先确认 `new_id` 列是否存在：
+
+```sql
+alter table public.gui_zones add column if not exists new_id uuid not null default gen_random_uuid();
+-- 用旧 id join 重写所有引用关系（related、gui_zone_versions.zone_id）
+-- 删旧列 → drop 主键约束 → rename id → rename new_id → add primary key → drop legacy 列
+```
+
+注意 `gen_random_uuid()` 对每一行求值，3 行会得到 3 个不同的 uuid；写引用时要 join 回旧 id 再转。
+
+### 用 PostgREST 验证迁移结果
+
+不连 psql 也能验：`select=新列` 返回 200 说明列在；400 + `42703 column ... does not exist` 说明还没迁移。
+外键/依赖对象导致的失败只能看控制台报错原文，`2BP01` 就是「有东西依赖它」。
+
+## 令牌与验证的其他入口
+
+- 浏览器端取令牌不必开 F12：临时页答完两题把令牌显示出来（`_local/tests/lib/token.html`）。
+- 令牌 2 小时有效，存在 sessionStorage 的 `gui_token` / `gui_token_exp`
+  （测试里用 `addInitScript` 直接注入即可，不必走验证表单）。
