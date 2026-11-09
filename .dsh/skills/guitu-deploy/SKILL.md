@@ -37,6 +37,21 @@ for ($i=1; $i -le 20; $i++) {
 
 几分钟还不行就转后台 job 继续重试，不要堵在那里。
 
+### 推送卡在「Pushing to …」不动
+
+症状：`git push --verbose` 打完 `Pushing to <url>` 就没了下文，`ls-remote` 却秒回。
+原因是分片上传被代理挂住。改成分块之外的 Content-Length 就通：
+
+```powershell
+git -c http.postBuffer=104857600 -c http.version=HTTP/1.1 push origin main
+```
+
+实测这一条命令一次成功，重试循环里的普通 `git push` 反而会一直挂着。
+
+凭据：`gh-proxy.com` 是远端前缀，但 Windows 凭据库里存的是 `git:https://github.com`
+（用户名 `cangwu-protect-union`）。`git credential fill` 能直接取到，不需要重新登录；
+取不到时会一直等 GCM 弹窗（这个环境弹不出来），表现为推送无响应。
+
 ## 等部署
 
 Pages 有 30–90 秒延迟。轮询**本次改动特有的字符串**判断生效，不要只看状态码。
