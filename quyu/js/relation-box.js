@@ -89,24 +89,35 @@
       }
     }
 
-    function resolveForward() {
-      if (!tokens.length) { forward = []; return Promise.resolve(); }
-      return window.ZoneRelations.titlesFor(window.ZoneRelations.parse(tokens)).then(function (list) {
-        forward = list.map(function (f) {
+    function resolveForward(snapshot) {
+      if (!snapshot.length) return Promise.resolve([]);
+      return window.ZoneRelations.titlesFor(window.ZoneRelations.parse(snapshot)).then(function (list) {
+        return list.map(function (f) {
           return { type: f.type, id: f.id, title: f.title, own: true, ownerType: selfType, ownerId: selfId };
         });
       });
     }
 
     function loadRemote() {
-      if (!selfId) { remote = []; return Promise.resolve(); }
+      if (!selfId) return Promise.resolve([]);
       return window.ZoneRelations.listFor(selfType, selfId).then(function (items) {
-        remote = (items || []).filter(function (it) { return !it.own; });
-      }).catch(function () { remote = []; });
+        return (items || []).filter(function (it) { return !it.own; });
+      }).catch(function () { return []; });
     }
 
+    /* 每次刷新带一个序号：先发出的请求可能后返回（实测同一批 titles 请求快慢能差 200ms 以上），
+       只有最后一次刷新的结果能写回 forward / remote，否则旧列表会把刚勾上的条目盖掉。 */
+    var seq = 0;
+
     function refresh() {
-      return Promise.all([resolveForward(), loadRemote()]).then(render);
+      var mine = ++seq;
+      var snapshot = tokens.slice();
+      return Promise.all([resolveForward(snapshot), loadRemote()]).then(function (rs) {
+        if (mine !== seq) return;
+        forward = rs[0];
+        remote = rs[1];
+        render();
+      });
     }
 
     host.addEventListener("click", function (ev) {
