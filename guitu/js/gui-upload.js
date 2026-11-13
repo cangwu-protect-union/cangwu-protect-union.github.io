@@ -25,7 +25,15 @@
 var THUMB_EDGE = 260;     /* 缩略图最长边：列表显示 96px，2 倍屏 192px，取 260 留余量 */
 var THUMB_QUALITY = 0.72; /* 缩略图 JPEG 质量，通常 8~15KB */
   var BUCKET = "gui-images";
-  var HEIC_LIB = "js/lib/heic2any.min.js";
+  /* HEIC 库按本脚本的地址解析，而不是按页面地址：
+     别的模块（rpg6.0）直接加载这个文件时，「js/lib/…」相对它们的页面会 404。 */
+  var HEIC_LIB = (function () {
+    var self = document.currentScript;
+    if (self && self.src) {
+      try { return new URL("lib/heic2any.min.js", self.src).href; } catch (err) { /* 退回相对路径 */ }
+    }
+    return "js/lib/heic2any.min.js";
+  })();
 
   function cfg() {
     var c = window.GUI_CLOUDBASE || {};

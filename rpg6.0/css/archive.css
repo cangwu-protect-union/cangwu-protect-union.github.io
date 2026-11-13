@@ -1,0 +1,534 @@
+/* ============================================================
+   archive.css —— 回合制正传6.0 角色档案的模块样式
+   ------------------------------------------------------------
+   只放本模块特有的排版：列表行、六维格、技能块、审核标记、
+   表单与确认框。颜色全部取 css/style.css 的变量，不引入新色。
+   ============================================================ */
+
+/* --- 筛选条 --------------------------------------------------- */
+
+.rpg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 16px;
+}
+
+.rpg-toolbar .gui-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rpg-toolbar .btn { flex: 0 0 auto; white-space: nowrap; }
+
+.rpg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin: 0 0 4px;
+}
+
+.rpg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+.rpg-field-grow { flex: 1 1 220px; }
+
+.rpg-field select,
+.rpg-field input {
+  font: inherit;
+  font-size: .9rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.rpg-filters .btn { margin-bottom: 1px; }
+
+.rpg-note { margin: 8px 0 0; }
+
+.rpg-status {
+  margin: 10px 0 0;
+  font-size: .88rem;
+  color: var(--muted);
+}
+
+/* --- 列表行 --------------------------------------------------- */
+
+.rpg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.rpg-row:hover { border-color: var(--accent); }
+
+.rpg-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.rpg-name { font-weight: 600; }
+
+.rpg-alias,
+.rpg-occ {
+  color: var(--muted);
+  font-size: .9em;
+}
+
+.rpg-rating {
+  flex: 0 0 auto;
+  min-width: 2.2em;
+  text-align: center;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.rpg-rating.is-empty { border-color: transparent; }
+
+.rpg-mark {
+  flex: 0 0 auto;
+  display: inline-block;
+  min-width: 1.6em;
+  text-align: center;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.rpg-mark.is-empty {
+  border-color: transparent;
+  min-width: 1.6em;
+}
+
+.mark-ok { color: var(--accent); border-color: var(--accent); }
+.mark-half { color: var(--fg); }
+.mark-bad { color: #b42318; border-color: #b42318; }
+.mark-unknown { color: var(--muted); }
+
+@media (prefers-color-scheme: dark) {
+  .mark-bad { color: #ff7b72; border-color: #ff7b72; }
+}
+
+/* --- 详情 ----------------------------------------------------- */
+
+.char-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.char-name { font-size: 1em; }
+
+.char-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 18px;
+  margin: 18px 0 6px;
+}
+
+.char-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .92rem;
+}
+
+.char-stat-label { color: var(--muted); }
+
+.char-skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.char-skill {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.char-skill-head { margin: 0; font-weight: 600; }
+
+.char-skill-cond {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: .9em;
+}
+
+.char-skill-effect { margin: 4px 0 0; }
+
+.char-skill-note {
+  margin: 4px 0 0;
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.char-people {
+  margin: 22px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.char-people p { margin: 0 0 2px; }
+
+.char-gallery { margin-top: 16px; }
+
+.char-gallery summary {
+  cursor: pointer;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+.char-gallery .entry-gallery { margin-top: 10px; }
+
+.rpg-banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: .88rem;
+}
+
+/* --- 投稿 / 编辑表单 ------------------------------------------ */
+
+.rpg-form {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.field em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: .82em;
+}
+
+.field-hint {
+  display: block;
+  font-size: .8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.field textarea { resize: vertical; }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 140px;
+  gap: 12px;
+}
+
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-inline select { width: auto; min-width: 150px; }
+
+.form-group {
+  margin: 0;
+  padding: 10px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.form-group legend {
+  padding: 0 6px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.field-compact { gap: 3px; font-size: .85rem; }
+
+.skill-rows {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+
+.skill-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.skill-row-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.image-item {
+  margin: 0;
+  width: 120px;
+  display: grid;
+  gap: 4px;
+}
+
+.image-item img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.image-empty { margin: 8px 0 0; font-size: .85rem; }
+
+.image-progress { margin: 8px 0 0; }
+
+.form-problems {
+  padding: 10px 14px;
+  border: 1px solid #b42318;
+  border-radius: 8px;
+  font-size: .88rem;
+}
+
+.form-problems p { margin: 0 0 4px; }
+
+.form-problems ul { margin: 0; padding-left: 20px; }
+
+@media (prefers-color-scheme: dark) {
+  .form-problems { border-color: #ff7b72; }
+}
+
+.rpg-submit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 18px 0 0;
+}
+
+.rpg-review-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.rpg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.rpg-section { margin-bottom: 10px; }
+
+.rpg-foot-link {
+  margin: 28px 0 0;
+  font-size: .85rem;
+}
+
+/* --- 确认框 --------------------------------------------------- */
+
+.rpg-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  width: min(440px, calc(100vw - 32px));
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.rpg-dialog::backdrop { background: rgba(0, 0, 0, .38); }
+
+.rpg-dialog-box {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  margin: 0;
+}
+
+.rpg-dialog-title { margin: 0; font-size: 1.02rem; }
+
+.rpg-dialog-text {
+  margin: 0;
+  font-size: .88rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.rpg-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* --- 编撰列表 ------------------------------------------------- */
+
+.rpg-admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rpg-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rpg-admin-row.is-deleted { opacity: .62; }
+
+.rpg-admin-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.rpg-admin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: .82rem;
+}
+
+.rpg-state {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.rpg-admin-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* --- 投稿卡 --------------------------------------------------- */
+
+.rpg-sub-list {
+  display: grid;
+  gap: 14px;
+}
+
+.rpg-sub {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rpg-sub.is-done { background: var(--card); }
+
+.rpg-sub-title {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+}
+
+.rpg-sub-meta {
+  margin: 0 0 10px;
+  font-size: .82rem;
+}
+
+.rpg-sub-note {
+  margin: 10px 0 0;
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.rpg-sub-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.rpg-sub-link {
+  margin: 8px 0 0;
+  font-size: .88rem;
+}
+
+/* --- 窄屏 ----------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .rpg-toolbar { flex-direction: column; align-items: stretch; }
+  .char-stats { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skill-row-main { grid-template-columns: 1fr; }
+  .rpg-admin-actions { margin-left: 0; width: 100%; }
+}
