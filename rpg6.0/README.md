@@ -101,5 +101,6 @@ gui-gate.js → POST /rpc/gui_verify → 令牌存 sessionStorage
 
 ## 原始资料
 
-`archive/doc/*.txt` 是 33 份原始角色档案，`archive/picture/*.jpeg` 是对应图片（1–19）。
+`archive/doc/*.txt` 是 33 份原始角色档案，`archive/picture/*.jpeg` 是对应图片（1–19，其中 1–4 未被角色引用）。
+角色与图片按人物对应，同一张合影可对应多名角色。
 导入数据库后 txt 不再参与渲染，保留作核对依据。
