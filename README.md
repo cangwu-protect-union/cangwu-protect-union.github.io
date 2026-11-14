@@ -38,12 +38,21 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 ```
 .
 ├── index.html          首页          ┐
-├── about.html          关于          │ 主站（不加载脚本）
-├── projects.html       项目          ┘
+├── about.html          关于          │ 主站
+├── projects.html       项目          │
+├── stats.html          本站统计       ┘
 ├── 架构.md             主站页面依赖（标记区间自动生成）
-├── 访客流程图.md        主站三页之间的跳转
+├── 访客流程图.md        主站页面之间的跳转
 ├── css/
 │   └── style.css       全站样式（主站、站点建议、鬼图鉴共用）
+├── data/
+│   └── updates.json    网站功能更新记录（手工维护，统计页读取）
+├── js/                 全站共用脚本
+│   ├── members.js      四位可公开成员代号（下拉与统计共用）
+│   ├── operator.js     选编辑人的下拉与确认框
+│   ├── edit-log.js     写编辑日志（site_edit_log）
+│   ├── visit-beacon.js 公开页访问打点（site_views）
+│   └── stats.js        统计页
 │
 ├── suggest/            ★ 站点建议模块（详见 suggest/架构.md）
 │   ├── suggest.html           提供建议：访客匿名提交
@@ -97,13 +106,19 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 ```
 
 划分原则很简单：**能公开的按模块放，不能公开的统一进 `_local/`**。
-根目录只留主站三页、共用样式和生成的模块文档，每个功能开一个目录，打开文件夹一眼就能看出结构。
+根目录只留主站四页、共用样式与脚本、`data/updates.json` 和生成的模块文档，每个功能开一个目录，打开文件夹一眼就能看出结构。
 
 **站点建议**（`suggest/`）：项目页第一个卡片上的「提供建议 / 审核建议」。访客匿名提交，数据进 CloudBase 的
 `site_suggestions` 表；匿名只能插入，读取与删除要组织验证令牌。限频由数据库触发器做：
 全站每分钟 20 条、相同内容 10 分钟内重复直接拒绝，再按 `x-forwarded-for` 做每 IP 每分钟 3 条
 的尽力而为（实测网关转发过来的 IP 每次可能不同，这一条不保证生效）。
 两个页面直接引用 `guitu/data/config.js` 与 `guitu/js/gui-gate.js`，不另存副本。
+
+**编辑人与本站统计**：鬼图鉴、异常区域档案、站点建议的写操作会要求选一位 CPU 公开成员，
+记进 `site_edit_log`；条目与区域行上另有 `editor` / `edited_at`（存量分别是 `CPU` 与
+`回合制游戏工作室`）。公开页加载 `js/visit-beacon.js` 往 `site_views` 记一次访问（只存路径与
+匿名访客号，不存 IP 与 UA）。`stats.html` 通过 RPC 读聚合结果，明细行匿名读不到。
+成员是「自述」：全站共用一个令牌，拿到令牌的人可以选任意一位，这一项不能当追责依据。
 
 **纯静态**——没有后端、没有数据库服务需要自己跑、不需要编译。
 鬼图鉴的数据存在腾讯云 CloudBase（PostgreSQL），页面本身仍是纯静态。
@@ -148,6 +163,8 @@ python -m http.server 8000
 | 中文句子中间多出空格 | HTML 里一句话跨了行 | 一个中文字段写成一行 |
 | 传 iPhone 原图很慢或失败 | 浏览器端压缩 + HEIC 转码，HEIC 库 1.3 MB 按需加载 | 别改成 CDN，也别预加载 |
 | `build-docs.js --check` 报「文档已过期」 | 改了页面、脚本或跨模块引用 | 跑 `node _local/tools/build-docs.js`；这是拦截，不是脚本坏了 |
+| 统计页的流量一直是 0 | `visit-beacon.js` 在 `localhost` / `127.0.0.1` 上不发请求 | 只有部署域名会打点；本地验证用控制台往 `site_views` 插测试行 |
+| 统计页三块都空、提示「统计后端还没启用」 | 没执行 `_local/sql/editor-stats-setup.sql`，RPC 不存在 | 先跑迁移再刷新；前端不会因此报错 |
 | 生成 PNG 时卡住不动 | 无头 Edge 在受限终端里起不来 | 换普通终端跑；四份 md 已经写好，PNG 只是配图 |
 
 各模块的细节以 `guitu/README.md`、`quyu/README.md` 和两份 `架构.md` 的第四、五节为准。

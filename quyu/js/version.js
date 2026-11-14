@@ -109,29 +109,42 @@
 
   applyBtn.addEventListener("click", function () {
     if (!version) return;
-    if (!confirm("把「" + (version.title || version.zone_id) + "」的内容恢复成这个版本？\n\n当前内容会先归档一份。")) return;
 
-    showError("");
-    applyBtn.disabled = true;
-    applyBtn.textContent = "正在应用…";
+    window.Operator.ask({
+      title: "应用这个版本",
+      text: "「" + (version.title || version.zone_id) + "」的内容会恢复成这个版本，当前内容先归档一份。",
+      confirmText: "应用版本"
+    }).then(function (answer) {
+      if (!answer) return;
 
-    window.ZoneData.getEntryAny(version.zone_id).then(function (now) {
-      /* 先归档当前内容，再覆盖，否则这一步的改动就再也找不回来了 */
-      return now ? window.ZoneData.archiveVersion(now, "edit") : null;
-    }).then(function () {
-      return window.ZoneData.updateEntry({ id: version.zone_id, title: version.title,
-        lng: version.lng, lat: version.lat,
-        image: version.image, images: version.images, thumbs: version.thumbs,
-        related: version.related, refs: version.refs,
-        intro: version.intro, body: version.body, tags: version.tags, date: version.date });
-    }).then(function () {
-      return window.ZoneData.markVersionApplied(version.version_id);
-    }).then(function () {
-      location.href = "zone.html?id=" + encodeURIComponent(version.zone_id);
-    }).catch(function (err) {
-      showError("应用失败：" + (err.message || "请稍后重试"));
-      applyBtn.disabled = false;
-      applyBtn.textContent = "应用这个版本";
+      showError("");
+      applyBtn.disabled = true;
+      applyBtn.textContent = "正在应用…";
+
+      window.ZoneData.getEntryAny(version.zone_id).then(function (now) {
+        /* 先归档当前内容，再覆盖，否则这一步的改动就再也找不回来了 */
+        return now ? window.ZoneData.archiveVersion(now, "edit") : null;
+      }).then(function () {
+        return window.ZoneData.updateEntry({ id: version.zone_id, title: version.title,
+          lng: version.lng, lat: version.lat,
+          image: version.image, images: version.images, thumbs: version.thumbs,
+          related: version.related, refs: version.refs,
+          intro: version.intro, body: version.body, tags: version.tags, date: version.date,
+          editor: answer.member });
+      }).then(function () {
+        return window.ZoneData.markVersionApplied(version.version_id);
+      }).then(function () {
+        return window.EditLog.log({
+          module: "quyu", targetType: "zone", targetId: version.zone_id,
+          targetTitle: version.title || "", action: "apply", member: answer.member, note: answer.note
+        });
+      }).then(function () {
+        location.href = "zone.html?id=" + encodeURIComponent(version.zone_id);
+      }).catch(function (err) {
+        showError("应用失败：" + (err.message || "请稍后重试"));
+        applyBtn.disabled = false;
+        applyBtn.textContent = "应用这个版本";
+      });
     });
   });
 })();

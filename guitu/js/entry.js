@@ -55,6 +55,8 @@
     root.innerHTML =
       '<h1 class="entry-title">' + esc(entry.title) + "</h1>" +
       (entry.date ? '<p class="entry-date muted">记录日期：' + esc(entry.date) + "</p>" : "") +
+      '<p class="entry-date muted">编辑：' + esc(entry.editor || "CPU") +
+        (entry.edited_at ? " · " + esc(String(entry.edited_at).slice(0, 10)) : "") + "</p>" +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +
       (tags ? '<ul class="tags entry-tags">' + tags + "</ul>" : "");

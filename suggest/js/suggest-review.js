@@ -90,19 +90,33 @@
     var row = btn.closest(".review-item");
     if (!row) return;
 
-    if (!window.confirm("确定删除这条建议？删除后无法恢复。")) return;
-
     var id = row.getAttribute("data-id");
-    btn.disabled = true;
-    btn.textContent = "删除中…";
+    var titleEl = row.querySelector(".review-item-title");
+    var title = titleEl ? titleEl.textContent : "";
 
-    D.remove(id).then(function () {
-      row.parentNode.removeChild(row);
-      syncEmpty();
-    }).catch(function (err) {
-      btn.disabled = false;
-      btn.textContent = "删除";
-      countEl.textContent = "删除失败：" + err.message;
+    window.Operator.ask({
+      title: "删除建议",
+      text: "「" + title + "」删除后无法恢复。",
+      confirmText: "删除",
+      danger: true
+    }).then(function (answer) {
+      if (!answer) return;
+
+      btn.disabled = true;
+      btn.textContent = "删除中…";
+
+      D.remove(id).then(function () {
+        window.EditLog.log({
+          module: "suggest", targetType: "suggestion", targetId: id,
+          targetTitle: title, action: "review", member: answer.member, note: answer.note
+        });
+        row.parentNode.removeChild(row);
+        syncEmpty();
+      }).catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = "删除";
+        countEl.textContent = "删除失败：" + err.message;
+      });
     });
   });
 })();

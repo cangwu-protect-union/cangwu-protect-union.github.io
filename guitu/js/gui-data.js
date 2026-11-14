@@ -210,7 +210,8 @@
       refs: r.refs || [],
       related: r.related || [],
       intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
-      deleted: !!r.deleted, updated_at: r.updated_at
+      deleted: !!r.deleted, updated_at: r.updated_at,
+      editor: r.editor || "CPU", edited_at: r.edited_at || null
     };
   }
 
@@ -479,7 +480,9 @@
       intro: entry.intro,
       body: entry.body,
       tags: entry.tags || [],
-      date: entry.date
+      date: entry.date,
+      editor: entry.editor || "CPU",
+      edited_at: new Date().toISOString()
     };
 
     return sendWithColumnFallback(url, "POST", payload, c).then(function () {
@@ -590,7 +593,8 @@
           refs: r.refs || [],
           related: r.related || [],
           intro: r.intro, body: r.body, tags: r.tags || [], date: r.date,
-          deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at
+          deleted: !!r.deleted, updated_at: r.updated_at, created_at: r.created_at,
+          editor: r.editor || "CPU", edited_at: r.edited_at || null
         };
       });
     }).catch(function (err) {
@@ -653,57 +657,38 @@
 
     var row = toRow(entry);
     row.updated_at = new Date().toISOString();
+    row.editor = entry.editor || "CPU";
+    row.edited_at = row.updated_at;
 
     var url = c.base + c.table + "?id=eq." + encodeURIComponent(entry.id);
     return sendWithColumnFallback(url, "PATCH", row, c);
   }
 
-  /* 软删除：只把 deleted 置为 true，数据库里不删行 */
-  function softDelete(entryId) {
+  /* 软删除：只把 deleted 置为 true，数据库里不删行。
+     用 sendWithColumnFallback：数据库还没加 editor 列时自动去掉该字段重试。 */
+  function softDelete(entryId, member) {
     var c = cfg();
     if (!c) return Promise.reject(new Error("云数据库未配置"));
 
+    var now = new Date().toISOString();
     var url = c.base + c.table + "?id=eq." + encodeURIComponent(entryId);
-    return withTimeout(
-      fetch(url, {
-        method: "PATCH",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify({ deleted: true, updated_at: new Date().toISOString() })
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("删除失败 HTTP " + res.status + " " + t.slice(0, 160));
-        });
-      }
-    });
+    return sendWithColumnFallback(url, "PATCH",
+      { deleted: true, updated_at: now, edited_at: now, editor: member || "CPU" }, c);
   }
 
   /* 恢复：把某条目重新设为可见，并写入指定的内容（不传则用它的最新版本） */
-  function restoreEntry(entryId, content) {
+  function restoreEntry(entryId, content, member) {
     var c = cfg();
     if (!c) return Promise.reject(new Error("云数据库未配置"));
 
     var row = content ? toRow(content) : {};
     row.deleted = false;
     row.updated_at = new Date().toISOString();
+    row.edited_at = row.updated_at;
+    row.editor = member || "CPU";
 
     var url = c.base + c.table + "?id=eq." + encodeURIComponent(entryId);
-    return withTimeout(
-      fetch(url, {
-        method: "PATCH",
-        headers: headers(c, { "Prefer": "return=minimal" }),
-        body: JSON.stringify(row)
-      }),
-      TIMEOUT_MS
-    ).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          throw new Error("恢复失败 HTTP " + res.status + " " + t.slice(0, 160));
-        });
-      }
-    });
+    return sendWithColumnFallback(url, "PATCH", row, c);
   }
 
   /* 新增一个条目（编辑界面用，走和 add 相同的逻辑但不写本地缓冲） */
@@ -713,6 +698,8 @@
 
     var row = toRow(entry);
     row.id = entry.id;
+    row.editor = entry.editor || "CPU";
+    row.edited_at = new Date().toISOString();
 
     return sendWithColumnFallback(c.base + c.table, "POST", row, c);
   }

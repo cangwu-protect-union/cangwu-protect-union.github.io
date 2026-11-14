@@ -154,26 +154,40 @@
     var noteEl = row.querySelector(".review-note");
     var note = noteEl ? noteEl.value.trim() : "";
     var label = btn.textContent;
+    var isReject = nextStatus === "rejected";
+    var titleEl = row.querySelector(".review-item-title");
+    var title = titleEl ? titleEl.textContent : "";
 
-    if (nextStatus === "rejected" && !window.confirm("确定驳回这条情报？")) return;
+    window.Operator.ask({
+      title: isReject ? "驳回情报" : "通过情报",
+      text: "「" + title + "」",
+      confirmText: isReject ? "驳回" : "通过",
+      danger: isReject
+    }).then(function (answer) {
+      if (!answer) return;
 
-    var buttons = row.querySelectorAll("[data-act]");
-    Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
-    btn.textContent = "处理中…";
+      var buttons = row.querySelectorAll("[data-act]");
+      Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
+      btn.textContent = "处理中…";
 
-    window.GuiData.setTipStatus(id, nextStatus, note).then(function () {
-      row.parentNode.removeChild(row);
-      syncEmpty();
-    }).catch(function (err) {
-      Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
-      btn.textContent = label;
-      countEl.textContent = "操作失败：" + err.message;
+      window.GuiData.setTipStatus(id, nextStatus, note).then(function () {
+        window.EditLog.log({
+          module: "guitu", targetType: "tip", targetId: id,
+          targetTitle: title, action: "review", member: answer.member, note: note
+        });
+        row.parentNode.removeChild(row);
+        syncEmpty();
+      }).catch(function (err) {
+        Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
+        btn.textContent = label;
+        countEl.textContent = "操作失败：" + err.message;
 
-      /* 令牌过期 / 没权限：清掉本地令牌，回到验证界面 */
-      if (/42501|row-level security|permission denied/i.test(String(err.message))) {
-        window.GuiGate.clearVerified();
-        setTimeout(function () { location.reload(); }, 1500);
-      }
+        /* 令牌过期 / 没权限：清掉本地令牌，回到验证界面 */
+        if (/42501|row-level security|permission denied/i.test(String(err.message))) {
+          window.GuiGate.clearVerified();
+          setTimeout(function () { location.reload(); }, 1500);
+        }
+      });
     });
   });
 })();

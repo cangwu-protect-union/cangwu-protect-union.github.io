@@ -13,6 +13,7 @@
   var doneText = document.getElementById("doneText");
   var doneView = document.getElementById("doneView");
   var submitBtn = document.getElementById("submitBtn");
+  var editorSel = document.getElementById("editorSel");
 
   var editor = null;
 
@@ -20,6 +21,7 @@
     gateSection.hidden = true;
     formSection.hidden = false;
 
+    window.Operator.fill(editorSel, "请选择编辑人");
     editor = window.ZoneEditor.mount(document.getElementById("editorMount"), { mode: "create" });
     editor.form.el.title.focus();
   }
@@ -37,10 +39,17 @@
   submitBtn.addEventListener("click", function () {
     if (!editor) return;
 
+    var member = window.Operator.value(editorSel);
+    if (!member) { editor.form.showError("请选择编辑人。"); return; }
+
     submitBtn.disabled = true;
     submitBtn.textContent = "正在保存…";
 
-    editor.save().then(function (zone) {
+    editor.save(member).then(function (zone) {
+      window.EditLog.log({
+        module: "quyu", targetType: "zone", targetId: zone.id,
+        targetTitle: zone.title, action: "create", member: member
+      });
       formSection.hidden = true;
       doneSection.hidden = false;
       doneText.textContent = "「" + zone.title + "」已写入档案。";

@@ -22,8 +22,14 @@
   var downUntil = 0;
 
   var PAGE_SIZE = 12;
+  /* 相邻角色一次取 100 位（rpg_search 的上限），最多 50 页 */
+  var SIBLING_PAGE_SIZE = 100;
+  var SIBLING_MAX_PAGES = 50;
 
-  var MEMBERS = ["Forever", "苏橘AA", "全能天鬼", "漪珩BV1fy4y1L7Rq"];
+  /* 成员名单的唯一定义在 js/members.js；页面没加载它时退回这份副本 */
+  var MEMBERS = (window.CPU_MEMBERS && window.CPU_MEMBERS.length)
+    ? window.CPU_MEMBERS.slice()
+    : ["Forever", "苏橘AA", "全能天鬼", "漪珩BV1fy4y1L7Rq"];
   var MARKS = ["√", "O", "X"];
   var STAT_KEYS = ["atk", "def", "mres", "hp", "mp", "spd"];
   var STAT_LABELS = {
@@ -104,6 +110,14 @@
   }
 
   function trim(v) { return String(v == null ? "" : v).trim(); }
+
+  /* 写一条编辑日志给统计页；页面没加载 js/edit-log.js 时静默跳过 */
+  function logEdit(ev) {
+    if (window.EditLog && typeof window.EditLog.log === "function") {
+      return window.EditLog.log(ev);
+    }
+    return Promise.resolve(false);
+  }
 
   /* ---------------- 请求 ---------------- */
 
@@ -429,6 +443,46 @@
     });
   }
 
+  /* ---------------- 读：相邻角色 ---------------- */
+
+  /* 按列表同样的筛选与排序把结果收齐，返回当前角色在其中的位置。
+     当前角色不在结果集（筛选失效、已删除）时 index 为 -1。 */
+  function listSiblings(item, opts) {
+    opts = opts || {};
+    var empty = { ids: [], index: -1, total: 0 };
+
+    if (!item || item.deleted) return Promise.resolve(empty);
+    if (!matches(item, trim(opts.q), trim(opts.rating), trim(opts.occ))) {
+      return Promise.resolve(empty);
+    }
+
+    var collected = [];
+    var total = 0;
+
+    function step(page) {
+      return search({
+        q: opts.q,
+        rating: opts.rating,
+        occ: opts.occ,
+        order: opts.order,
+        page: page,
+        pageSize: SIBLING_PAGE_SIZE
+      }).then(function (res) {
+        var items = res.items || [];
+        collected = collected.concat(items);
+        total = typeof res.total === "number" ? res.total : collected.length;
+
+        if (!items.length || collected.length >= total || page >= SIBLING_MAX_PAGES) {
+          var ids = collected.map(function (x) { return x.id; });
+          return { ids: ids, index: ids.indexOf(item.id), total: ids.length };
+        }
+        return step(page + 1);
+      });
+    }
+
+    return step(1);
+  }
+
   function findCharacterBySubmission(submissionId) {
     var c = cfg();
     if (!c || !submissionId) return Promise.resolve(null);
@@ -570,7 +624,13 @@
       reviewed_at: nowIso(),
       review_note: trim(note)
     };
-    return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(id), "PATCH", row);
+    return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(id), "PATCH", row)
+      .then(function () {
+        return logEdit({
+          module: "rpg6.0", targetType: "submission", targetId: id,
+          targetTitle: "", action: "review", member: reviewer, note: trim(note)
+        });
+      });
   }
 
   /* 转正：先查是否已建过角色（幂等），再建角色，最后改投稿状态。
@@ -603,6 +663,8 @@
         row.review_note = trim(note);
         row.source_submission_id = submissionId;
         row.created_at = nowIso();
+        row.editor = reviewer;
+        row.edited_at = row.created_at;
         row.updated_at = row.created_at;
         characterId = row.id;
 
@@ -636,6 +698,11 @@
       };
       return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(submissionId), "PATCH", patch)
         .then(function () { return { id: characterId, reused: true }; });
+    }).then(function (result) {
+      return logEdit({
+        module: "rpg6.0", targetType: "character", targetId: result.id,
+        targetTitle: trim(payload.name), action: "review", member: reviewer, note: trim(note)
+      }).then(function () { return result; });
     });
   }
 
@@ -652,7 +719,13 @@
     row.edited_at = nowIso();
     row.updated_at = row.edited_at;
 
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row);
+    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
+      .then(function () {
+        return logEdit({
+          module: "rpg6.0", targetType: "character", targetId: id,
+          targetTitle: trim(payload.name), action: "update", member: operator
+        });
+      });
   }
 
   function softDelete(id, operator) {
@@ -666,7 +739,13 @@
       deleted_at: nowIso(),
       updated_at: nowIso()
     };
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row);
+    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
+      .then(function () {
+        return logEdit({
+          module: "rpg6.0", targetType: "character", targetId: id,
+          targetTitle: "", action: "delete", member: operator || ""
+        });
+      });
   }
 
   function restoreCharacter(id, content, operator) {
@@ -680,7 +759,13 @@
     row.edited_at = nowIso();
     row.updated_at = row.edited_at;
 
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row);
+    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
+      .then(function () {
+        return logEdit({
+          module: "rpg6.0", targetType: "character", targetId: id,
+          targetTitle: trim(content && content.name), action: "restore", member: operator || ""
+        });
+      });
   }
 
   function archiveVersion(character, reason) {
@@ -804,6 +889,7 @@
     facets: facets,
     getCharacter: getCharacter,
     listAll: listAll,
+    listSiblings: listSiblings,
     listVersions: listVersions,
     listVersionsOf: listVersionsOf,
     getVersion: getVersion,

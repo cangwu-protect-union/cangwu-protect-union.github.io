@@ -202,11 +202,16 @@
       return v;
     }
 
-    function save() {
+    function save(member) {
       var problems = form.validate();
       if (problems.length) { form.showError(problems.join("；")); return Promise.reject(new Error("校验未通过")); }
+      if (!member) {
+        form.showError("请选择编辑人。");
+        return Promise.reject(new Error("请选择编辑人"));
+      }
 
       var v = values();
+      v.editor = member;
       formErrorEl.hidden = true;
 
       var saved;

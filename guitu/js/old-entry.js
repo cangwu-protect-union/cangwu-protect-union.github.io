@@ -115,32 +115,41 @@
 
       var latest = versions[0];   /* 时间倒序的第一条就是最新版本 */
 
-      if (!window.confirm("确定恢复条目「" + latest.title + "」吗？\n\n会用它的最新版本内容重新出现在图鉴中。")) {
-        return;
-      }
+      window.Operator.ask({
+        title: "恢复条目",
+        text: "「" + latest.title + "」会用它的最新版本内容重新出现在图鉴中。",
+        confirmText: "恢复此条目"
+      }).then(function (answer) {
+        if (!answer) return;
 
-      restoreBtn.disabled = true;
-      restoreBtn.textContent = "恢复中…";
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = "恢复中…";
 
-      window.GuiData.restoreEntry(entryId, {
-        title: latest.title,
-        image: latest.image || "",
-        images: latest.images || [],
-        thumbs: latest.thumbs || [],
-        intro: latest.intro || "",
-        body: latest.body || "",
-        tags: latest.tags || [],
-        date: latest.date || ""
-      }).then(function () {
-        /* 被恢复的这个版本已经变成当前内容，要从旧图鉴里消失，
-           否则看起来像同时存在两份。 */
-        return window.GuiData.markVersionApplied(latest.version_id);
-      }).then(function () {
-        location.href = "edit-gui.html";
-      }).catch(function (err) {
-        restoreBtn.disabled = false;
-        restoreBtn.textContent = "恢复此条目";
-        groupState.textContent = "恢复失败：" + err.message;
+        window.GuiData.restoreEntry(entryId, {
+          title: latest.title,
+          image: latest.image || "",
+          images: latest.images || [],
+          thumbs: latest.thumbs || [],
+          intro: latest.intro || "",
+          body: latest.body || "",
+          tags: latest.tags || [],
+          date: latest.date || ""
+        }, answer.member).then(function () {
+          /* 被恢复的这个版本已经变成当前内容，要从旧图鉴里消失，
+             否则看起来像同时存在两份。 */
+          return window.GuiData.markVersionApplied(latest.version_id);
+        }).then(function () {
+          return window.EditLog.log({
+            module: "guitu", targetType: "entry", targetId: entryId,
+            targetTitle: latest.title, action: "restore", member: answer.member, note: answer.note
+          });
+        }).then(function () {
+          location.href = "edit-gui.html";
+        }).catch(function (err) {
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = "恢复此条目";
+          groupState.textContent = "恢复失败：" + err.message;
+        });
       });
     });
   }

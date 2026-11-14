@@ -3,12 +3,25 @@
    ------------------------------------------------------------
    只看不改。图片默认折叠在页面最底部（<details>），
    审核人与最近编辑各一行；旧档案没有时间就只显示审核人。
+   底部按列表同样的筛选与排序翻上一个 / 下一个角色。
    ============================================================ */
 (function () {
   "use strict";
 
   var rootEl = document.getElementById("charRoot");
-  var id = new URLSearchParams(location.search).get("id");
+  var backEl = document.querySelector(".entry-back a");
+
+  var params = new URLSearchParams(location.search);
+  var id = params.get("id");
+  var filters = {
+    q: params.get("q") || "",
+    rating: params.get("rating") || "",
+    occ: params.get("occ") || "",
+    order: params.get("order") === "desc" ? "desc" : "asc"
+  };
+  var PAGE_SIZE = (window.RpgData && window.RpgData.PAGE_SIZE) || 12;
+  var siblings = null;
+  var rendered = false;
 
   var MARK_CLASS = {
     "√": "mark-ok",
@@ -120,6 +133,94 @@
            "</details>";
   }
 
+  /* ---------------- 翻页 ---------------- */
+
+  function listUrl(page) {
+    var p = new URLSearchParams();
+    if (filters.q) p.set("q", filters.q);
+    if (filters.rating) p.set("rating", filters.rating);
+    if (filters.occ) p.set("occ", filters.occ);
+    if (filters.order === "desc") p.set("order", "desc");
+    if (page > 1) p.set("page", String(page));
+    var qs = p.toString();
+    return "rpg6.0.html" + (qs ? "?" + qs : "");
+  }
+
+  function detailUrl(charId) {
+    var p = new URLSearchParams();
+    p.set("id", charId);
+    if (filters.q) p.set("q", filters.q);
+    if (filters.rating) p.set("rating", filters.rating);
+    if (filters.occ) p.set("occ", filters.occ);
+    if (filters.order === "desc") p.set("order", "desc");
+    return "character.html?" + p.toString();
+  }
+
+  /* 返回列表时带上同样的筛选，并落在当前角色所在那一页 */
+  function updateBackLink() {
+    if (!backEl) return;
+    var page = 1;
+    if (siblings && siblings.index >= 0) {
+      page = Math.floor(siblings.index / PAGE_SIZE) + 1;
+    }
+    backEl.href = listUrl(page);
+  }
+
+  function pagerHtml() {
+    if (!siblings || siblings.index < 0) return "";
+
+    var ids = siblings.ids || [];
+    var total = ids.length;
+    if (total < 2) return "";
+
+    var index = siblings.index;
+    return '<nav class="gui-pager char-pager" aria-label="角色翻页">' +
+             '<button type="button" class="btn btn-ghost" data-dir="-1"' +
+               (index <= 0 ? " disabled" : "") + ">上一个</button>" +
+             '<span class="gui-pager-info">第 ' + (index + 1) + " / 共 " + total + " 位</span>" +
+             '<button type="button" class="btn btn-ghost" data-dir="1"' +
+               (index >= total - 1 ? " disabled" : "") + ">下一个</button>" +
+           "</nav>";
+  }
+
+  /* 相邻列表比正文晚到时，把翻页条补在末尾 */
+  function appendPager() {
+    if (!rendered || !siblings || siblings.index < 0) return;
+    if (rootEl.querySelector(".char-pager")) return;
+    var html = pagerHtml();
+    if (html) rootEl.insertAdjacentHTML("beforeend", html);
+  }
+
+  function go(delta) {
+    if (!siblings || siblings.index < 0) return;
+    if (!delta) return;
+
+    var nextIndex = siblings.index + delta;
+    var nextId = siblings.ids[nextIndex];
+    if (!nextId) return;
+
+    Array.prototype.forEach.call(rootEl.querySelectorAll("[data-dir]"), function (btn) {
+      btn.disabled = true;
+    });
+    rootEl.setAttribute("aria-busy", "true");
+
+    window.RpgData.getCharacter(nextId).then(function (item) {
+      rootEl.removeAttribute("aria-busy");
+      if (!item) {
+        fail("没有找到这条档案");
+        return;
+      }
+      siblings.index = nextIndex;
+      render(item);
+      history.replaceState(null, "", detailUrl(nextId));
+      window.scrollTo(0, 0);
+    }).catch(function (err) {
+      rootEl.removeAttribute("aria-busy");
+      rootEl.innerHTML = '<h1 class="entry-title">载入失败</h1>' +
+        '<p class="lead">' + esc(err.message) + "</p>";
+    });
+  }
+
   function render(item) {
     var banner = item.deleted
       ? '<p class="rpg-banner">这条档案已被删除，仅编辑区可见。</p>'
@@ -139,8 +240,10 @@
                "</h1>";
 
     document.title = item.name + " · 角色档案 · CPU";
+    rendered = true;
     rootEl.innerHTML = banner + head + statsHtml(item) + skillsHtml(item.skills) +
-      peopleHtml(item) + galleryHtml(item.images);
+      peopleHtml(item) + galleryHtml(item.images) + pagerHtml();
+    updateBackLink();
   }
 
   function fail(text) {
@@ -153,12 +256,28 @@
     return;
   }
 
+  rootEl.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-dir]");
+    if (!btn || btn.disabled) return;
+    go(parseInt(btn.getAttribute("data-dir"), 10));
+  });
+
+  updateBackLink();
+
   window.RpgData.getCharacter(id).then(function (item) {
     if (!item) {
       fail("没有找到这条档案");
       return;
     }
     render(item);
+
+    return window.RpgData.listSiblings(item, filters).then(function (res) {
+      siblings = res;
+      updateBackLink();
+      appendPager();
+    }).catch(function () {
+      updateBackLink();
+    });
   }).catch(function (err) {
     rootEl.innerHTML = '<h1 class="entry-title">载入失败</h1>' +
       '<p class="lead">' + esc(err.message) + "</p>";

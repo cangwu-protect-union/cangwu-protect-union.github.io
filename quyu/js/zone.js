@@ -63,6 +63,8 @@
     root.innerHTML =
       '<h1 class="entry-title">' + esc(zone.title) + "</h1>" +
       (zone.date ? '<p class="entry-date muted">记录日期：' + esc(zone.date) + "</p>" : "") +
+      '<p class="entry-date muted">编辑：' + esc(zone.editor || "CPU") +
+        (zone.edited_at ? " · " + esc(String(zone.edited_at).slice(0, 10)) : "") + "</p>" +
       locHtml +
       gallery +
       '<div class="entry-body">' + paras + "</div>" +

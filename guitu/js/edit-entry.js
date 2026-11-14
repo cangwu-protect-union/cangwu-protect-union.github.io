@@ -21,6 +21,7 @@
   var imgFile    = document.getElementById("imgFile");
   var imgStatus  = document.getElementById("imgStatus");
   var formError  = document.getElementById("formError");
+  var editorSel  = document.getElementById("editorSel");
 
   var entry = null;          /* 原始条目（用于存档旧版本） */
   var images = [];           /* 当前原图地址数组，编辑中 */
@@ -41,6 +42,9 @@
     location.replace("edit-gui.html?next=" + encodeURIComponent(location.pathname + location.search));
     return;
   }
+
+  /* 编辑人：每次都要重选，不记住上次选择 */
+  if (editorSel) window.Operator.fill(editorSel, "请选择编辑人");
 
   /* ---------- 小工具 ---------- */
   function esc(s) {
@@ -317,6 +321,9 @@
     var paras = collectParagraphs();
     if (!paras.length) { fail("至少要有一段正文。"); return; }
 
+    var member = window.Operator.value(editorSel);
+    if (!member) { fail("请选择编辑人。"); return; }
+
     var tags = window.GuiData.parseTags(document.getElementById("fTags").value);
 
     var body = paras.join("\n\n");
@@ -333,7 +340,8 @@
       intro: intro,
       body: body,
       tags: tags,
-      date: entry.date
+      date: entry.date,
+      editor: member
     };
 
     /* 不再二次验证：进入编辑区时已经验证过（会话内有效） */
@@ -346,6 +354,11 @@
     window.GuiData.archiveVersion(entry, "edit").then(function () {
       return window.GuiData.updateEntry(updated);
     }).then(function () {
+      return window.EditLog.log({
+        module: "guitu", targetType: "entry", targetId: entry.id,
+        targetTitle: title, action: "update", member: member
+      });
+    }).then(function () {
       location.href = "edit-gui.html";
     }).catch(function (err) {
       busy = false;
@@ -355,30 +368,40 @@
     });
   });
 
-  /* ---------- 删除条目：确认 → 验证 → 存档 → 软删除 ---------- */
+  /* ---------- 删除条目：选人 → 存档 → 软删除 ---------- */
   document.getElementById("deleteBtn").addEventListener("click", function () {
     if (busy) return;
     clearFail();
 
-    if (!window.confirm("确定要删除条目「" + entry.title + "」吗？\n\n删除后它不再显示在图鉴里，但旧内容会存进「旧图鉴」，以后可以恢复。")) {
-      return;   /* 取消：什么都不做 */
-    }
+    window.Operator.ask({
+      title: "删除条目",
+      text: "「" + entry.title + "」将不再显示在图鉴里，旧内容会存进「旧图鉴」，以后可以恢复。",
+      confirmText: "删除条目",
+      danger: true
+    }).then(function (answer) {
+      if (!answer) return;
 
-    /* 不再二次验证：进入编辑区时已经验证过 */
-    busy = true;
-    var btn = document.getElementById("deleteBtn");
-    btn.disabled = true;
-    btn.textContent = "删除中…";
+      /* 不再二次验证：进入编辑区时已经验证过 */
+      busy = true;
+      var btn = document.getElementById("deleteBtn");
+      btn.disabled = true;
+      btn.textContent = "删除中…";
 
-    window.GuiData.archiveVersion(entry, "delete").then(function () {
-      return window.GuiData.softDelete(entry.id);
-    }).then(function () {
-      location.href = "edit-gui.html";
-    }).catch(function (err) {
-      busy = false;
-      btn.disabled = false;
-      btn.textContent = "删除条目";
-      fail("删除失败：" + err.message);
+      window.GuiData.archiveVersion(entry, "delete").then(function () {
+        return window.GuiData.softDelete(entry.id, answer.member);
+      }).then(function () {
+        return window.EditLog.log({
+          module: "guitu", targetType: "entry", targetId: entry.id,
+          targetTitle: entry.title, action: "delete", member: answer.member, note: answer.note
+        });
+      }).then(function () {
+        location.href = "edit-gui.html";
+      }).catch(function (err) {
+        busy = false;
+        btn.disabled = false;
+        btn.textContent = "删除条目";
+        fail("删除失败：" + err.message);
+      });
     });
   });
 })();

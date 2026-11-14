@@ -105,39 +105,49 @@
     applyBtn.addEventListener("click", function () {
       if (busy || !entry) return;
 
-      if (!window.confirm("确定应用这个版本吗？\n\n图鉴里的当前内容会被替换，并存入「旧图鉴」。")) {
-        return;
-      }
+      window.Operator.ask({
+        title: "应用这个版本",
+        text: "图鉴里的当前内容会被替换，并存入「旧图鉴」。",
+        confirmText: "应用版本"
+      }).then(function (answer) {
+        if (!answer) return;
 
-      busy = true;
-      applyBtn.disabled = true;
-      applyBtn.textContent = "应用中…";
+        busy = true;
+        applyBtn.disabled = true;
+        applyBtn.textContent = "应用中…";
 
-      /* 1. 把当前内容存进旧图鉴
-         2. 用这个版本的内容替换
-         3. 把这个版本标记为「已应用」——它已经变成当前内容，
-            不该再出现在旧图鉴里，否则看起来像复制了一份 */
-      window.GuiData.archiveVersion(entry, "edit").then(function () {
-        return window.GuiData.updateEntry({
-          id: entry.id,
-          title: version.title,
-          image: (version.images && version.images[0]) || version.image || "",
-          images: version.images || [],
-          thumbs: version.thumbs || [],
-          intro: version.intro || "",
-          body: version.body || "",
-          tags: version.tags || [],
-          date: version.date || entry.date
+        /* 1. 把当前内容存进旧图鉴
+           2. 用这个版本的内容替换
+           3. 把这个版本标记为「已应用」——它已经变成当前内容，
+              不该再出现在旧图鉴里，否则看起来像复制了一份 */
+        window.GuiData.archiveVersion(entry, "edit").then(function () {
+          return window.GuiData.updateEntry({
+            id: entry.id,
+            title: version.title,
+            image: (version.images && version.images[0]) || version.image || "",
+            images: version.images || [],
+            thumbs: version.thumbs || [],
+            intro: version.intro || "",
+            body: version.body || "",
+            tags: version.tags || [],
+            date: version.date || entry.date,
+            editor: answer.member
+          });
+        }).then(function () {
+          return window.GuiData.markVersionApplied(version.version_id);
+        }).then(function () {
+          return window.EditLog.log({
+            module: "guitu", targetType: "entry", targetId: entry.id,
+            targetTitle: version.title, action: "apply", member: answer.member, note: answer.note
+          });
+        }).then(function () {
+          location.href = "edit-gui.html";
+        }).catch(function (err) {
+          busy = false;
+          applyBtn.disabled = false;
+          applyBtn.textContent = "应用这个版本";
+          bannerText.textContent = "应用失败：" + err.message;
         });
-      }).then(function () {
-        return window.GuiData.markVersionApplied(version.version_id);
-      }).then(function () {
-        location.href = "edit-gui.html";
-      }).catch(function (err) {
-        busy = false;
-        applyBtn.disabled = false;
-        applyBtn.textContent = "应用这个版本";
-        bannerText.textContent = "应用失败：" + err.message;
       });
     });
   }

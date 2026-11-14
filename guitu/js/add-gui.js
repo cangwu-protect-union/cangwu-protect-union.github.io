@@ -28,10 +28,12 @@
   var doneSection = document.getElementById("doneSection");
   var entryForm   = document.getElementById("entryForm");
   var formError   = document.getElementById("formError");
+  var editorSel   = document.getElementById("editorSel");
 
   function showForm() {
     if (gateSection) gateSection.hidden = true;
     formSection.hidden = false;
+    if (!IS_TIP && editorSel) window.Operator.fill(editorSel, "请选择编辑人");
     var t = document.getElementById("fTitle");
     if (t) t.focus();
   }
@@ -86,6 +88,16 @@
       return;
     }
 
+    var member = "";
+    if (!IS_TIP && editorSel) {
+      member = window.Operator.value(editorSel);
+      if (!member) {
+        formError.textContent = "请选择编辑人。";
+        formError.hidden = false;
+        return;
+      }
+    }
+
     /* 查重：标题和已有条目/情报相似度够高就先拦一次，确认后才继续。
        查重本身失败不会阻塞提交（GuiData.dupCheck 内部吞掉错误）。 */
     if (!dupAcknowledged) {
@@ -131,7 +143,8 @@
       tags: tags,
       date: today,
       related: relBox ? relBox.tokens() : [],
-      refs: pickedRefs          /* 引用过的情报 [{id,title}]，仅增加条目模式会有 */
+      refs: pickedRefs,          /* 引用过的情报 [{id,title}]，仅增加条目模式会有 */
+      editor: member
     };
 
     var submitBtn = entryForm.querySelector('button[type="submit"]');
@@ -146,7 +159,15 @@
         return { remoteSaved: false, error: err.message };
       });
     } else {
-      savePromise = window.GuiData.add(entry);
+      savePromise = window.GuiData.add(entry).then(function (result) {
+        if (result && result.remoteSaved) {
+          window.EditLog.log({
+            module: "guitu", targetType: "entry", targetId: entry.id,
+            targetTitle: title, action: "create", member: member
+          });
+        }
+        return result;
+      });
     }
 
     savePromise.then(function (result) {

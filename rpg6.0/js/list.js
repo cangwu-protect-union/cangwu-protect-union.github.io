@@ -67,7 +67,8 @@
   }
 
   function rowHtml(item) {
-    return '<a class="rpg-row" href="character.html?id=' + encodeURIComponent(item.id) + '">' +
+    return '<a class="rpg-row" href="character.html?id=' + encodeURIComponent(item.id) +
+             filterQuery() + '">' +
              markHtml(item.review_mark) +
              '<span class="rpg-row-main">' +
                aliasHtml(item.aliases) +
@@ -78,6 +79,17 @@
                ? '<span class="rpg-rating">' + esc(item.rating) + "</span>"
                : '<span class="rpg-rating is-empty"></span>') +
            "</a>";
+  }
+
+  /* 详情的相邻角色要沿用列表的筛选与排序 */
+  function filterQuery() {
+    var params = new URLSearchParams();
+    if (state.q) params.set("q", state.q);
+    if (state.rating) params.set("rating", state.rating);
+    if (state.occ) params.set("occ", state.occ);
+    if (state.order === "desc") params.set("order", "desc");
+    var qs = params.toString();
+    return qs ? "&" + qs : "";
   }
 
   function totalPages() {

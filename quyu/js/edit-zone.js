@@ -18,6 +18,7 @@
   var saveBtn = document.getElementById("saveBtn");
   var deleteBtn = document.getElementById("deleteBtn");
   var restoreBtn = document.getElementById("restoreBtn");
+  var editorSel = document.getElementById("editorSel");
 
   var editor = null;
   var current = null;
@@ -82,6 +83,7 @@
     failHref: "edit-zones.html",
     onPass: function () {
       gateSection.hidden = true;
+      window.Operator.fill(editorSel, "请选择编辑人");
       load();
     }
   });
@@ -94,13 +96,20 @@
     if (!editor || !current) return;
 
     showError("");
+    var member = window.Operator.value(editorSel);
+    if (!member) { showError("请选择编辑人。"); return; }
+
     saveBtn.disabled = true;
     saveBtn.textContent = "正在保存…";
 
-    editor.save().then(function (saved) {
+    editor.save(member).then(function (saved) {
       return window.ZoneData.getEntryAny(saved.id);
     }).then(function (fresh) {
       current = fresh || current;
+      window.EditLog.log({
+        module: "quyu", targetType: "zone", targetId: current.id,
+        targetTitle: current.title, action: "update", member: member
+      });
       saveBtn.disabled = false;
       saveBtn.textContent = "保存";
       showError("");
@@ -116,13 +125,22 @@
 
   deleteBtn.addEventListener("click", function () {
     if (!current) return;
+    showError("");
+
+    var member = window.Operator.value(editorSel);
+    if (!member) { showError("请选择编辑人。"); return; }
+
     if (!confirm("删除「" + current.title + "」？\n\n删除只是打标记，内容和版本都会留在历史里，可以恢复。")) return;
 
-    showError("");
     deleteBtn.disabled = true;
 
     window.ZoneData.archiveVersion(current, "delete").then(function () {
-      return window.ZoneData.softDelete(current.id);
+      return window.ZoneData.softDelete(current.id, member);
+    }).then(function () {
+      return window.EditLog.log({
+        module: "quyu", targetType: "zone", targetId: current.id,
+        targetTitle: current.title, action: "delete", member: member
+      });
     }).then(function () {
       current.deleted = true;
       render();
@@ -135,12 +153,20 @@
   restoreBtn.addEventListener("click", function () {
     if (!current) return;
     showError("");
+
+    var member = window.Operator.value(editorSel);
+    if (!member) { showError("请选择编辑人。"); return; }
+
     restoreBtn.disabled = true;
 
-    window.ZoneData.restoreEntry(current.id).then(function () {
+    window.ZoneData.restoreEntry(current.id, null, member).then(function () {
       return window.ZoneData.getEntryAny(current.id);
     }).then(function (fresh) {
       current = fresh || current;
+      window.EditLog.log({
+        module: "quyu", targetType: "zone", targetId: current.id,
+        targetTitle: current.title, action: "restore", member: member
+      });
       render();
     }).catch(function (err) {
       showError("恢复失败：" + (err.message || "请稍后重试"));
