@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>测试 · 回合制正传6.0 · CPU</title>
+  <title>回合制正传 6.0 · 对局测试 · CPU</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="css/battle.css">
 </head>
 <body>
 
@@ -16,15 +17,52 @@
         <a href="../index.html">首页</a>
         <a href="../about.html">关于</a>
         <a href="../projects.html">项目</a>
+        <a href="rpg6.0.html">角色档案</a>
+        <a href="rules.html">规则</a>
+        <a href="battles.html">战报</a>
       </nav>
     </div>
   </header>
 
-  <main class="container">
+  <main class="container battle-page">
 
-    <section class="hero">
-      <h1>回合制正传 6.0 测试</h1>
-      <p class="lead">游戏测试功能尚未开放。</p>
+    <section class="battle-setup" data-setup>
+      <h1>回合制正传 6.0 · 对局测试</h1>
+      <p class="lead">1v1，双方都由人操作。速度低者先手，同速由种子决定。</p>
+      <div class="setup-row">
+        <label>甲
+          <select data-pick-a></select>
+        </label>
+        <label>乙
+          <select data-pick-b></select>
+        </label>
+        <label>种子
+          <input data-seed type="text" inputmode="numeric" placeholder="留空则随机">
+        </label>
+        <button type="button" class="btn" data-start>开始对局</button>
+      </div>
+      <p class="setup-note" data-source>正在读取角色…</p>
+      <p><button type="button" class="btn btn-ghost" data-resume hidden></button></p>
+      <p class="setup-note">技能库目前覆盖 12 名角色，其余角色不会出现在列表里。同一种子加同一串操作必然复现同一局。对局结束后战报自动入库，刷新中途可以从「继续上一局」接着打。</p>
+    </section>
+
+    <section class="battle-stage" data-stage hidden>
+      <div class="battle-grid" data-grid></div>
+      <div class="battle-bar" data-bar>
+        <span class="bb-turn" data-turn></span>
+        <span class="bb-hint" data-hint></span>
+        <span class="bb-replay" data-replay hidden>
+          <button type="button" class="btn btn-ghost" data-step-start>开局</button>
+          <button type="button" class="btn btn-ghost" data-step-prev>上一步</button>
+          <button type="button" class="btn btn-ghost" data-step-next>下一步</button>
+          <button type="button" class="btn btn-ghost" data-step-end>结局</button>
+          <button type="button" class="btn btn-ghost" data-takeover>从这里接着打</button>
+          <span class="bb-step" data-step-info></span>
+        </span>
+        <button type="button" class="btn btn-ghost" data-undo>撤销一步</button>
+        <button type="button" class="btn btn-ghost" data-restart>换人</button>
+      </div>
+      <section class="battle-result" data-result hidden></section>
     </section>
 
     <p><a class="btn btn-ghost" href="../projects.html">← 返回项目</a></p>
@@ -38,6 +76,26 @@
   </footer>
 
   <script src="../js/visit-beacon.js"></script>
+  <script src="../guitu/data/config.js"></script>
+  <script src="data/config.js"></script>
+  <script src="data/characters.js"></script>
+  <script src="js/rpg-data.js"></script>
+  <script src="data/battle-skills.js"></script>
+  <script src="js/engine/rng.js"></script>
+  <script src="js/engine/rules.js"></script>
+  <script src="js/engine/traits.js"></script>
+  <script src="js/engine/state.js"></script>
+  <script src="js/engine/damage.js"></script>
+  <script src="js/engine/effect-ops.js"></script>
+  <script src="js/engine/timeline.js"></script>
+  <script src="js/engine/conditions.js"></script>
+  <script src="js/engine/skills.js"></script>
+  <script src="js/engine/actions.js"></script>
+  <script src="js/engine/battle.js"></script>
+  <script src="js/battle/battle-view.js"></script>
+  <script src="js/battle/battle-pick.js"></script>
+  <script src="js/battle/battle-record.js"></script>
+  <script src="js/battle/battle-page.js"></script>
 
 </body>
 </html>

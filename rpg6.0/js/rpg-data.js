@@ -57,7 +57,8 @@
       key: String(base.publishableKey).trim(),
       characters: tables.characters || "rpg_characters",
       versions: tables.versions || "rpg_character_versions",
-      submissions: tables.submissions || "rpg_submissions"
+      submissions: tables.submissions || "rpg_submissions",
+      battles: tables.battles || "rpg_battles"
     };
   }
 
@@ -876,6 +877,82 @@
     return problems;
   }
 
+  /* ---------------- 战报 ---------------- */
+
+  function mapBattle(r) {
+    if (!r) return null;
+    return {
+      id: r.id || "",
+      engine_version: r.engine_version || "",
+      seed: Number(r.seed) || 0,
+      character_a: r.character_a || "",
+      character_b: r.character_b || "",
+      name_a: r.name_a || "",
+      name_b: r.name_b || "",
+      actions: Array.isArray(r.actions) ? r.actions : [],
+      result: r.result || "unfinished",
+      steps: Number(r.steps) || 0,
+      rounds: Number(r.rounds) || 0,
+      final_hash: r.final_hash || "",
+      created_at: r.created_at || null
+    };
+  }
+
+  function listBattles(opts) {
+    var c = cfg();
+    if (!c) return Promise.resolve([]);
+    var limit = Math.min(Math.max(Number(opts && opts.limit) || 20, 1), 50);
+    var offset = Math.max(Number(opts && opts.offset) || 0, 0);
+    var path = c.battles +
+      "?select=id,engine_version,seed,character_a,character_b,name_a,name_b,result,steps,rounds,created_at" +
+      "&order=created_at.desc&limit=" + limit + "&offset=" + offset;
+    return get(c, path).then(function (rows) {
+      return (Array.isArray(rows) ? rows : []).map(mapBattle);
+    }).catch(function (err) {
+      console.warn("[战报] 列表读取失败：", err.message);
+      throw err;
+    });
+  }
+
+  function getBattle(id) {
+    if (!id) return Promise.resolve(null);
+    var c = cfg();
+    if (!c) return Promise.resolve(null);
+    return get(c, c.battles + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1")
+      .then(function (rows) {
+        var row = (Array.isArray(rows) ? rows : [])[0];
+        return row ? mapBattle(row) : null;
+      })
+      .catch(function (err) {
+        console.warn("[战报] 读取失败：", err.message);
+        return null;
+      });
+  }
+
+  function createBattle(record) {
+    var c = cfg();
+    if (!c) return Promise.reject(new Error("云服务未配置，战报无法保存。"));
+
+    var row = {
+      id: trim(record.id) || newId("b"),
+      engine_version: trim(record.engine_version),
+      seed: Math.abs(Number(record.seed) || 0),
+      character_a: trim(record.character_a),
+      character_b: trim(record.character_b),
+      name_a: trim(record.name_a),
+      name_b: trim(record.name_b),
+      actions: Array.isArray(record.actions) ? record.actions : [],
+      result: trim(record.result) || "unfinished",
+      steps: Number(record.steps) || 0,
+      rounds: Number(record.rounds) || 0,
+      final_hash: trim(record.final_hash)
+    };
+
+    return send(c, c.rest + c.battles, "POST", row).then(function () {
+      return { id: row.id };
+    });
+  }
+
   window.RpgData = {
     PAGE_SIZE: PAGE_SIZE,
     MEMBERS: MEMBERS,
@@ -897,6 +974,10 @@
     getSubmission: getSubmission,
     nextSeq: nextSeq,
     findCharacterBySubmission: findCharacterBySubmission,
+
+    listBattles: listBattles,
+    getBattle: getBattle,
+    createBattle: createBattle,
 
     addSubmission: addSubmission,
     rejectSubmission: rejectSubmission,

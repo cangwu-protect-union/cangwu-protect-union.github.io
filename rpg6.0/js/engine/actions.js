@@ -53,6 +53,20 @@
     var selfHit = target.uid === unit.uid;
     if (selfHit) {
       type = "true";
+    } else if (B.skills && B.skills.basicMod) {
+      var mod = B.skills.basicMod(state, unit, target, events) || {};
+      if (mod.healInstead) {
+        B.damage.heal(state, {
+          uid: unit.uid,
+          amount: amount * (mod.factor ? mod.factor : 1),
+          rounding: "round5",
+          skillId: "basic.attack",
+          label: "普攻回血"
+        }, events);
+        return { kind: "basic", type: "attack", target: target.uid, charged: false, healed: true };
+      }
+      if (mod.type) type = mod.type;
+      if (mod.factor) amount = amount * mod.factor;
     }
     B.damage.hit(state, {
       sourceUid: unit.uid,

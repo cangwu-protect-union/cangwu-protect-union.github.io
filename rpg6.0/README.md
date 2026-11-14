@@ -1,14 +1,15 @@
 # rpg6.0 —— 回合制正传 6.0 角色档案
 
 以档案形式维护回合制正传 6.0 的角色与规则：角色公开查阅、开放投稿、成员编撰与审核；规则只由开发人员改代码编撰。
-`test.html` 是占位页。
+`test.html` 是可以真打一局的 1v1 对局测试页，`battles.html` 是战报列表。
 
-## 四条硬规则
+## 五条硬规则
 
 1. **图片只能随投稿进入系统。** 建档后图片只读；审核转正时也不能改图。
 2. **没有「新增角色」入口。** 新角色只能由「投稿 → 审核 → 转正」产生。
 3. **审核时的修改不写回投稿。** 改动只写进角色表，投稿行只更新状态、审核人、审核时间与备注。
 4. **规则只能由开发人员改代码。** 正文写在 `data/rule-docs.js`，网页上没有编辑入口，也不进数据库。
+5. **战报只增不改。** 匿名只能插入与读取，没有 update / delete 权限；写错的战报要 service_role 手工删。
 
 ## 页面
 
@@ -21,7 +22,8 @@
 | `rules.html` | 规则列表：只有条目名，点进去看正文；不读数据库，无搜索框 |
 | `rule.html?id=` | 规则正文。内容来自 `data/rule-docs.js`，公开只读 |
 | `provide-tip.html` | 投稿表单，文本 + 图片，不需要验证 |
-| `test.html` | 游戏测试占位页 |
+| `test.html` | 对局测试：选两名角色开打，1v1 双方手动；结束后战报自动入库，`?record=` 回放，回放可从中间某一步接管继续打 |
+| `battles.html` | 战报列表，时间倒序，每页 20 条可加载更多，点开即逐步回放 |
 
 ### 编辑区（需要组织验证）
 
@@ -50,10 +52,29 @@ js/
 ├── edit-character.js  编辑器 / 转正表单
 ├── old-characters.js  旧档案总览
 ├── old-character.js   某角色的历史版本
-└── version.js         单版本查看
+├── version.js         单版本查看
+├── engine/            战斗引擎（纯函数，不碰 DOM）
+│   ├── rng.js         种子随机
+│   ├── rules.js       数值与公式（取整、三种伤害、速度条）
+│   ├── traits.js      8 主业 + 6 副业
+│   ├── state.js       建局、面板结算、深拷贝、状态指纹
+│   ├── damage.js      伤害/回血/强扣/死亡
+│   ├── effect-ops.js  效果解释器（27 个 op）
+│   ├── timeline.js    标准回合、速度条、行动队列
+│   ├── conditions.js  技能条件
+│   ├── skills.js      技能执行与档案校验
+│   ├── actions.js     普攻/击溃/蓄蓝
+│   └── battle.js      门面：create / apply / available / hash / replay
+└── battle/            对局界面
+    ├── battle-view.js 三板块渲染与速度条预测
+    ├── battle-pick.js 选中状态
+    ├── battle-record.js 战报构建与回放
+    ├── battle-page.js 页面装配、存档、回放模式
+    └── battle-list.js 战报列表
 ```
 
 角色页面脚本只依赖 `rpg-data.js` 与 `rpg-form.js`，彼此之间没有横向依赖；规则两页只读 `data/rule-docs.js`。
+对局页另外按顺序加载 `js/engine/*` 与 `js/battle/*`，引擎之间靠 `window.RPG6B` 组合，见 [架构.md](架构.md) 的「战斗引擎」一节。
 
 ## 数据
 
@@ -64,6 +85,7 @@ js/
 | `rpg_characters` | 角色。软删除用 `deleted`，作者与人员字段都在这里 |
 | `rpg_character_versions` | 旧档案，只增不改，`applied` 标记已应用 |
 | `rpg_submissions` | 投稿，`status` ∈ pending / approved / rejected |
+| `rpg_battles` | 战报：种子 + 双方角色 id + 归一化动作序列 + 最终指纹；匿名只读、只插，不可改删 |
 
 两个只读函数：`rpg_search`（筛选 + 分页 + 总数）、`rpg_facets`（筛选下拉的选项）。
 迁移脚本在 `_local/sql/rpg-setup.sql`，旧档案导入在 `_local/sql/rpg-seed-characters.sql`。
@@ -104,6 +126,16 @@ gui-gate.js → POST /rpc/gui_verify → 令牌存 sessionStorage
 rules.html / rule.html → data/rule-docs.js → 渲染列表或正文
 ```
 
+对局（引擎在浏览器里跑，只有战报落库）：
+
+```
+test.html → 选人 → RPG6B.battle.create({seed, a, b})
+          → 每次操作 apply(state, action) → { state, events, committed }
+          → 结束 BattleRecord.build(state, meta, committed[]) → rpg-data.createBattle → rpg_battles
+battles.html → rpg-data.listBattles → 列表
+test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步回放
+```
+
 ## 容易踩的坑
 
 - `Prefer` 头必须拼接：`"return=minimal, gui-token=" + token`，覆盖会丢令牌。
@@ -115,6 +147,17 @@ rules.html / rule.html → data/rule-docs.js → 渲染列表或正文
 - 写操作会往站点共用的 `site_edit_log` 记一行，统计页的成员贡献度靠它；日志写失败只打 warn，不影响保存。
 - 规则正文是手写 HTML，直接 `innerHTML`；它只能由开发人员改，所以没有 sanitize。以后若要开放网页编辑，必须先补 sanitize 与权限层。
 - 规则数据文件不能叫 `data/rules.js`：会和 `js/rules.js` 撞名，`docgen.config.js` 的 `roles` 按文件名取值，两个节点会显示成同一个标签。
+
+对局与战报：
+
+- `state.seed` 必须存**原始种子**。存混淆后的 `rng` 值会再混淆一次，回放从第一步就发散；`state.rng` 才是随机数状态。
+- 引擎文件按 `<script>` 顺序加载、靠 `window.RPG6B` 组合，`battle-record.js` 依赖 `RPG6B.state.hash`，顺序不能乱。
+- 战报存的是 `committed` 动作。点技能但蓄力不足时引擎会把动作归一化成 `charge`，存原始动作会重放出不同结果。
+- 战报记的是角色 id 不是快照。角色被改过之后回放可能对不上指纹，页面会标「与当前角色数据不一致」，这是提示不是 bug。
+- 改了引擎规则要顺手把 `data/config.js` 的 `engineVersion` 加一版，旧战报会被标成「旧引擎战报」；不升版本就只能靠指纹对不上来发现。
+- 匿名对战报只有 select / insert 权限，PATCH 与 DELETE 返回 `401 42501`；写错的战报只能 service_role 手工删。
+- 中途刷新靠 `localStorage` 的 `rpg6-live-battle` 恢复，和数据库无关；结束后保存成功才清掉它。
+- `docgen` 只扫模块根下的 `js/*.js`，`js/engine/`、`js/battle/` 不进架构图，说明写在 [架构.md](架构.md) 的「战斗引擎」一节。
 
 ## 原始资料
 

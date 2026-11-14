@@ -50,6 +50,18 @@
     return true;
   }
 
+  function resolveDeath(state, unit, events) {
+    if (unit.hp > 0) return false;
+    if (B.state.hasStatus(unit, "noDeath")) {
+      unit.hp = 1;
+      pushEvent(events, { type: "noDeath", round: state.round, uid: unit.uid });
+      return false;
+    }
+    B.state.finish(state, B.state.otherUid(state, unit.uid));
+    pushEvent(events, { type: "death", round: state.round, uid: unit.uid });
+    return true;
+  }
+
   function hit(state, spec, events) {
     var target = B.state.unitOf(state, spec.targetUid);
     var source = null;
@@ -144,10 +156,7 @@
     if (spec.healBack && source && dmg > 0) {
       heal(state, { uid: source.uid, amount: dmg, rounding: "none", reason: "healBack" }, events);
     }
-    if (target.hp <= 0) {
-      B.state.finish(state, B.state.otherUid(state, target.uid));
-      pushEvent(events, { type: "death", round: state.round, uid: target.uid });
-    }
+    resolveDeath(state, target, events);
     return dmg;
   }
 
@@ -167,10 +176,7 @@
       label: spec.label || "",
       hpAfter: target.hp
     });
-    if (target.hp <= 0) {
-      B.state.finish(state, B.state.otherUid(state, target.uid));
-      pushEvent(events, { type: "death", round: state.round, uid: target.uid });
-    }
+    resolveDeath(state, target, events);
     return amount;
   }
 

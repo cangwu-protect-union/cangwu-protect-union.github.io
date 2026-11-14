@@ -29,6 +29,13 @@
       out.reason = "本版未实现：" + skill.unsupported;
       return out;
     }
+    if (skill.once && unit.flags["used." + skill.id]) {
+      out.ok = false;
+      out.reason = "这个技能只能用一次";
+      out.canCharge = false;
+      out.canRelease = false;
+      return out;
+    }
     var mpCost = skill.cost && skill.cost.mp ? skill.cost.mp : 0;
     if (B.state.hasStatus(unit, "noSkill")) {
       out.ok = false;
@@ -54,6 +61,23 @@
       return out;
     }
     var need = skill.charge || 0;
+    if (skill.requires) {
+      for (var r = 0; r < skill.requires.length; r++) {
+        var req = skill.requires[r];
+        var current = B.state.markOf(unit, req.mark);
+        var pass = true;
+        if (req.gte != null) pass = current >= req.gte;
+        else if (req.lte != null) pass = current <= req.lte;
+        else if (req.eq != null) pass = current === req.eq;
+        if (!pass) {
+          out.ok = false;
+          out.reason = req.reason || ("「" + B.state.markName(unit, req.mark) + "」层数不满足");
+          out.canCharge = false;
+          out.canRelease = false;
+          return out;
+        }
+      }
+    }
     var have = chargeOf(unit, skill.id);
     if (have < need) {
       out.needsCharge = true;

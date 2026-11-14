@@ -82,7 +82,7 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 │   └── vendor/leaflet/     Leaflet 1.9.4（本地化，不依赖 CDN）
 │
 ├── rpg6.0/             ★ 回合制正传6.0 角色档案模块（详见 rpg6.0/README.md）
-│   ├── README.md           模块说明、三条硬规则、踩坑记录
+│   ├── README.md           模块说明、五条硬规则、踩坑记录
 │   ├── 架构.md             页面/脚本/数据/后端依赖，标记区间自动生成
 │   ├── 访客流程图.md        界面上点哪里能到哪里
 │   ├── *.html              10 个页面（公开 4 个 + 编辑流程 6 个）

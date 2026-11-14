@@ -4,6 +4,10 @@
    写法：每个 op 的字段见 _local/docs/回合制6.0测试功能-plan.md 第 5 节。 */
 window.RPG6_SKILLS = {
   version: 1,
+  /* 标记：谁身上有哪些计数器。对手可见、可被对手的技能操作（mark / markClear / dispel marks）。 */
+  marks: {
+    "王荣逸": [{ key: "shuati", name: "刷题", max: 3, init: 0 }]
+  },
   characters: {
 
     "刘文哲": [
@@ -405,6 +409,376 @@ window.RPG6_SKILLS = {
         ops: [
           { op: "use", skillId: "yuzy.jishen", times: 2 },
           { op: "stat", stat: "spd", who: "target", mode: "mul", value: 2, duration: 8 }
+        ]
+      }
+    ],
+
+    "杨舒然": [
+      {
+        id: "yangshuran.gaoyuan",
+        name: "高猿长啸",
+        conditionText: "2蓄力",
+        cost: { mp: 0 },
+        charge: 2,
+        cooldown: 0,
+        target: "allEnemies",
+        ops: [
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 6 },
+            label: "高猿长啸",
+            ops: [
+              {
+                op: "dice",
+                sides: 6,
+                cases: [
+                  { in: [1], ops: [{ op: "damage", type: "true", value: 30, noBreak: true }] },
+                  { in: [6], ops: [{ op: "damage", type: "true", value: 30, noBreak: true }] }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "yangshuran.yuanli",
+        name: "猿力与你同在",
+        conditionText: "2蓝",
+        cost: { mp: 2 },
+        charge: 0,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "phys", value: 210, noBreak: true, healBack: true },
+          { op: "damage", type: "magic", value: 160, noBreak: true, healBack: true },
+          { op: "damage", type: "true", value: 120, noBreak: true, healBack: true }
+        ]
+      },
+      {
+        id: "yangshuran.gouzhi",
+        name: "苟之危笑",
+        conditionText: "2蓝2蓄力",
+        cost: { mp: 2 },
+        charge: 2,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "stat", stat: "maxHp", who: "target", mode: "set", value: { minus: [{ stat: "self.hp" }, 5] }, duration: null }
+        ]
+      },
+      {
+        id: "yangshuran.juedui",
+        name: "绝对防御",
+        conditionText: "无",
+        once: true,
+        cost: { mp: 0 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        ops: [
+          { op: "status", kind: "noDeath", who: "self", rounds: 6, label: "不会死亡" }
+        ]
+      }
+    ],
+
+    "包必冉": [
+      {
+        id: "baobiran.wuneng",
+        name: "无能狂怒",
+        conditionText: "1蓝",
+        cost: { mp: 1 },
+        charge: 0,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 5 },
+            label: "无能狂怒",
+            ops: [
+              { op: "damage", type: "basic", value: { stat: "self.atk" } }
+            ]
+          }
+        ]
+      },
+      {
+        id: "baobiran.kouchu",
+        name: "口出狂言",
+        conditionText: "2蓝1蓄力",
+        cost: { mp: 2 },
+        charge: 1,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "phys", value: 175 },
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 4 },
+            label: "口出狂言",
+            ops: [
+              { op: "buff", kind: "panic", who: "target", percent: 5, duration: 4 }
+            ]
+          }
+        ]
+      },
+      {
+        id: "baobiran.sanbei",
+        name: "三杯不过岗",
+        conditionText: "被动",
+        passive: true,
+        cost: { mp: 0 },
+        charge: 0,
+        cooldown: 0,
+        target: "enemy",
+        ops: [],
+        hooks: {
+          basicMod: [
+            {
+              op: "dice",
+              sides: 6,
+              cases: [
+                { in: [2, 4, 6], ops: [{ op: "setBasicMod", type: "true", factor: 2 }] },
+                { in: [1, 3, 5], ops: [{ op: "setBasicMod", healInstead: true }] }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+
+    "宋知远": [
+      {
+        id: "songzhiyuan.dianmo",
+        name: "电摩冲击",
+        conditionText: "3蓄力",
+        cost: { mp: 0 },
+        charge: 3,
+        cooldown: 0,
+        target: "self",
+        ops: [
+          { op: "status", kind: "noSkill", who: "self", rounds: 10, label: "无法使用技能" },
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 10 },
+            label: "电摩冲击",
+            ops: [
+              {
+                op: "if",
+                cond: { left: { stat: "self.spd" }, op: "lt", right: 170 },
+                then: [
+                  {
+                    op: "if",
+                    cond: { left: { plus: [{ stat: "self.spd" }, 30] }, op: "gt", right: 170 },
+                    then: [{ op: "stat", stat: "spd", who: "self", mode: "add", value: { minus: [170, { stat: "self.spd" }] }, duration: null }],
+                    else: [{ op: "stat", stat: "spd", who: "self", mode: "add", value: 30, duration: null }]
+                  }
+                ],
+                else: []
+              },
+              {
+                op: "if",
+                cond: { left: { stat: "self.atk" }, op: "lt", right: 230 },
+                then: [
+                  {
+                    op: "if",
+                    cond: { left: { plus: [{ stat: "self.atk" }, 20] }, op: "gt", right: 230 },
+                    then: [{ op: "stat", stat: "atk", who: "self", mode: "add", value: { minus: [230, { stat: "self.atk" }] }, duration: null }],
+                    else: [{ op: "stat", stat: "atk", who: "self", mode: "add", value: 20, duration: null }]
+                  }
+                ],
+                else: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "songzhiyuan.feilong",
+        name: "肥龙在天",
+        conditionText: "1蓄力",
+        cost: { mp: 0 },
+        charge: 1,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "phys", value: 180 },
+          { op: "damage", type: "true", value: 180 },
+          { op: "breakValue", who: "target", delta: 3 },
+          { op: "forceBreak", who: "target" }
+        ]
+      },
+      {
+        id: "songzhiyuan.shuijiao",
+        name: "睡觉",
+        conditionText: "1蓝",
+        cost: { mp: 1 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        ops: [
+          { op: "taunt", who: "self", delta: 1 },
+          { op: "stat", stat: "def", who: "self", mode: "add", value: 45, duration: 3 },
+          { op: "stat", stat: "mres", who: "self", mode: "add", value: 45, duration: 3 },
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 3 },
+            label: "睡觉",
+            ops: [
+              { op: "maxHp", who: "self", delta: 80 },
+              { op: "heal", who: "self", value: 150, rounding: "none" }
+            ]
+          },
+          { op: "status", kind: "break", who: "self", rounds: 3, label: "击溃" }
+        ]
+      },
+      {
+        id: "songzhiyuan.picao",
+        name: "皮糙肉厚",
+        conditionText: "被动",
+        passive: true,
+        cost: { mp: 0 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        unsupported: "受击免疫要在伤害结算前拦截，本批未实现",
+        ops: []
+      }
+    ],
+
+    "张家铭": [
+      {
+        id: "zhangjiaming.xiaoxingxing",
+        name: "小行星撞击",
+        conditionText: "2蓄力",
+        cost: { mp: 0 },
+        charge: 2,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "phys", value: { per: { stat: "target.def" }, factor: 6 }, noBreak: true }
+        ]
+      },
+      {
+        id: "zhangjiaming.saijin",
+        name: "塞进垃圾桶",
+        conditionText: "1蓝3蓄力",
+        cost: { mp: 1 },
+        charge: 3,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "phys", value: 300 },
+          { op: "status", kind: "stun", who: "target", rounds: 5, label: "眩晕" },
+          {
+            op: "tick",
+            duration: { unit: "targetRound" },
+            permanent: true,
+            label: "塞进垃圾桶",
+            ops: [{ op: "damage", type: "true", value: 50, fromBuff: true }]
+          }
+        ]
+      },
+      {
+        id: "zhangjiaming.qiufeng",
+        name: "秋风扫落叶",
+        conditionText: "1蓝1蓄力",
+        cost: { mp: 1 },
+        charge: 1,
+        cooldown: 0,
+        target: "allEnemies",
+        ops: [
+          {
+            op: "tick",
+            duration: { unit: "standard", count: 5 },
+            label: "秋风扫落叶",
+            ops: [{ op: "damage", type: "basic", value: { stat: "self.atk" } }]
+          }
+        ]
+      },
+      {
+        id: "zhangjiaming.weixiang",
+        name: "卫委壮观",
+        conditionText: "被动",
+        passive: true,
+        cost: { mp: 0 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        unsupported: "花防御/法抗主动闪避是可选防御动作，界面还没有这个入口",
+        ops: []
+      }
+    ],
+
+    "王荣逸": [
+      {
+        id: "wangrongyi.shuati",
+        name: "刷题",
+        conditionText: "1蓝",
+        cost: { mp: 1 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        requires: [{ mark: "shuati", lte: 2, reason: "刷题已满 3 层" }],
+        ops: [
+          { op: "mark", who: "self", key: "shuati", delta: 1 },
+          { op: "stat", stat: "atk", who: "self", mode: "add", value: 20, duration: null },
+          { op: "stat", stat: "def", who: "self", mode: "add", value: 20, duration: null },
+          { op: "stat", stat: "mres", who: "self", mode: "add", value: 20, duration: null },
+          { op: "stat", stat: "spd", who: "self", mode: "add", value: 20, duration: null },
+          { op: "maxHp", who: "self", delta: 120 },
+          { op: "heal", who: "self", value: 160, rounding: "none" },
+          { op: "maxMp", who: "self", delta: 3 },
+          { op: "dispel", who: "self", scope: "breakValue" }
+        ]
+      },
+      {
+        id: "wangrongyi.xuexi",
+        name: "学习氛围",
+        conditionText: "无",
+        cost: { mp: 0 },
+        charge: 0,
+        cooldown: 0,
+        target: "self",
+        unsupported: "「可停止」是给已挂持续效果留的开关，界面还没有关闭入口",
+        ops: []
+      },
+      {
+        id: "wangrongyi.xiti",
+        name: "习题轰炸",
+        conditionText: "1蓝1蓄力",
+        cost: { mp: 1 },
+        charge: 1,
+        cooldown: 0,
+        target: "enemy",
+        requires: [{ mark: "shuati", gte: 1, reason: "需要先刷题" }],
+        ops: [
+          {
+            op: "if",
+            cond: { left: { mark: "shuati" }, op: "eq", right: 1 },
+            then: [{ op: "damage", type: "phys", value: 100 }],
+            else: [
+              {
+                op: "if",
+                cond: { left: { mark: "shuati" }, op: "eq", right: 2 },
+                then: [{ op: "damage", type: "phys", value: 150 }],
+                else: [{ op: "damage", type: "phys", value: 210 }]
+              }
+            ]
+          },
+          { op: "mp", who: "self", delta: 3 },
+          { op: "status", kind: "stun", who: "target", rounds: 3, label: "眩晕" }
+        ]
+      },
+      {
+        id: "wangrongyi.manfen",
+        name: "满分嘲讽",
+        conditionText: "3蓝3蓄力",
+        cost: { mp: 3 },
+        charge: 3,
+        cooldown: 0,
+        target: "enemy",
+        ops: [
+          { op: "damage", type: "true", value: { plus: [240, { per: { mark: "shuati" }, factor: 150 }] } }
         ]
       }
     ]

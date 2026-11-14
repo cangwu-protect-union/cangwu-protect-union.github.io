@@ -26,9 +26,9 @@
     if (next.phase === "finished") throw new Error("对局已结束");
     if (!next.turnUid) B.timeline.beginTurn(next, events);
     var committed = B.actions.execute(next, action, events);
-    var unit = B.state.unitOf(next, next.turnUid);
-    unit.actionsLeft -= 1;
-    if (next.phase !== "finished" && unit.actionsLeft <= 0) {
+    var unit = next.turnUid ? B.state.unitOf(next, next.turnUid) : null;
+    if (unit) unit.actionsLeft -= 1;
+    if (next.phase !== "finished" && unit && unit.actionsLeft <= 0) {
       B.timeline.endTurn(next, events);
       B.timeline.beginTurn(next, events);
     }

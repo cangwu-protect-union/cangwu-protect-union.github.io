@@ -77,6 +77,14 @@
       if (!holder) return 0;
       return holder.flags[counterKey(ctx, expr.counter, expr.perTarget !== false)] || 0;
     }
+    if (expr.mark) {
+      var markParts = String(expr.mark).split(".");
+      var markWho = markParts.length > 1 ? markParts[0] : "self";
+      var markKey = markParts.length > 1 ? markParts[1] : markParts[0];
+      var markedUnit = sideUnit(state, ctx, markWho);
+      if (!markedUnit) return 0;
+      return B.state.markOf(markedUnit, markKey);
+    }
     if (expr.minus) {
       return evalValue(state, ctx, expr.minus[0]) - evalValue(state, ctx, expr.minus[1]);
     }
@@ -103,6 +111,10 @@
       var last = self && self.lastDamageType ? self.lastDamageType : "phys";
       return last;
     }
+    if (op.type === "basic") {
+      var caster = sideUnit(state, ctx, "self");
+      return caster ? B.traits.basicType(caster) : "phys";
+    }
     return op.type || "phys";
   }
 
@@ -128,6 +140,8 @@
       remain: mod.remain,
       skillId: ctx.skillId || ""
     });
+    if (mod.stat === "maxHp") target.hp = Math.min(target.hp, B.state.maxHpOf(target));
+    if (mod.stat === "maxMp") target.mp = Math.min(target.mp, B.state.maxMpOf(target));
   }
 
   function addBuff(state, ctx, op, events) {
@@ -172,13 +186,14 @@
       remain: spec ? spec.count : 0,
       unit: spec ? spec.unit : "standard",
       source: sourceTag(ctx),
-      label: ctx.label || ""
+      label: op.label || ctx.label || ""
     });
     pushEvent(state, events, {
       type: "statusAdd",
       uid: target.uid,
       kind: entry.kind,
       remain: entry.remain,
+      label: entry.label,
       skillId: ctx.skillId || ""
     });
   }
@@ -190,7 +205,7 @@
     state.effectSeq = (state.effectSeq || 0) + 1;
     var effect = {
       id: "ef" + state.effectSeq,
-      remain: spec ? spec.count : 1,
+      remain: op.permanent ? B.state.PERMANENT : (spec ? spec.count : 1),
       unit: spec ? spec.unit : "standard",
       unstoppable: !!op.unstoppable,
       label: op.label || ctx.label || "",
@@ -279,6 +294,13 @@
     if (op.scope === "breakValue") {
       target.breakValue = 0;
       removed.push("breakValue");
+    }
+    if (op.scope === "marks") {
+      var markKeys = Object.keys(target.marks || {});
+      for (var mk = 0; mk < markKeys.length; mk++) {
+        target.marks[markKeys[mk]].value = 0;
+        removed.push(markKeys[mk]);
+      }
     }
     pushEvent(state, events, { type: "dispel", uid: target.uid, scope: op.scope || "debuff", removed: removed, skillId: ctx.skillId || "" });
   }
@@ -431,6 +453,27 @@
         pushEvent(state, events, { type: key, uid: target.uid, value: target[key] });
         return;
       }
+      case "forceBreak": {
+        target = sideUnit(state, ctx, op.who || "target");
+        if (!target) return;
+        var rounds = B.rules.breakRounds(target.breakValue);
+        if (rounds <= 0) return;
+        var breakStatus = B.state.addStatus(target, {
+          kind: "break",
+          remain: rounds,
+          source: sourceTag(ctx),
+          label: "击溃"
+        });
+        pushEvent(state, events, {
+          type: "statusAdd",
+          uid: target.uid,
+          kind: "break",
+          remain: breakStatus.remain,
+          label: "击溃",
+          skillId: ctx.skillId || ""
+        });
+        return;
+      }
       case "dice": {
         runDice(state, ctx, op, events);
         return;
@@ -467,6 +510,43 @@
         runSchedule(state, ctx, op, events);
         return;
       }
+      case "mark": {
+        target = sideUnit(state, ctx, op.who || "self");
+        if (!target || !target.marks || !target.marks[op.key]) return;
+        var markDef = target.marks[op.key];
+        if (op.mode === "set" && op.value != null) markDef.value = evalValue(state, ctx, op.value);
+        else markDef.value = markDef.value + (op.delta == null ? 1 : Number(op.delta));
+        markDef.value = B.rules.clamp(markDef.value, 0, markDef.max);
+        pushEvent(state, events, {
+          type: "mark",
+          uid: target.uid,
+          key: op.key,
+          name: markDef.name,
+          value: markDef.value,
+          max: markDef.max,
+          skillId: ctx.skillId || ""
+        });
+        return;
+      }
+      case "markClear": {
+        target = sideUnit(state, ctx, op.who || "target");
+        if (!target || !target.marks) return;
+        var keys = op.key ? [op.key] : Object.keys(target.marks);
+        for (var mk = 0; mk < keys.length; mk++) {
+          if (!target.marks[keys[mk]]) continue;
+          target.marks[keys[mk]].value = 0;
+          pushEvent(state, events, {
+            type: "mark",
+            uid: target.uid,
+            key: keys[mk],
+            name: target.marks[keys[mk]].name,
+            value: 0,
+            max: target.marks[keys[mk]].max,
+            skillId: ctx.skillId || ""
+          });
+        }
+        return;
+      }
       case "taunt": {
         target = sideUnit(state, ctx, op.who || "self");
         if (!target) return;
@@ -490,6 +570,13 @@
           if (state.phase === "finished") return;
           runOps(state, ctx, ref.ops, events);
         }
+        return;
+      }
+      case "setBasicMod": {
+        if (!ctx.mod) return;
+        if (op.type) ctx.mod.type = op.type;
+        if (op.factor != null) ctx.mod.factor = Number(op.factor);
+        if (op.healInstead) ctx.mod.healInstead = true;
         return;
       }
       case "note": {
@@ -572,10 +659,51 @@
 
   function turnEnd(state, unit, events) {
     if (!unit) return;
-    unit.effects = tickDown(unit.effects, events, state, unit.uid, "effect", "turn");
-    unit.buffs = tickDown(unit.buffs, events, state, unit.uid, "buff", "turn");
-    unit.statuses = tickDown(unit.statuses, events, state, unit.uid, "status", "turn");
-    unit.mods = tickDown(unit.mods, events, state, unit.uid, "mod", "turn");
+    /* 以「回合」计时、且这一回合轮到它的效果，先结算再扣时间 */
+    for (var u = 0; u < state.units.length; u++) {
+      var owner = state.units[u];
+      var active = owner.effects.slice();
+      for (var i = 0; i < active.length; i++) {
+        if (!isDueForTurn(active[i], unit)) continue;
+        if (state.phase === "finished") break;
+        runOps(state, ctxOfEffect(active[i]), active[i].ops, events);
+      }
+    }
+    for (var k = 0; k < state.units.length; k++) {
+      var holder = state.units[k];
+      holder.effects = tickTurnList(holder.effects, state, unit, events, "effect");
+      holder.buffs = tickTurnList(holder.buffs, state, unit, events, "buff");
+      holder.statuses = tickTurnList(holder.statuses, state, unit, events, "status");
+      holder.mods = tickTurnList(holder.mods, state, unit, events, "mod");
+    }
+  }
+
+  function isDueForTurn(item, unit) {
+    if (item.unit === "selfRound") return item.sourceUid === unit.uid;
+    if (item.unit === "targetRound") return item.targetUid === unit.uid;
+    return false;
+  }
+
+  function tickTurnList(list, state, unit, events, kind) {
+    var kept = [];
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (!isDueForTurn(item, unit)) {
+        kept.push(item);
+        continue;
+      }
+      if (item.remain === B.state.PERMANENT) {
+        kept.push(item);
+        continue;
+      }
+      item.remain -= 1;
+      if (item.remain > 0) {
+        kept.push(item);
+        continue;
+      }
+      pushEvent(state, events, { type: kind + "Expire", uid: unit.uid, kind: item.kind || item.stat || "", label: item.label || "" });
+    }
+    return kept;
   }
 
   function roundStart(state, events) {

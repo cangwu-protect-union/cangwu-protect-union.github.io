@@ -45,8 +45,10 @@
       mpPerTurn: 0,
       known: true
     };
+    /* 档案里主业/副业偶尔写反（张家铭写的是「爆破手/强攻手」），两张表都查一遍 */
+    var jobDef = baseOf(JOBS, job) || baseOf(SIDE_JOBS, job);
+    var sideDef = baseOf(SIDE_JOBS, sideJob) || baseOf(JOBS, sideJob);
     var taunt = 0;
-    var jobDef = baseOf(JOBS, job);
     if (jobDef) {
       for (var k in jobDef) {
         if (Object.prototype.hasOwnProperty.call(jobDef, k) && k !== "taunt") out[k] = jobDef[k];
@@ -55,7 +57,6 @@
     } else {
       out.known = false;
     }
-    var sideDef = baseOf(SIDE_JOBS, sideJob);
     if (sideDef) {
       for (var j in sideDef) {
         if (Object.prototype.hasOwnProperty.call(sideDef, j) && j !== "taunt") out[j] = sideDef[j];

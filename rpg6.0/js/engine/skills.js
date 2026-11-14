@@ -9,6 +9,7 @@
   var byId = {};
   var byOwner = {};
   var all = [];
+  var markDefs = {};
 
   function norm(text) {
     return String(text == null ? "" : text).replace(/\s+/g, "");
@@ -18,6 +19,7 @@
     byId = {};
     byOwner = {};
     all = [];
+    markDefs = (library && library.marks) || {};
     var chars = library && library.characters ? library.characters : {};
     Object.keys(chars).forEach(function (owner) {
       chars[owner].forEach(function (skill) {
@@ -36,6 +38,20 @@
 
   function find(id) {
     return byId[id] || null;
+  }
+
+  /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作 */
+  function initUnit(unit) {
+    var defs = markDefs[unit.name] || [];
+    if (!unit.marks) unit.marks = {};
+    for (var i = 0; i < defs.length; i++) {
+      var def = defs[i];
+      unit.marks[def.key] = {
+        value: Number(def.init) || 0,
+        name: def.name || def.key,
+        max: def.max == null ? 99 : Number(def.max)
+      };
+    }
   }
 
   function forUnit(unit) {
@@ -155,6 +171,7 @@
 
     unit.charge = null;
     unit.reflect = null;
+    if (skill.once) unit.flags["used." + skill.id] = true;
     if (skill.cooldown) unit.cooldowns[skill.id] = state.round;
     unit.stats.casts += 1;
     events.push({
@@ -192,6 +209,19 @@
         B.effectOps.runOps(state, ctx, prepareOps(hooks[kind], unit), events);
       }
     }
+  }
+
+  /* 普攻前的被动修正：返回 {type, factor, healInstead}，没有被动时返回空对象 */
+  function basicMod(state, unit, target, events) {
+    var ctx = {
+      sourceUid: unit.uid,
+      targetUid: target.uid,
+      skillId: "basic.mod",
+      label: "普攻修正",
+      mod: {}
+    };
+    runHooks(state, unit, "basicMod", ctx, events);
+    return ctx.mod;
   }
 
   function validate(characters) {
@@ -242,10 +272,12 @@
   api.find = find;
   api.forUnit = forUnit;
   api.has = has;
+  api.initUnit = initUnit;
   api.execute = execute;
   api.resolveTarget = resolveTarget;
   api.prepareOps = prepareOps;
   api.runHooks = runHooks;
+  api.basicMod = basicMod;
   api.validate = validate;
   api.statusOf = statusOf;
   api.all = function () { return all.slice(); };

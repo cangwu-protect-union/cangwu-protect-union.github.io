@@ -53,9 +53,11 @@
       stats: { hitsDealt: 0, hitsTaken: 0, casts: 0, turns: 0 },
       hpLog: [],
       lastDamageType: "",
+      marks: {},
       skills: []
     };
     B.traits.applyToUnit(unit);
+    if (B.skills && B.skills.initUnit) B.skills.initUnit(unit);
     unit.mp = B.rules.clamp(unit.trait.openMp || 0, 0, base.maxMp);
     return unit;
   }
@@ -130,6 +132,16 @@
       if (list[i].kind === kind) return true;
     }
     return false;
+  }
+
+  function markOf(unit, key) {
+    var mark = unit.marks && unit.marks[key];
+    return mark ? mark.value : 0;
+  }
+
+  function markName(unit, key) {
+    var mark = unit.marks && unit.marks[key];
+    return mark ? mark.name : key;
   }
 
   function canAct(unit) {
@@ -217,11 +229,17 @@
   }
 
   function createBattle(opts) {
-    var seed = B.rng.init(opts && opts.seed);
+    var rawSeed = 0;
+    if (opts && opts.seed != null) {
+      rawSeed = Math.floor(Math.abs(Number(opts.seed)));
+      if (!isFinite(rawSeed)) rawSeed = 0;
+    }
     var state = {
-      version: (opts && opts.version) || "6.0-engine.1",
-      seed: seed,
-      rng: seed,
+      version: (opts && opts.version) ||
+        (root.RPG_APP && root.RPG_APP.engineVersion) ||
+        "6.0-engine.2",
+      seed: rawSeed,
+      rng: B.rng.init(rawSeed),
       round: 0,
       phase: "fight",
       result: "",
@@ -269,11 +287,14 @@
       for (var s = 0; s < u.statuses.length; s++) st.push(u.statuses[s].kind + u.statuses[s].remain);
       var eff = [];
       for (var e = 0; e < u.effects.length; e++) eff.push(u.effects[e].id + u.effects[e].remain);
+      var marks = [];
+      var markKeys = Object.keys(u.marks || {});
+      for (var mk = 0; mk < markKeys.length; mk++) marks.push(markKeys[mk] + u.marks[markKeys[mk]].value);
       parts.push([
         u.uid, u.hp, u.mp, u.gauge, u.actionsLeft, u.breakValue, u.stunValue,
         u.charge ? u.charge.skillId + ":" + u.charge.amount : "-",
         buffs.join(","), mods.join(","), st.join(","), eff.join(","),
-        u.scheduled.length, u.lastDamageType
+        u.scheduled.length, u.lastDamageType, marks.join(",")
       ].join("|"));
     }
     return fnv1a(parts.join(";"));
@@ -291,6 +312,8 @@
   api.mresOf = mresOf;
   api.spdOf = spdOf;
   api.hasStatus = hasStatus;
+  api.markOf = markOf;
+  api.markName = markName;
   api.canAct = canAct;
   api.addMod = addMod;
   api.removeModsBySource = removeModsBySource;
