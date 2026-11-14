@@ -211,6 +211,17 @@
     return entry;
   }
 
+  /* 进入击溃：击溃值固定为 0，击溃状态期间也不会再增加 */
+  function enterBreak(unit, remain, source, label) {
+    unit.breakValue = 0;
+    return addStatus(unit, {
+      kind: "break",
+      remain: remain,
+      source: source || "",
+      label: label || "击溃"
+    });
+  }
+
   function addHpLog(unit, round, delta) {
     if (!delta) return;
     unit.hpLog.push({ round: round, delta: delta });
@@ -237,7 +248,7 @@
     var state = {
       version: (opts && opts.version) ||
         (root.RPG_APP && root.RPG_APP.engineVersion) ||
-        "6.0-engine.2",
+        "6.0-engine.3",
       seed: rawSeed,
       rng: B.rng.init(rawSeed),
       round: 0,
@@ -319,6 +330,7 @@
   api.removeModsBySource = removeModsBySource;
   api.addBuff = addBuff;
   api.addStatus = addStatus;
+  api.enterBreak = enterBreak;
   api.addHpLog = addHpLog;
   api.decideOrder = decideOrder;
   api.createBattle = createBattle;

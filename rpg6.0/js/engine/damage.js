@@ -35,6 +35,10 @@
   }
 
   function addBreakValue(state, unit, events) {
+    if (B.state.hasStatus(unit, "break")) {
+      unit.breakValue = 0;
+      return false;
+    }
     var max = B.rules.CONFIG.breakValueMax;
     if (unit.breakValue >= max) return false;
     unit.breakValue += 1;

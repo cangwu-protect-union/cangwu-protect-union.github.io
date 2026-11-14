@@ -94,12 +94,19 @@
       throw new Error("击溃值不足 " + threshold + "（现在 " + target.breakValue + "）");
     }
     var rounds = B.rules.breakRounds(target.breakValue);
-    var applied = B.state.addStatus(target, {
-      kind: "break",
-      remain: rounds,
-      source: "break." + unit.uid,
-      label: "击溃"
-    });
+    /* 被动先按进入击溃前的击溃值结算（如以德服人），再清零并进入击溃 */
+    if (state.phase !== "finished" && B.skills && B.skills.runHooks) {
+      B.skills.runHooks(state, unit, "breakAction", {
+        sourceUid: unit.uid,
+        targetUid: target.uid,
+        skillId: "passive.breakAction",
+        label: "击溃被动"
+      }, events);
+    }
+    if (state.phase === "finished") {
+      return { kind: "basic", type: "break", target: target.uid };
+    }
+    var applied = B.state.enterBreak(target, rounds, "break." + unit.uid, "击溃");
     events.push({
       type: "statusAdd",
       round: state.round,
@@ -109,14 +116,6 @@
       source: "break",
       label: "击溃"
     });
-    if (state.phase !== "finished" && B.skills && B.skills.runHooks) {
-      B.skills.runHooks(state, unit, "breakAction", {
-        sourceUid: unit.uid,
-        targetUid: target.uid,
-        skillId: "passive.breakAction",
-        label: "击溃被动"
-      }, events);
-    }
     return { kind: "basic", type: "break", target: target.uid };
   }
 

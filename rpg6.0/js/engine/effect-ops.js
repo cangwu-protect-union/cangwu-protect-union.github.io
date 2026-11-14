@@ -181,13 +181,16 @@
       pushEvent(state, events, { type: "reflect", uid: target.uid, kind: "status", detail: op.kind });
     }
     var spec = durationOf(op.duration || op.rounds);
-    var entry = B.state.addStatus(target, {
-      kind: op.kind,
-      remain: spec ? spec.count : 0,
-      unit: spec ? spec.unit : "standard",
-      source: sourceTag(ctx),
-      label: op.label || ctx.label || ""
-    });
+    var label = op.label || ctx.label || "";
+    var entry = op.kind === "break"
+      ? B.state.enterBreak(target, spec ? spec.count : 0, sourceTag(ctx), label)
+      : B.state.addStatus(target, {
+        kind: op.kind,
+        remain: spec ? spec.count : 0,
+        unit: spec ? spec.unit : "standard",
+        source: sourceTag(ctx),
+        label: label
+      });
     pushEvent(state, events, {
       type: "statusAdd",
       uid: target.uid,
@@ -458,12 +461,7 @@
         if (!target) return;
         var rounds = B.rules.breakRounds(target.breakValue);
         if (rounds <= 0) return;
-        var breakStatus = B.state.addStatus(target, {
-          kind: "break",
-          remain: rounds,
-          source: sourceTag(ctx),
-          label: "击溃"
-        });
+        var breakStatus = B.state.enterBreak(target, rounds, sourceTag(ctx), "击溃");
         pushEvent(state, events, {
           type: "statusAdd",
           uid: target.uid,
