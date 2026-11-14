@@ -12,7 +12,7 @@ node _local/tools/build-docs.js
 
 ## 清单
 
-共 11 张，合计 1216 KB。
+共 11 张，合计 1269 KB。
 
 | 文件 | 内容 |
 |---|---|

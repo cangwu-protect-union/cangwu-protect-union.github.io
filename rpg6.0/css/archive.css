@@ -5,6 +5,31 @@
    表单与确认框。颜色全部取 css/style.css 的变量，不引入新色。
    ============================================================ */
 
+/* --- 「角色」/「规则」两栏 ------------------------------------- */
+
+.rpg-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 26px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpg-tabs a {
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: .95rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.rpg-tabs a:hover { color: var(--fg); text-decoration: none; }
+
+.rpg-tabs a.is-on {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
 /* --- 筛选条 --------------------------------------------------- */
 
 .rpg-toolbar {
@@ -522,10 +547,73 @@
   font-size: .88rem;
 }
 
+/* --- 规则正文 ------------------------------------------------- */
+
+.rule-list { margin: 20px 0 0; }
+
+.rule-page { margin: 22px 0 0; }
+
+.rule-body { max-width: 48em; }
+
+.rule-body h2 {
+  font-size: 1.12rem;
+  margin: 34px 0 10px;
+}
+
+.rule-section:first-child h2 { margin-top: 18px; }
+
+.rule-defs { margin: 0; }
+
+.rule-defs dt {
+  margin: 12px 0 2px;
+  font-weight: 600;
+}
+
+.rule-defs dt:first-child { margin-top: 0; }
+
+.rule-defs dd { margin: 0; }
+
+.rule-defs ul {
+  margin: 6px 0 0;
+  padding-left: 1.3em;
+}
+
+.rule-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0 0;
+}
+
+.rule-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .92rem;
+}
+
+/* 列多或单元格长的表：窄屏不压缩，改为容器内横向滚动 */
+.rule-table.is-wide { min-width: 42em; }
+.rule-table.is-ranges { min-width: 30em; }
+.rule-table.is-members { min-width: 30em; }
+
+.rule-table th,
+.rule-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.rule-table th {
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--card);
+}
+
 /* --- 窄屏 ----------------------------------------------------- */
 
 @media (max-width: 640px) {
   .rpg-toolbar { flex-direction: column; align-items: stretch; }
+  .rpg-tabs { margin-top: 20px; }
+  .rule-table { font-size: .86rem; }
   .char-stats { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
