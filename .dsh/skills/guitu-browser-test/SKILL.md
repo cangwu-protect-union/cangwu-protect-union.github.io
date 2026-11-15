@@ -25,6 +25,15 @@ pwsh: python -m http.server 9300 --bind 127.0.0.1   （run_in_background）
 
 `_local/tests/run-all.mjs` 会自己起服务，跑正式用例时不用手工开。
 
+**收工要按 PID 关**：`job_kill` 只杀掉 pwsh 外壳，python 子进程仍在监听，下次跑 `run-all` 会撞端口或让「服务器是不是我开的」判断失真。实测收尾：
+
+```powershell
+Get-NetTCPConnection -LocalPort 9300 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+再 `Invoke-WebRequest http://127.0.0.1:9300/...` 确认已拒连，别只看 job 状态。
+
 必须用 `http://127.0.0.1:PORT/...`，**不要 `file://`**：Origin 为 `null`，云端 CORS 直接拦掉。
 
 ## 沙箱
@@ -59,6 +68,21 @@ await close();
 ```
 
 `openBrowser()` 自己 spawn Edge 开调试端口再 `connectOverCDP`，拿到的是真浏览器；CDP 连接下部分 `newContext` 选项无效。细节见 `_local/pw/README.md`。
+
+### 模拟手机（横竖屏、触摸）
+
+`page.setViewportSize` 只改视口，**不改 `pointer` 与 `maxTouchPoints`**；靠这两个判断的响应式分支、横屏遮罩会全部测不到。要走 CDP：
+
+```js
+const cdp = await ctx.newCDPSession(page);
+await cdp.send('Emulation.setDeviceMetricsOverride', {
+  width: 844, height: 390, deviceScaleFactor: 3, mobile: true
+});
+await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+await page.setViewportSize({ width: 844, height: 390 });
+```
+
+`mobile: true` 之后 `(pointer: coarse)` 才为真、`navigator.maxTouchPoints` 才是 5；`maxTouchPoints` 至少给 1（给 0 会报 `Touch points must be between 1 and 16`）。切回桌面要显式 `setTouchEmulationEnabled({enabled:false})`，否则同一页后续断言仍按手机走。
 
 ## 退路：CDP 直连
 
@@ -101,4 +125,5 @@ await page.waitForFunction(() => {
 - 结果对不上时先做最小差异对照：只改一个变量（换身份、换 profile、换 curl 与应用代码），确认是产品问题还是测量方式问题。
 - 测试后清理自建数据；条目只能软删除，彻底清除要 SQL。`gui_tips` 可以先置 `rejected` 让它从公开面消失，再让用户跑一句 delete。
 - 控制台里的 `favicon.ico 404` 是全站既有噪音（没放 favicon），不当回归；只看自己的资源与 JS 异常。
+- 用真实操作跑完一局对局、提交表单这类流程会**真的写云端数据**；截图脚本要提前想好怎么收拾，别把测试记录留在库里才发现。匿名通常只能插不能删，删要 service_role，届时把 id 交给用户跑 SQL。
 - 临时断言脚本放 `_local/pw`，跑完就删；能留下的用例写进 `_local/tests/cases/`，见 skill `site-e2e-tests`。

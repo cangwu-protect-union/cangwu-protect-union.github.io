@@ -28,7 +28,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库与对局页。加�
 | `.../actions.js` | 普攻/击溃/蓄蓝，普攻前被动改判 |
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
 | `rpg6.0/data/battle-skills.js` | 角色技能与标记声明（唯一数据源） |
-| `rpg6.0/js/battle/*` | 渲染、选中状态、战报、页面装配 |
+| `rpg6.0/js/battle/*` | 渲染（五块 + 折叠）、选中状态、战报、页面装配 |
 | `_local/tests/engine/run.mjs` | 引擎单测入口 |
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 
@@ -65,6 +65,18 @@ description: 回合制正传 6.0 的战斗引擎、技能库与对局页。加�
 | 混伤 | 同时造成等量普伤与真伤两段 |
 | 标记 | 对手可见、可被对手技能削减或清空 |
 
+## 手机横屏与折叠（对局页）
+
+- **断点**：`(orientation: landscape) and (max-height: 520px)`。不要用 `max-width`——手机横屏宽 844px，会被当成竖屏走单列，一屏要滑三屏。
+- **遮罩**：JS 判「粗指针 + `maxTouchPoints > 0` + 视口短边 ≤520」才给 `<html>` 加 `is-phone`，CSS 只在 `is-phone` + 竖屏显示。唯一按钮 = 请求全屏 + `screen.orientation.lock("landscape")`；iOS 没有该 API，退化成「请手动横过来」。不要加第二个出口。
+- **一屏布局**：`html.is-battle` 隐藏站点 header/footer；`.battle-page` 锁 `100dvh`；grid 两列（`speed` / `unitA unitB` / `queryA queryB` / `log`），各格自己滚，页面不滚。
+- **四处折叠**（状态都在 JS 变量里，`render()` 重建 DOM 后按它恢复，不要直接读 DOM）：
+  - 速度条、战斗日志：原生 `<details>`；`speedOpen` / `battleLogOpen`。
+  - 展开态统一 `position: fixed; inset: 0` 铺满视口，`<summary>` 用 `position: sticky` 顶住当关闭入口；这套规则**只写在紧凑断点里**。桌面战斗日志保持常显 `<section>`，由 `renderBattleLog(state, open, collapsible)` 决定输出哪种标签。
+  - 伤害记录（手机独有）：绝对定位浮层，靠 `.battle-unit { overflow: visible }` 才盖得出去；高度由 `applyLogPanel()` 现算——`max-height` 取「卡片底边 → 底栏顶边」，`min-height` 至少盖到整张技能卡，少了会露出半行技能文字；`.bu-status` 要 `position: relative; z-index: 4`，否则浮层可能盖住自己的「收起」按钮。
+  - Buff 详情：手机没有 hover，点 chip 弹气泡（`data-detail` + `BattleView.chipDetail`），点别处或滚动关闭。
+- **改完必看两个视口**：844×390（不滚、双方并排、操作栏可见）与 1280×900（战斗日志仍是 `SECTION` / `static`）。
+
 ## 测试
 
 ```powershell
@@ -93,11 +105,18 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 10. **技能禁用与点击**：只有「不是这个角色的回合」才拦截点击；条件不满足（缺蓝、层数不够）要放行点击并给出原因。
 11. **随机策略跑久了必然撞僵局**（治疗抵平、击溃锁死），先分类再判断是不是 bug。
 12. **取整只做一次**：多段伤害每段各自 round5，Buff 乘算合并成一个乘数再取整。
+13. **折叠控件的点击会触发 `render()` 重建 DOM**：给浮层注入测试行必须先点开再塞，先塞会被一次重绘冲掉。
+14. **遮罩别用纯 CSS `(pointer: coarse)`**：触屏笔记本、平板都会被算进去。Playwright 里 `setViewportSize` 不改 pointer 与触摸点数，要 `Emulation.setDeviceMetricsOverride({mobile:true})` + `setTouchEmulationEnabled` 才测得到。
+15. **`display:none` 的表格仍在 DOM 里**：`querySelectorAll('.fc-table tbody tr')` 照样数到 21 行，断言「收起」要查 `details.open` 或 computed style，别数行数。
+16. **紧凑断点的样式不要提到全局**：桌面吃进去就会变成盖满整页的浮层。桌面和手机共用一份 DOM（靠 `grid-template-areas` 换形），每条手机规则都要想一遍桌面会怎样。
+17. **两个会话同时改 `js/battle/*`**：先在改动前重读文件，chip 的属性名（`data-buff` → `data-detail`）这类重构会被另一端换掉，按旧选择器写的用例会静默失灵。
 
 ## 交付前检查
 
 - [ ] `run.mjs` 全绿
 - [ ] `batch --pairs=smoke` 无引擎异常
+- [ ] `run-all.mjs --group=回合制` 全绿（含 `844×390` 横屏用例）
 - [ ] `check.ps1` 退出码 0
 - [ ] 文档里的角色数/技能数同步（`test.html` 提示、`rpg6.0/README.md`、`架构.md`、plan、机制文档）
 - [ ] 新角色写进机制文档，`unsupported` 的技能写明原因
+- [ ] 动过对局页：桌面 1280×900 与手机 844×390 各截一张图核对，确认没有任何一块要横向滚动
