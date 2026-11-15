@@ -195,11 +195,16 @@
     return line;
   }
 
-  function renderBattleLog(state, open) {
+  /* 桌面是常显的普通区块；紧凑布局才折成一行、点开成覆盖层 */
+  function renderBattleLog(state, open, collapsible) {
     var list = state.log || [];
     var start = Math.max(0, list.length - 160);
-    var html = '<details class="battle-log" data-log' + (open ? " open" : "") + ">" +
-      '<summary><span class="bl-title">战斗日志</span></summary><ol class="bl-items">';
+    var head = collapsible
+      ? '<summary><span class="bl-title">战斗日志</span></summary>'
+      : '<h2 class="bl-title">战斗日志</h2>';
+    var html = collapsible
+      ? '<details class="battle-log" data-log' + (open ? " open" : "") + ">" + head + '<ol class="bl-items">'
+      : '<section class="battle-log" data-log>' + head + '<ol class="bl-items">';
     var rows = 0;
     for (var i = start; i < list.length; i++) {
       var line = eventLine(state, list[i]);
@@ -208,7 +213,7 @@
       html += '<li class="bl-row ' + line.cls + '">' + esc(line.text) + "</li>";
     }
     if (!rows) html += '<li class="bl-row is-empty">还没有事件</li>';
-    html += "</ol></details>";
+    html += collapsible ? "</ol></details>" : "</ol></section>";
     return html;
   }
 
@@ -376,7 +381,8 @@
     parts.push('<aside class="battle-buff" data-buffbox>' + renderBuffBox(null) + "</aside>");
     parts.push(renderQuery(state, state.units[0], meta, pick, readOnly));
     parts.push(renderQuery(state, state.units[1], meta, pick, readOnly));
-    parts.push(renderBattleLog(state, !!(options && options.battleLogOpen)));
+    parts.push(renderBattleLog(state, !!(options && options.battleLogOpen),
+      !!(options && options.battleLogCollapsible)));
     return parts.join("");
   }
 

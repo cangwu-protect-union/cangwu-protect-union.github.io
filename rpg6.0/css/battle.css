@@ -80,11 +80,16 @@
   overflow: auto;
 }
 
-/* ---------- 战斗日志 ---------- */
+/* ---------- 战斗日志 ----------
+   桌面是常显的普通区块（和原来一样）；只有手机横屏的紧凑布局才折成一行、点开成覆盖层。 */
 
 .battle-log {
   max-height: 220px;
   font-size: 12px;
+}
+
+.battle-log > h2.bl-title {
+  margin: 0 0 4px;
 }
 
 .bl-title {
@@ -738,19 +743,19 @@ html.is-battle .site-footer {
 }
 
 /* ---------- 横屏入口遮罩 ----------
-   只在竖屏触摸设备上出现，转成横屏后媒体查询失效，自动消失。
-   没有任何第二个出口：唯一的按钮负责全屏 + 锁方向，锁不住就让用户手动转。 */
+   只在竖屏手机上出现：html.is-phone 由 JS 判定（粗指针 + 有触摸 + 短边 ≤520），
+   桌面窄窗口、平板、鼠标设备都不弹。没有第二个出口：唯一的按钮负责全屏 + 锁方向。 */
 
 .rotate-gate {
   display: none;
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
-  body {
+@media (orientation: portrait) {
+  html.is-phone body {
     overflow: hidden;
   }
 
-  .rotate-gate {
+  html.is-phone .rotate-gate {
     display: flex;
     position: fixed;
     inset: 0;
@@ -847,6 +852,7 @@ html.is-battle .site-footer {
     margin: 6px 0;
   }
 
+  /* 战斗日志：默认只留一行摘要，展开铺满视口 */
   .battle-log {
     max-height: 26px;
     padding: 2px 8px;
@@ -858,13 +864,24 @@ html.is-battle .site-footer {
   }
 
   .battle-log[open] {
-    max-height: 30vh;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    max-height: none;
     overflow: auto;
-    padding: 4px 8px;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 0;
+    background: var(--bg);
   }
 
   .battle-log[open] > summary {
-    margin-bottom: 4px;
+    position: sticky;
+    top: -12px;
+    margin: -12px -14px 8px;
+    padding: 12px 14px 8px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
 
   .battle-buff {
@@ -886,6 +903,28 @@ html.is-battle .site-footer {
 
   .battle-speed .fc-table {
     max-width: none;
+  }
+
+  /* 速度条展开也铺满视口，不把下面的列挤扁 */
+  .battle-speed[open] {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    max-height: none;
+    overflow: auto;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 0;
+    background: var(--bg);
+  }
+
+  .battle-speed[open] > summary {
+    position: sticky;
+    top: -12px;
+    margin: -12px -14px 8px;
+    padding: 12px 14px 8px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
 
   .battle-unit,
@@ -928,6 +967,13 @@ html.is-battle .site-footer {
 
   .battle-unit.is-log-open .bu-log {
     display: block;
+  }
+
+  /* 状态行永远盖在浮层之上：浮层再高也不会挡住「收起」按钮 */
+  .bu-status {
+    position: relative;
+    z-index: 4;
+    background: var(--bg);
   }
 
   .bu-log-toggle {

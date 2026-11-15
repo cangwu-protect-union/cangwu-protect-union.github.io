@@ -264,8 +264,13 @@
     if (!panel) return;
     var limit = dom.bar ? dom.bar.getBoundingClientRect().top : root.innerHeight;
     if (!limit) limit = root.innerHeight;
-    var avail = Math.max(96, limit - card.getBoundingClientRect().bottom - 8);
+    var bottom = card.getBoundingClientRect().bottom;
+    var avail = Math.max(96, limit - bottom - 8);
     panel.style.maxHeight = avail + "px";
+    /* 至少盖住整张技能卡（含操作栏），避免半行文字露在浮层下面 */
+    var query = dom.grid.querySelector('[data-query="' + logUid + '"]');
+    var need = query ? query.getBoundingClientRect().bottom - bottom + 2 : 96;
+    panel.style.minHeight = Math.min(avail, Math.max(96, need)) + "px";
   }
 
   function render() {
@@ -275,6 +280,7 @@
       readOnly: mode !== "play",
       speedOpen: speedOpen === null ? !compact : speedOpen,
       battleLogOpen: battleLogOpen === null ? !compact : battleLogOpen,
+      battleLogCollapsible: compact,
       logUid: logUid
     });
     dom.grid.classList.toggle("is-picking", root.BattlePick.isActive(pick));
@@ -729,6 +735,22 @@
 
   function bindGate() {
     if (dom.gateGo) dom.gateGo.addEventListener("click", onGateGo);
+    syncPhone();
+    if (root.addEventListener) {
+      root.addEventListener("resize", syncPhone);
+      root.addEventListener("orientationchange", syncPhone);
+    }
+  }
+
+  /* 只认手机：粗指针 + 有触摸 + 短边不超过 520。桌面窄窗口、平板、鼠标设备都不弹遮罩 */
+  function syncPhone() {
+    var el = root.document.documentElement;
+    if (!el || !el.classList) return;
+    var coarse = root.matchMedia ? root.matchMedia("(pointer: coarse)").matches : false;
+    var touch = !!(root.navigator && (root.navigator.maxTouchPoints || 0) > 0);
+    var shortSide = Math.min(root.innerWidth, root.innerHeight);
+    if (coarse && touch && shortSide <= 520) el.classList.add("is-phone");
+    else el.classList.remove("is-phone");
   }
 
   /* ---------------- 事件 ---------------- */
@@ -833,6 +855,11 @@
 
     document.addEventListener("keydown", function (event) {
       if (event.key !== "Escape") return;
+      if (battleLogOpen) {
+        battleLogOpen = false;
+        render();
+        return;
+      }
       if (root.BattlePick.isActive(pick)) {
         root.BattlePick.cancel(pick);
         setHint("已取消选择");
