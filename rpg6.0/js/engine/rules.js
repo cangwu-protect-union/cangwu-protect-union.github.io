@@ -11,6 +11,7 @@
     stunValueMax: 5,
     breakThreshold: 3,
     roundStep: 5,
+    statStep: 5,
     diceSides: 6,
     statFloor: { atk: 0, def: 0, spd: 0, maxHp: 1, maxMp: 0 }
   };
@@ -36,6 +37,13 @@
     var s = Number(step) || 1;
     if (!isFinite(n)) return 0;
     return Math.floor(n / s) * s;
+  }
+
+  /* 面板数值统一向下取到 5 的倍数（攻击/防御/法抗/血上限/蓝上限/速度，含所有乘算） */
+  function panelRound(n) {
+    var v = Number(n);
+    if (!isFinite(v)) return 0;
+    return floorTo(v, CONFIG.statStep);
   }
 
   function phys(atk, def) {
@@ -99,6 +107,7 @@
   api.round5 = round5;
   api.ceilTo = ceilTo;
   api.floorTo = floorTo;
+  api.panelRound = panelRound;
   api.phys = phys;
   api.magic = magic;
   api.trueDamage = trueDamage;

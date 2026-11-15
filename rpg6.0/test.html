@@ -2,13 +2,26 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>回合制正传 6.0 · 对局测试 · CPU</title>
   <meta name="robots" content="noindex">
+  <meta name="screen-orientation" content="landscape">
+  <meta name="x5-orientation" content="landscape">
+  <meta name="x5-fullscreen" content="true">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="css/battle.css">
 </head>
 <body>
+
+  <div class="rotate-gate" data-gate>
+    <div class="gate-box">
+      <p class="gate-title">请横屏</p>
+      <p class="gate-note" data-gate-note>对局要同时看双方状态，竖屏放不下。</p>
+      <button type="button" class="btn" data-gate-go>横屏继续</button>
+    </div>
+  </div>
+
+  <div class="buff-pop" data-buffpop hidden></div>
 
   <header class="site-header">
     <div class="container header-inner">

@@ -53,8 +53,9 @@
   grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 210px;
   grid-template-areas:
     "speed unitA unitB buff"
-    "speed queryA queryB queryB";
-  grid-template-rows: minmax(320px, 52vh) auto;
+    "speed queryA queryB queryB"
+    "log log log log";
+  grid-template-rows: minmax(320px, 52vh) auto auto;
   gap: 8px;
   margin: 16px 0;
 }
@@ -65,11 +66,13 @@
 .battle-buff { grid-area: buff; }
 .battle-query[data-query="a"] { grid-area: queryA; }
 .battle-query[data-query="b"] { grid-area: queryB; }
+.battle-log { grid-area: log; }
 
 .battle-speed,
 .battle-unit,
 .battle-buff,
-.battle-query {
+.battle-query,
+.battle-log {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -77,11 +80,124 @@
   overflow: auto;
 }
 
+/* ---------- 战斗日志 ---------- */
+
+.battle-log {
+  max-height: 220px;
+  font-size: 12px;
+}
+
+.bl-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 0;
+}
+
+.battle-log > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.battle-log > summary::-webkit-details-marker {
+  display: none;
+}
+
+.battle-log > summary::before {
+  content: "▸";
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.battle-log[open] > summary::before {
+  content: "▾";
+}
+
+.bl-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bl-row {
+  line-height: 1.6;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bl-row.is-round {
+  color: var(--muted);
+  border-top: 1px dashed var(--border);
+  margin-top: 3px;
+  padding-top: 2px;
+}
+
+.bl-row.is-action,
+.bl-row.is-status {
+  color: var(--fg);
+}
+
+.bl-row.is-damage { color: #b42318; }
+.bl-row.is-heal { color: #087443; }
+.bl-row.is-cancel { color: var(--accent); }
+
+/* ---------- 伤害类型选择 ---------- */
+
+.bq-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px dashed var(--accent);
+  padding-top: 6px;
+}
+
+.bq-choice-label {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.chip.is-effect {
+  border-color: var(--accent);
+}
+
 .bs-title {
   font-size: 12px;
   font-weight: 400;
   color: var(--muted);
-  margin: 0 0 6px;
+  margin: 0;
+}
+
+.battle-speed > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.battle-speed > summary::-webkit-details-marker {
+  display: none;
+}
+
+.battle-speed > summary::before {
+  content: "▸";
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.battle-speed[open] > summary::before {
+  content: "▾";
 }
 
 .fc-table {
@@ -254,6 +370,10 @@
   cursor: default;
 }
 
+.chip[data-detail] {
+  cursor: pointer;
+}
+
 .chip.is-status {
   color: var(--muted);
 }
@@ -308,6 +428,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 只在紧凑布局（手机横屏）里出现，桌面仍然是卡片内常显的日志 */
+.bu-log-toggle {
+  display: none;
+}
+
 /* ---------- Buff 详情 ---------- */
 
 .battle-buff {
@@ -327,6 +452,11 @@
 .bb-meta {
   margin: 0 0 6px;
   color: var(--muted);
+}
+
+.bb-kind {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .bb-text {
@@ -410,6 +540,20 @@
 .bq-skill-effect {
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.bq-skill-toggle {
+  display: none;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  min-width: 38px;
+  padding: 6px 6px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .bq-actions {
@@ -585,3 +729,312 @@
     max-height: none;
   }
 }
+
+/* ---------- 沉浸：对局中隐藏站点框架 ---------- */
+
+html.is-battle .site-header,
+html.is-battle .site-footer {
+  display: none;
+}
+
+/* ---------- 横屏入口遮罩 ----------
+   只在竖屏触摸设备上出现，转成横屏后媒体查询失效，自动消失。
+   没有任何第二个出口：唯一的按钮负责全屏 + 锁方向，锁不住就让用户手动转。 */
+
+.rotate-gate {
+  display: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  body {
+    overflow: hidden;
+  }
+
+  .rotate-gate {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    background: var(--bg);
+    text-align: center;
+  }
+}
+
+.gate-box {
+  max-width: 320px;
+}
+
+.gate-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.gate-note {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+
+.rotate-gate .btn {
+  font-size: 15px;
+  padding: 10px 22px;
+}
+
+/* ---------- Buff 气泡（点 chip 弹出，取代手机上的 hover） ---------- */
+
+.buff-pop {
+  position: fixed;
+  z-index: 70;
+  max-width: 240px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--fg) 16%, transparent);
+}
+
+.buff-pop .bb-detail h2 {
+  font-size: 13px;
+}
+
+/* ---------- 手机横屏：一屏放完 ----------
+   844×390 这类视口下，页面本身不滚，速度条收起成一行，
+   双方状态与技能并排两列，各自内部滚动。 */
+
+@media (orientation: landscape) and (max-height: 520px) {
+  html.is-battle,
+  html.is-battle body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  html.is-battle .battle-page {
+    max-width: none;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 6px;
+    margin: 0 auto;
+  }
+
+  html.is-battle .battle-page > p {
+    display: none;
+  }
+
+  html.is-battle .battle-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  html.is-battle .battle-grid {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "speed speed"
+      "unitA unitB"
+      "queryA queryB"
+      "log log";
+    grid-template-rows: auto minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+    gap: 6px;
+    margin: 6px 0;
+  }
+
+  .battle-log {
+    max-height: 26px;
+    padding: 2px 8px;
+    overflow: hidden;
+  }
+
+  .battle-log > summary {
+    margin-bottom: 0;
+  }
+
+  .battle-log[open] {
+    max-height: 30vh;
+    overflow: auto;
+    padding: 4px 8px;
+  }
+
+  .battle-log[open] > summary {
+    margin-bottom: 4px;
+  }
+
+  .battle-buff {
+    display: none;
+  }
+
+  .battle-speed {
+    max-height: none;
+    padding: 4px 8px;
+  }
+
+  .battle-speed > summary {
+    margin-bottom: 0;
+  }
+
+  .battle-speed[open] > summary {
+    margin-bottom: 4px;
+  }
+
+  .battle-speed .fc-table {
+    max-width: none;
+  }
+
+  .battle-unit,
+  .battle-query {
+    padding: 6px;
+  }
+
+  .battle-unit {
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+  }
+
+  .battle-query {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 伤害记录：默认折进状态行，展开是盖住操作栏的浮层 */
+  .bu-log {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    z-index: 3;
+    display: none;
+    flex: none;
+    min-height: 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin-top: 2px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--fg) 16%, transparent);
+  }
+
+  .battle-unit.is-log-open .bu-log {
+    display: block;
+  }
+
+  .bu-log-toggle {
+    display: inline-block;
+    margin-left: auto;
+    padding: 2px 0;
+    min-height: 24px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .bu-buffs {
+    min-height: 16px;
+  }
+
+  .battle-query {
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .bq-head,
+  .bq-stats {
+    display: none;
+  }
+
+  .bq-skills {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 1px;
+  }
+
+  .bq-skill {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 2px 6px;
+    min-height: 32px;
+    padding: 3px 4px;
+    align-items: center;
+  }
+
+  .bq-skill-cond {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bq-skill-effect {
+    display: none;
+  }
+
+  .bq-skill.is-open .bq-skill-effect {
+    display: block;
+    grid-column: 1 / -1;
+    padding-top: 2px;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: normal;
+  }
+
+  .bq-skill-toggle {
+    display: inline-block;
+  }
+
+  .bq-actions {
+    padding-top: 4px;
+  }
+
+  .bq-btn {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+
+  html.is-battle .battle-bar {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 4px 0;
+    overflow-x: auto;
+    font-size: 12px;
+  }
+
+  .bb-hint {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .battle-bar .btn {
+    flex: none;
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+
+  .battle-result {
+    flex: none;
+    max-height: 42vh;
+    overflow: auto;
+    margin: 6px 0;
+    padding: 10px;
+  }
+}
+

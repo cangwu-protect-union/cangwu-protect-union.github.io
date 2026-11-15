@@ -130,6 +130,11 @@
   function execute(state, action, events) {
     if (!action || typeof action !== "object") throw new Error("动作格式错误");
     var unit = currentUnit(state);
+    /* 行动前的持续效果判定（高猿长啸）：跳过时行动照样消耗，committed 仍是原动作，
+       因为掷骰由种子决定，回放会得到同一次判定。 */
+    if (B.effectOps && B.effectOps.actionGate && !B.effectOps.actionGate(state, unit, events)) {
+      return action;
+    }
     if (action.kind === "basic") {
       if (action.type === "attack") {
         return basicAttack(state, unit, requireTarget(state, unit, action.target), events);

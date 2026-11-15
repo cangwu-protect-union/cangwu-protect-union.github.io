@@ -175,7 +175,7 @@ window.RPG_RULES = [
       "<tr><td>冲锋手</td><td>中+</td><td>低</td><td>低</td><td>低</td><td>高+</td><td>低</td><td>1 嘲讽</td></tr>",
       "<tr><td>粉碎者</td><td>中-</td><td>中</td><td>中-</td><td>高</td><td>中+</td><td>中</td><td>普攻法伤</td></tr>",
       "<tr><td>爆发者</td><td>低</td><td>低</td><td>低</td><td>高</td><td>中-</td><td>低</td><td>一回合行动两次</td></tr>",
-      "<tr><td>斗士</td><td>中</td><td>低</td><td>中-</td><td>中</td><td>中</td><td>中</td><td>当血&lt;50%时，攻防速+50%（下取个位）</td></tr>",
+      "<tr><td>斗士</td><td>中</td><td>低</td><td>中-</td><td>中</td><td>中</td><td>中</td><td>当血&lt;50%时，攻防速+50%，结果向下取 5 的倍数</td></tr>",
       "<tr><td>医师</td><td>低-</td><td>低</td><td>中-</td><td>中+</td><td>中</td><td>低</td><td>普攻造成法伤，攻击队友真伤且回血，1 嘲讽</td></tr>",
       "</tbody>",
       "</table>",
@@ -195,6 +195,7 @@ window.RPG_RULES = [
       "</tbody>",
       "</table>",
       "</div>",
+      "<p>面板数值（攻、防、法抗、血上限、速）的最终值向下取 5 的倍数，包含职业加成与各种乘算；蓝上限只取整到个位。</p>",
       "</section>",
 
       '<section class="rule-section">',

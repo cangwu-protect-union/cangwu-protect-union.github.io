@@ -212,6 +212,8 @@
       unit: spec ? spec.unit : "standard",
       unstoppable: !!op.unstoppable,
       label: op.label || ctx.label || "",
+      desc: op.desc || "",
+      gate: op.gate || null,
       ops: op.ops || [],
       sourceUid: ctx.sourceUid,
       targetUid: target.uid,
@@ -231,8 +233,7 @@
     });
   }
 
-  function runDice(state, ctx, op, events) {
-    var sides = op.sides || B.rules.CONFIG.diceSides;
+  function runDice(state, ctx, op, events) {    var sides = op.sides || B.rules.CONFIG.diceSides;
     var roll = B.rng.dice(state, sides);
     pushEvent(state, events, { type: "dice", uid: ctx.sourceUid, sides: sides, value: roll, skillId: ctx.skillId || "" });
     var cases = op.cases || [];
@@ -249,6 +250,39 @@
     }
     if (op.else) runOps(state, ctx, op.else, events);
     return roll;
+  }
+
+  /* 行动前掷骰：身上挂着带 gate 的持续效果时，掷出 cancel 里的点数就跳过这次行动。
+     被跳过的行动仍然消耗（不补），由 actions.execute 直接返回。 */
+  function actionGate(state, unit, events) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      var effect = list[i];
+      var gate = effect.gate;
+      if (!gate) continue;
+      var sides = gate.sides || B.rules.CONFIG.diceSides;
+      var roll = B.rng.dice(state, sides);
+      pushEvent(state, events, {
+        type: "dice",
+        uid: unit.uid,
+        sides: sides,
+        value: roll,
+        label: effect.label || "",
+        skillId: effect.skillId || ""
+      });
+      var cancel = gate.cancel || [];
+      if (cancel.indexOf(roll) >= 0) {
+        pushEvent(state, events, {
+          type: "actionCanceled",
+          uid: unit.uid,
+          value: roll,
+          label: effect.label || "",
+          skillId: effect.skillId || ""
+        });
+        return false;
+      }
+    }
+    return true;
   }
 
   function runIf(state, ctx, op, events) {
@@ -714,6 +748,7 @@
 
   api.runOps = runOps;
   api.runOp = runOp;
+  api.actionGate = actionGate;
   api.valueOf = valueOf;
   api.statValue = statValue;
   api.roundStart = roundStart;

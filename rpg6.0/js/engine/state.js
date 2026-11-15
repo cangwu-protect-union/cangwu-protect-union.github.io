@@ -99,6 +99,8 @@
     if (unit.trait && unit.trait.lowHpBoost && (stat === "atk" || stat === "def" || stat === "spd")) {
       if (unit.hp * 2 < maxHpOf(unit)) value = Math.floor(value * 1.5);
     }
+    /* 面板数值统一向下取 5 的倍数；蓝上限例外，只向下取整到个位 */
+    value = stat === "maxMp" ? Math.floor(value) : B.rules.panelRound(value);
     var floor = B.rules.CONFIG.statFloor[stat];
     if (floor != null && stat !== "mres") value = Math.max(floor, value);
     return value;

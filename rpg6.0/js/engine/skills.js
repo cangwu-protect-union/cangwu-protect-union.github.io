@@ -142,6 +142,19 @@
     return { kind: "charge", skillId: skill.id, amount: unit.charge.amount };
   }
 
+  function pickChoice(skill, action) {
+    if (!skill.choices || !skill.choices.length) return { ops: skill.ops || [], key: "" };
+    var key = action && action.choice ? String(action.choice) : "";
+    /* 旧战报（6.0-engine.3 及更早）没有 choice 字段，按技能原来的整套 ops 回放 */
+    if (!key) return { ops: skill.ops || [], key: "" };
+    for (var i = 0; i < skill.choices.length; i++) {
+      if (skill.choices[i].key === key) {
+        return { ops: skill.choices[i].ops || [], key: key };
+      }
+    }
+    throw new Error("未知的伤害类型：" + key);
+  }
+
   function releaseSkill(state, unit, skill, action, events) {
     var targetUid = resolveTarget(state, unit, skill, action.target);
     var ctx = {
@@ -184,8 +197,11 @@
       target: targetUid
     });
 
-    B.effectOps.runOps(state, ctx, prepareOps(skill.ops, unit), events);
-    return { kind: "skill", skillId: skill.id, target: targetUid };
+    var choice = pickChoice(skill, action);
+    B.effectOps.runOps(state, ctx, prepareOps(choice.ops, unit), events);
+    var done = { kind: "skill", skillId: skill.id, target: targetUid };
+    if (choice.key) done.choice = choice.key;
+    return done;
   }
 
   function execute(state, unit, action, events) {

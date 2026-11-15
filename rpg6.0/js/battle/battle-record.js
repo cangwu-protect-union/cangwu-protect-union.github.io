@@ -48,7 +48,12 @@
     var current = created.state;
     var actions = record.actions || [];
     for (var i = 0; i < actions.length; i++) {
-      current = B.battle.apply(current, actions[i]).state;
+      try {
+        current = B.battle.apply(current, actions[i]).state;
+      } catch (err) {
+        /* 旧引擎战报在新规则下可能算不下去，保留能回放的前半段 */
+        break;
+      }
       list.push(current);
     }
     return list;

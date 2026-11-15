@@ -30,6 +30,10 @@
     noDeath: "不会死亡"
   };
 
+  function typeName(type) {
+    return type === "magic" ? "法伤" : type === "true" ? "真伤" : "普伤";
+  }
+
   function esc(text) {
     return String(text == null ? "" : text)
       .replace(/&/g, "&amp;")
@@ -92,8 +96,126 @@
     return html;
   }
 
-  function renderUnit(state, unit, active) {
-    var html = '<article class="battle-unit' + (active ? " is-active" : "") + (unit.hp <= 0 ? " is-dead" : "") + '" data-unit="' + unit.uid + '">';
+  /* ---------------- 战斗日志 ---------------- */
+
+  function unitName(state, uid) {
+    try {
+      return B.state.unitOf(state, uid).name;
+    } catch (err) {
+      return uid || "?";
+    }
+  }
+
+  /* 返回 { text, cls }；返回 null 的事件不进日志 */
+  function eventLine(state, e) {
+    var who = e.uid ? unitName(state, e.uid) : "";
+    var round = e.round == null ? "" : "第 " + e.round + " 回合 · ";
+    var line = null;
+    switch (e.type) {
+      case "roundStart":
+        line = { text: "— 第 " + e.round + " 标准回合 —", cls: "is-round" };
+        break;
+      case "action":
+        line = { text: round + who + " 施放「" + (e.name || e.skillId) + "」", cls: "is-action" };
+        break;
+      case "turnSkip":
+        line = { text: round + who + " 无法行动，跳过", cls: "is-cancel" };
+        break;
+      case "actionCanceled":
+        line = { text: round + who + " 的行动被跳过（" + (e.label || "持续效果") + " 掷出 " + e.value + "）", cls: "is-cancel" };
+        break;
+      case "dice":
+        line = { text: round + (e.label ? e.label + " 掷出 " : "掷出 ") + e.value + "（d" + e.sides + "）", cls: "is-dice" };
+        break;
+      case "damage":
+        line = { text: round + (e.label || "伤害") + " · " + who + " 受 " + e.amount + " " + typeName(e.damageType) +
+          (e.noBreak ? "（不计击溃值）" : ""), cls: "is-damage" };
+        break;
+      case "directLoss":
+        line = { text: round + (e.label || "强扣") + " · " + who + " 受 " + e.amount + " 强扣", cls: "is-damage" };
+        break;
+      case "reflect":
+        line = { text: round + "反弹 " + e.amount + " 回 " + unitName(state, e.against || who), cls: "is-damage" };
+        break;
+      case "heal":
+        if (e.amount > 0) line = { text: round + (e.label || "回复") + " · " + who + " +" + e.amount, cls: "is-heal" };
+        break;
+      case "mp":
+        line = { text: round + who + " 蓝 " + (e.delta > 0 ? "+" : "") + e.delta + "（" + e.mp + "）", cls: "is-mute" };
+        break;
+      case "mark":
+        line = { text: round + who + " " + (e.name || e.key) + " " + e.value + "/" + e.max, cls: "is-mute" };
+        break;
+      case "stat":
+        line = { text: round + who + " " + (STAT_LABEL[e.stat] || e.stat) +
+          (e.mode === "set" ? " 变为 " + e.value : " " + (e.value > 0 ? "+" : "") + e.value), cls: "is-mute" };
+        break;
+      case "statusAdd":
+        line = { text: round + who + " 获得「" + (e.label || e.kind) + "」" + e.remain + " 回合", cls: "is-status" };
+        break;
+      case "breakValue":
+        line = { text: round + who + " 击溃值 " + e.value, cls: "is-mute" };
+        break;
+      case "stunValue":
+        line = { text: round + who + " 眩晕值 " + e.value, cls: "is-mute" };
+        break;
+      case "effectAdd":
+        line = { text: round + who + " 挂上「" + (e.label || "持续效果") + "」" + e.remain + " 标准回合", cls: "is-status" };
+        break;
+      case "effectExpire":
+        line = { text: round + who + " 的「" + (e.label || "持续效果") + "」结束", cls: "is-mute" };
+        break;
+      case "buffAdd":
+        line = { text: round + who + " 附加「" + ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[e.kind] + " " + e.percent + "%」", cls: "is-status" };
+        break;
+      case "buffExpire":
+        line = { text: round + who + " 的「" + ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[e.kind] + "」结束", cls: "is-mute" };
+        break;
+      case "dispel":
+        if (e.removed && e.removed.length) line = { text: round + who + " 清除 " + e.removed.length + " 项", cls: "is-mute" };
+        break;
+      case "interrupt":
+        if (e.removed && e.removed.length) line = { text: round + who + " 被打断 " + e.removed.length + " 个持续效果", cls: "is-cancel" };
+        break;
+      case "chargeLost":
+        line = { text: round + who + " 蓄力被打断", cls: "is-cancel" };
+        break;
+      case "charg":
+        line = { text: round + who + " 蓄力 " + e.amount + "/" + (e.need || "?"), cls: "is-mute" };
+        break;
+      case "noDeath":
+        line = { text: round + who + " 强行留 1 血", cls: "is-cancel" };
+        break;
+      case "death":
+        line = { text: round + who + " 倒下", cls: "is-cancel" };
+        break;
+      default:
+        line = null;
+    }
+    return line;
+  }
+
+  function renderBattleLog(state, open) {
+    var list = state.log || [];
+    var start = Math.max(0, list.length - 160);
+    var html = '<details class="battle-log" data-log' + (open ? " open" : "") + ">" +
+      '<summary><span class="bl-title">战斗日志</span></summary><ol class="bl-items">';
+    var rows = 0;
+    for (var i = start; i < list.length; i++) {
+      var line = eventLine(state, list[i]);
+      if (!line) continue;
+      rows += 1;
+      html += '<li class="bl-row ' + line.cls + '">' + esc(line.text) + "</li>";
+    }
+    if (!rows) html += '<li class="bl-row is-empty">还没有事件</li>';
+    html += "</ol></details>";
+    return html;
+  }
+
+  function renderUnit(state, unit, active, logUid) {
+    var openLog = logUid === unit.uid;
+    var html = '<article class="battle-unit' + (active ? " is-active" : "") + (unit.hp <= 0 ? " is-dead" : "") +
+      (openLog ? " is-log-open" : "") + '" data-unit="' + unit.uid + '">';
     html += '<header class="bu-head"><span class="bu-name">' + esc(unit.name) +
       "<i>（" + esc(unit.job || "无主业") + (unit.subJob ? "/" + esc(unit.subJob) : "") + "）</i></span>";
     html += '<span class="bu-vitals">蓝 <b>' + unit.mp + "</b>/" + B.state.maxMpOf(unit) +
@@ -107,13 +229,21 @@
 
     var chips = "";
     unit.buffs.forEach(function (buff, i) {
-      chips += '<span class="chip" data-buff="' + unit.uid + ":" + i + '">' +
+      chips += '<span class="chip" data-detail="buff:' + unit.uid + ":" + i + '">' +
         esc(({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[buff.kind] || buff.kind) +
         " " + buff.percent + "%</span>";
+    });
+    (unit.effects || []).forEach(function (effect, i) {
+      var left = effect.remain === B.state.PERMANENT ? "永久" : effect.remain + " 回合";
+      chips += '<span class="chip is-effect" data-detail="effect:' + unit.uid + ":" + i + '">' +
+        esc(effect.label || "持续效果") + " " + left + "</span>";
     });
     unit.statuses.forEach(function (status) {
       chips += '<span class="chip is-status">' + esc(STATUS_TEXT[status.kind] || status.kind) + " " + status.remain + "</span>";
     });
+    if (unit.trait && unit.trait.lowHpBoost && unit.hp * 2 < B.state.maxHpOf(unit)) {
+      chips += '<span class="chip is-status" title="斗士：血量低于 50% 时攻防速 ×1.5，向下取 5 的倍数">低血加成 攻防速 ×1.5</span>';
+    }
     if (!chips) chips = '<span class="chip is-empty">无 Buff</span>';
     html += '<div class="bu-buffs">' + chips + "</div>";
 
@@ -133,7 +263,9 @@
       marks += '<span class="bu-mark">' + esc(mark.name) + " " + mark.value + "/" + mark.max + "</span>";
     });
     html += '<footer class="bu-status"><span>行动 ' + unit.actionsLeft + "</span><span>击溃值 " +
-      unit.breakValue + "</span><span>眩晕值 " + unit.stunValue + "</span>" + charge + marks + "</footer>";
+      unit.breakValue + "</span><span>眩晕值 " + unit.stunValue + "</span>" + charge + marks +
+      '<button type="button" class="bu-log-toggle">' + (openLog ? "▾伤害记录" : "▸伤害记录") + "</button>" +
+      "</footer>";
     html += "</article>";
     return html;
   }
@@ -163,13 +295,15 @@
       var reason = !active
         ? "现在不是这个角色的回合"
         : (!skill ? "本版未编码这个技能" : (skill.unsupported || (check && check.reason) || ""));
-      var picked = pick && pick.mode === "skill" && pick.id === (skill && skill.id);
+      var picked = pick && (pick.mode === "skill" || pick.mode === "choice") && pick.id === (skill && skill.id);
       html += '<li class="bq-skill' + (disabled ? " is-disabled" : "") + (picked ? " is-picked" : "") + '"' +
         (skill ? ' data-skill="' + esc(skill.id) + '"' : "") +
         ' title="' + esc(reason) + '">' +
         '<span class="bq-skill-name">' + (i + 1) + "." + esc(row.name) + "</span>" +
         '<span class="bq-skill-cond">（' + esc(row.condition) + "）</span>" +
-        '<span class="bq-skill-effect">' + esc(row.effect) + "</span></li>";
+        '<span class="bq-skill-effect">' + esc(row.effect) + "</span>" +
+        '<button type="button" class="bq-skill-toggle">效果</button>' +
+        "</li>";
     }
     if (!sheet.length) html += '<li class="bq-skill is-disabled">这个角色没有技能档案</li>';
     html += "</ul>";
@@ -182,7 +316,20 @@
       html += '<button type="button" class="btn btn-ghost bq-btn' + (pickedBasic ? " is-picked" : "") +
         '" data-basic="' + kind + '"' + (active ? "" : " disabled") + ">" + actions[a][1] + "</button>";
     }
-    html += "</div></div>";
+    html += "</div>";
+
+    if (active && pick && pick.mode === "choice") {
+      var choiceSkill = B.skills.find(pick.id);
+      if (choiceSkill && choiceSkill.owner === unit.name && choiceSkill.choices) {
+        html += '<div class="bq-choice"><span class="bq-choice-label">选择这次造成的伤害</span>';
+        choiceSkill.choices.forEach(function (item) {
+          html += '<button type="button" class="btn btn-ghost bq-btn" data-choice="' + esc(item.key) + '">' +
+            esc(item.label || item.key) + "</button>";
+        });
+        html += "</div>";
+      }
+    }
+    html += "</div>";
     return html;
   }
 
@@ -196,10 +343,12 @@
 
   function renderBuffBox(detail) {
     if (!detail) {
-      return '<p class="bb-empty">把鼠标放到 Buff 图标上查看详情</p>';
+      return '<p class="bb-empty">把鼠标放到 Buff 或持续效果上查看详情</p>';
     }
+    var left = detail.remain === B.state.PERMANENT ? "永久" : detail.remain + " 标准回合";
+    var kindText = detail.kind === "effect" ? "持续效果" : "Buff";
     return '<div class="bb-detail"><h2>' + esc(detail.name) + "</h2>" +
-      '<p class="bb-meta">剩余 ' + detail.remain + " 标准回合</p>" +
+      '<p class="bb-meta"><b class="bb-kind">' + kindText + "</b> · 剩余 " + left + "</p>" +
       '<p class="bb-text">' + esc(detail.text) + "</p></div>";
   }
 
@@ -215,14 +364,19 @@
 
   function render(state, meta, pick, hint, options) {
     var readOnly = !!(options && options.readOnly);
+    var speedOpen = !!(options && options.speedOpen);
+    var logUid = (options && options.logUid) || "";
     var rows = buildForecast(state, 21);
     var parts = [];
-    parts.push('<div class="battle-speed" data-speed><h2 class="bs-title">速度条预期</h2>' + renderSpeed(state, rows) + "</div>");
-    parts.push(renderUnit(state, state.units[0], state.turnUid === state.units[0].uid));
-    parts.push(renderUnit(state, state.units[1], state.turnUid === state.units[1].uid));
+    parts.push('<details class="battle-speed" data-speed' + (speedOpen ? " open" : "") + ">" +
+      '<summary><span class="bs-title">速度条预期</span></summary>' +
+      '<div class="bs-body">' + renderSpeed(state, rows) + "</div></details>");
+    parts.push(renderUnit(state, state.units[0], state.turnUid === state.units[0].uid, logUid));
+    parts.push(renderUnit(state, state.units[1], state.turnUid === state.units[1].uid, logUid));
     parts.push('<aside class="battle-buff" data-buffbox>' + renderBuffBox(null) + "</aside>");
     parts.push(renderQuery(state, state.units[0], meta, pick, readOnly));
     parts.push(renderQuery(state, state.units[1], meta, pick, readOnly));
+    parts.push(renderBattleLog(state, !!(options && options.battleLogOpen)));
     return parts.join("");
   }
 
@@ -251,15 +405,63 @@
     return out;
   }
 
-  function buffDetail(state, key) {
-    if (!key) return null;
-    var parts = key.split(":");
-    var unit = B.state.unitOf(state, parts[0]);
-    var buff = unit.buffs[Number(parts[1])];
+  function valueText(value) {
+    return typeof value === "number" ? value : "按公式";
+  }
+
+  /* 持续效果的说明：优先用技能里写的 desc，没有就按 ops 拼一句 */
+  function effectText(effect) {
+    if (effect.desc) return effect.desc;
+    var parts = [];
+    (effect.ops || []).forEach(function (op) {
+      if (op.op === "damage") {
+        parts.push("每标准回合 " + valueText(op.value) + " 点" + typeName(op.type));
+      } else if (op.op === "heal") {
+        parts.push("每标准回合回复 " + valueText(op.value));
+      } else if (op.op === "mp") {
+        parts.push("每标准回合蓝 " + (op.delta > 0 ? "+" : "") + op.delta);
+      } else if (op.op === "stat") {
+        parts.push((STAT_LABEL[op.stat] || op.stat) + " " + (op.mode === "set" ? "变为 " : op.value > 0 ? "+" : "") + valueText(op.value));
+      } else if (op.op === "dice" || op.op === "if" || op.op === "use") {
+        parts.push("每标准回合结算一次");
+      }
+    });
+    if (effect.gate && effect.gate.cancel) {
+      parts.push("持有者每次行动前掷 d" + (effect.gate.sides || 6) + "，掷出 " +
+        effect.gate.cancel.join("/") + " 跳过该次行动");
+    }
+    return parts.length ? parts.join("；") : "每标准回合结算一次";
+  }
+
+  /* spec 形如 "buff:a:0" / "effect:b:1" */
+  function chipDetail(state, spec) {
+    if (!spec) return null;
+    var parts = String(spec).split(":");
+    var kind = parts[0];
+    var uid = parts[1];
+    var index = Number(parts[2]);
+    var unit;
+    try {
+      unit = B.state.unitOf(state, uid);
+    } catch (err) {
+      return null;
+    }
+    if (kind === "effect") {
+      var effect = (unit.effects || [])[index];
+      if (!effect) return null;
+      return {
+        kind: "effect",
+        name: effect.label || "持续效果",
+        remain: effect.remain,
+        text: effectText(effect)
+      };
+    }
+    var buff = unit.buffs[index];
     if (!buff) return null;
-    var name = ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[buff.kind] || buff.kind;
+    var buffName = ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[buff.kind] || buff.kind;
     return {
-      name: name + " " + buff.percent + "%",
+      kind: "buff",
+      name: buffName + " " + buff.percent + "%",
       remain: buff.remain,
       text: (BUFF_TEXT[buff.kind] || "") + buff.percent + "%"
     };
@@ -269,7 +471,7 @@
     render: render,
     renderBar: renderBar,
     renderBuffBox: renderBuffBox,
-    buffDetail: buffDetail,
+    chipDetail: chipDetail,
     buildForecast: buildForecast,
     STAT_LABEL: STAT_LABEL
   };

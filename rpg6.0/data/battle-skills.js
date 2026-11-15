@@ -427,15 +427,10 @@ window.RPG6_SKILLS = {
             op: "tick",
             duration: { unit: "standard", count: 6 },
             label: "高猿长啸",
+            desc: "每标准回合 30 真伤（计击溃值）；对方每次行动前掷骰，掷出 2-5 跳过这次行动",
+            gate: { sides: 6, cancel: [2, 3, 4, 5] },
             ops: [
-              {
-                op: "dice",
-                sides: 6,
-                cases: [
-                  { in: [1], ops: [{ op: "damage", type: "true", value: 30, noBreak: true }] },
-                  { in: [6], ops: [{ op: "damage", type: "true", value: 30, noBreak: true }] }
-                ]
-              }
+              { op: "damage", type: "true", value: 30 }
             ]
           }
         ]
@@ -448,6 +443,25 @@ window.RPG6_SKILLS = {
         charge: 0,
         cooldown: 0,
         target: "enemy",
+        /* 释放时三选一：210 普伤 / 160 法伤 / 120 真伤，回复造成的伤害，无击溃值 */
+        choices: [
+          {
+            key: "phys",
+            label: "210 普伤",
+            ops: [{ op: "damage", type: "phys", value: 210, noBreak: true, healBack: true }]
+          },
+          {
+            key: "magic",
+            label: "160 法伤",
+            ops: [{ op: "damage", type: "magic", value: 160, noBreak: true, healBack: true }]
+          },
+          {
+            key: "true",
+            label: "120 真伤",
+            ops: [{ op: "damage", type: "true", value: 120, noBreak: true, healBack: true }]
+          }
+        ],
+        /* 旧口径：6.0-engine.3 及更早的战报没有 choice 字段，按三段依次结算回放 */
         ops: [
           { op: "damage", type: "phys", value: 210, noBreak: true, healBack: true },
           { op: "damage", type: "magic", value: 160, noBreak: true, healBack: true },

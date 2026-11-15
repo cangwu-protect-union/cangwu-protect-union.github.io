@@ -27,6 +27,10 @@
   var saveTried = false;
   var recordId = "";
   var saveError = "";
+  var speedOpen = null;
+  var openSkills = {};
+  var logUid = "";
+  var battleLogOpen = null;
 
   function $(sel, ctx) {
     return (ctx || document).querySelector(sel);
@@ -197,6 +201,7 @@
     recordId = "";
     saveError = "";
     mode = "play";
+    logUid = "";
     root.BattlePick.cancel(pick);
 
     var created = B.battle.create({ seed: useSeed, a: a, b: b });
@@ -222,16 +227,62 @@
     dom.setup.hidden = true;
     dom.stage.hidden = false;
     dom.result.hidden = true;
+    setImmersive(true);
     render();
   }
 
   /* ---------------- 渲染 ---------------- */
 
+  function isCompact() {
+    return !!(root.matchMedia && root.matchMedia("(orientation: landscape) and (max-height: 520px)").matches);
+  }
+
+  function setImmersive(on) {
+    var el = root.document.documentElement;
+    if (!el || !el.classList) return;
+    if (on) el.classList.add("is-battle");
+    else el.classList.remove("is-battle");
+  }
+
+  function restoreOpenSkills() {
+    Object.keys(openSkills).forEach(function (id) {
+      if (!openSkills[id]) return;
+      var li = dom.grid.querySelector('.bq-skill[data-skill="' + id + '"]');
+      if (!li) return;
+      li.classList.add("is-open");
+      var btn = li.querySelector(".bq-skill-toggle");
+      if (btn) btn.textContent = "收起";
+    });
+  }
+
+  /* 伤害记录浮层：从状态行下方展开，盖住下面的操作栏；高度按视口剩余量算 */
+  function applyLogPanel() {
+    if (!logUid) return;
+    var card = dom.grid.querySelector('.battle-unit[data-unit="' + logUid + '"]');
+    if (!card) return;
+    var panel = card.querySelector(".bu-log");
+    if (!panel) return;
+    var limit = dom.bar ? dom.bar.getBoundingClientRect().top : root.innerHeight;
+    if (!limit) limit = root.innerHeight;
+    var avail = Math.max(96, limit - card.getBoundingClientRect().bottom - 8);
+    panel.style.maxHeight = avail + "px";
+  }
+
   function render() {
     if (!state) return;
-    dom.grid.innerHTML = root.BattleView.render(state, meta, pick, hint, { readOnly: mode !== "play" });
+    var compact = isCompact();
+    dom.grid.innerHTML = root.BattleView.render(state, meta, pick, hint, {
+      readOnly: mode !== "play",
+      speedOpen: speedOpen === null ? !compact : speedOpen,
+      battleLogOpen: battleLogOpen === null ? !compact : battleLogOpen,
+      logUid: logUid
+    });
     dom.grid.classList.toggle("is-picking", root.BattlePick.isActive(pick));
     dom.grid.classList.toggle("is-replay", mode !== "play");
+    restoreOpenSkills();
+    applyLogPanel();
+    var logBox = dom.grid.querySelector("[data-log]");
+    if (logBox) logBox.scrollTop = logBox.scrollHeight;
     if (dom.turnEl) dom.turnEl.textContent = turnText();
     if (dom.hintEl) dom.hintEl.textContent = hint;
     if (dom.replayBox) {
@@ -361,7 +412,8 @@
     var parts = [];
     for (var i = 0; i < events.length && parts.length < 4; i++) {
       var e = events[i];
-      if (e.type === "dice") parts.push("掷出 " + e.value);
+      if (e.type === "dice") parts.push((e.label ? e.label + " 掷出 " : "掷出 ") + e.value);
+      else if (e.type === "actionCanceled") parts.push(B.state.unitOf(state, e.uid).name + " 行动被跳过");
       else if (e.type === "damage") parts.push("造成 " + e.amount + " 点" + typeName(e.damageType));
       else if (e.type === "directLoss") parts.push("强扣 " + e.amount);
       else if (e.type === "heal") parts.push("回复 " + e.amount);
@@ -438,6 +490,12 @@
       setHint("这个技能没有合法目标");
       return;
     }
+    if (targets.length === 1 && skill.choices && skill.choices.length) {
+      root.BattlePick.begin(pick, { mode: "choice", id: skill.id, targets: [targets[0]] });
+      setHint("选择「" + skill.name + "」这次造成的伤害类型");
+      render();
+      return;
+    }
     if (targets.length === 1) {
       applyAction({ kind: "skill", skillId: skill.id, target: targets[0] });
       return;
@@ -479,12 +537,42 @@
     if (!state) return;
     var box = $("[data-buffbox]", dom.grid);
     if (!box) return;
-    box.innerHTML = root.BattleView.renderBuffBox(root.BattleView.buffDetail(state, key));
+    box.innerHTML = root.BattleView.renderBuffBox(root.BattleView.chipDetail(state, key));
   }
 
   function onBuffLeave() {
     var box = $("[data-buffbox]", dom.grid);
     if (box) box.innerHTML = root.BattleView.renderBuffBox(null);
+  }
+
+  /* 手机没有 hover，点一下 chip 在它旁边弹气泡 */
+  var popShownAt = 0;
+
+  function showBuffPop(chip) {
+    if (!state || !dom.buffPop) return;
+    var detail = root.BattleView.chipDetail(state, chip.getAttribute("data-detail"));
+    if (!detail) return;
+    dom.buffPop.innerHTML = root.BattleView.renderBuffBox(detail);
+    dom.buffPop.hidden = false;
+    popShownAt = Date.now();
+    var rect = chip.getBoundingClientRect();
+    var w = dom.buffPop.offsetWidth;
+    var h = dom.buffPop.offsetHeight;
+    var left = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), root.innerWidth - w - 8);
+    var top = rect.bottom + 6;
+    if (top + h > root.innerHeight - 8) top = Math.max(8, rect.top - h - 6);
+    dom.buffPop.style.left = left + "px";
+    dom.buffPop.style.top = top + "px";
+  }
+
+  function hideBuffPop() {
+    if (dom.buffPop) dom.buffPop.hidden = true;
+  }
+
+  function onScrollHidePop() {
+    /* 点击时浏览器会先把目标滚进视野，那次滚动不该关掉刚弹出的气泡 */
+    if (Date.now() - popShownAt < 300) return;
+    hideBuffPop();
   }
 
   function undo() {
@@ -513,6 +601,9 @@
     dom.stage.hidden = true;
     dom.result.hidden = true;
     dom.setup.hidden = false;
+    hideBuffPop();
+    logUid = "";
+    setImmersive(false);
     document.title = BASE_TITLE;
     offerResume();
   }
@@ -540,6 +631,7 @@
     dom.setup.hidden = true;
     dom.stage.hidden = false;
     dom.result.hidden = true;
+    setImmersive(true);
     dom.grid.innerHTML = '<p class="setup-note">正在读取战报…</p>';
 
     if (!window.RpgData || typeof window.RpgData.getBattle !== "function") {
@@ -564,6 +656,9 @@
         hint = "回放：" + record.name_a + " vs " + record.name_b +
           " · 共 " + record.steps + " 步" +
           (oldEngine ? " · 由旧引擎（" + record.engine_version + "）生成，结果可能与现在不同" : "") +
+          (oldEngine && replayStates.length - 1 < record.steps
+            ? " · 新规则下只能回放到第 " + (replayStates.length - 1) + " 步"
+            : "") +
           (!oldEngine && !hashMatched ? " · 与当前角色数据不一致" : "");
         render();
       });
@@ -582,6 +677,60 @@
     render();
   }
 
+  /* ---------------- 横屏入口 ----------------
+     能全屏并锁方向就锁；不能（iOS 网页）就留在遮罩上，等人手动横过来。
+     遮罩的显示完全由 CSS 的竖屏媒体查询控制，转成横屏自动消失。 */
+
+  function setGateNote(text) {
+    if (dom.gateNote) dom.gateNote.textContent = text;
+  }
+
+  function requestFullscreen() {
+    var el = root.document.documentElement;
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen || null;
+    if (!fn) return Promise.resolve(false);
+    try {
+      return Promise.resolve(fn.call(el)).then(function () {
+        return true;
+      }).catch(function () {
+        return false;
+      });
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function lockLandscape() {
+    var so = root.screen && root.screen.orientation;
+    if (!so || typeof so.lock !== "function") return Promise.resolve(false);
+    try {
+      return Promise.resolve(so.lock("landscape")).then(function () {
+        return true;
+      }).catch(function () {
+        return false;
+      });
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function onGateGo() {
+    if (dom.gateGo) dom.gateGo.disabled = true;
+    setGateNote("正在尝试锁定横屏…");
+    requestFullscreen().then(function () {
+      return lockLandscape();
+    }).then(function (locked) {
+      if (dom.gateGo) dom.gateGo.disabled = false;
+      setGateNote(locked
+        ? "已锁定横屏。"
+        : "这个浏览器不能自动转屏，请手动把手机横过来。");
+    });
+  }
+
+  function bindGate() {
+    if (dom.gateGo) dom.gateGo.addEventListener("click", onGateGo);
+  }
+
   /* ---------------- 事件 ---------------- */
 
   function bind() {
@@ -593,12 +742,50 @@
         onBasic(basic.getAttribute("data-basic"));
         return;
       }
+      var toggle = event.target.closest(".bq-skill-toggle");
+      if (toggle) {
+        event.preventDefault();
+        var row = toggle.closest(".bq-skill");
+        if (row) {
+          var opened = row.classList.toggle("is-open");
+          toggle.textContent = opened ? "收起" : "效果";
+          openSkills[row.getAttribute("data-skill") || ""] = opened;
+        }
+        return;
+      }
+      var chip = event.target.closest("[data-detail]");
+      if (chip) {
+        event.preventDefault();
+        showBuffPop(chip);
+        return;
+      }
+      var logBtn = event.target.closest(".bu-log-toggle");
+      if (logBtn) {
+        event.preventDefault();
+        var card = logBtn.closest("[data-unit]");
+        var uid = card ? card.getAttribute("data-unit") : "";
+        logUid = logUid === uid ? "" : uid;
+        render();
+        return;
+      }
       var skill = event.target.closest("[data-skill]");
       if (skill) {
         event.preventDefault();
         var panel = skill.closest(".battle-query");
         if (panel && !panel.classList.contains("is-active")) return;
         onSkill(skill.getAttribute("data-skill"));
+        return;
+      }
+      var choice = event.target.closest("[data-choice]");
+      if (choice) {
+        event.preventDefault();
+        var choiceTarget = (pick.targets && pick.targets[0]) || "";
+        applyAction({
+          kind: "skill",
+          skillId: pick.id,
+          target: choiceTarget,
+          choice: choice.getAttribute("data-choice")
+        });
         return;
       }
       var unit = event.target.closest("[data-unit]");
@@ -614,13 +801,35 @@
       }
     });
 
+    dom.stage.addEventListener("toggle", function (event) {
+      if (!event.target.closest) return;
+      var speed = event.target.closest("[data-speed]");
+      if (speed) speedOpen = speed.open;
+      var battleLog = event.target.closest("[data-log]");
+      if (battleLog) battleLogOpen = battleLog.open;
+    }, true);
+
     dom.stage.addEventListener("mouseover", function (event) {
-      var chip = event.target.closest("[data-buff]");
-      if (chip) onBuffEnter(chip.getAttribute("data-buff"));
+      var chip = event.target.closest("[data-detail]");
+      if (chip) onBuffEnter(chip.getAttribute("data-detail"));
     });
     dom.stage.addEventListener("mouseout", function (event) {
-      if (event.target.closest("[data-buff]")) onBuffLeave();
+      if (event.target.closest("[data-detail]")) onBuffLeave();
     });
+
+    document.addEventListener("click", function (event) {
+      if (!dom.buffPop || dom.buffPop.hidden) return;
+      if (event.target.closest("[data-detail]") || event.target.closest("[data-buffpop]")) return;
+      hideBuffPop();
+    });
+    root.addEventListener("scroll", onScrollHidePop, true);
+
+    if (root.matchMedia) {
+      var compactMq = root.matchMedia("(orientation: landscape) and (max-height: 520px)");
+      var onViewport = function () { if (state) render(); };
+      if (compactMq.addEventListener) compactMq.addEventListener("change", onViewport);
+      else if (compactMq.addListener) compactMq.addListener(onViewport);
+    }
 
     document.addEventListener("keydown", function (event) {
       if (event.key !== "Escape") return;
@@ -688,6 +897,12 @@
     dom.stepInfo = $("[data-step-info]");
     dom.takeover = $("[data-takeover]");
     dom.resume = $("[data-resume]");
+    dom.gate = $("[data-gate]");
+    dom.gateGo = $("[data-gate-go]");
+    dom.gateNote = $("[data-gate-note]");
+    dom.buffPop = $("[data-buffpop]");
+
+    bindGate();
 
     if (!B || !B.battle || !B.skills || !window.RPG6_SKILLS) {
       dom.source.textContent = "引擎或技能库没有加载成功，对局功能不可用。";
