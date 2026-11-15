@@ -1,0 +1,127 @@
+{
+  "batch": "示例：赵云哲（真实候选，未写入游戏；只演示 plan 格式与脚手架）",
+  "allowExisting": false,
+  "engine": {
+    "version": "6.0-engine.6",
+    "changes": []
+  },
+  "docs": {
+    "expectedCharacters": 20,
+    "expectedSkills": 71
+  },
+  "characters": [
+    {
+      "name": "赵云哲",
+      "fixture": "zhaoyunzhe",
+      "fixtureId": "t-zyz",
+      "gender": "男",
+      "occupation": "粉碎者",
+      "sideJob": "射手",
+      "stats": { "atk": "60", "def": "15", "mres": "20", "hp": "425", "mp": "10", "spd": "95" },
+      "skills": [
+        {
+          "name": "剑光如我，斩尽牛杂！",
+          "condition": "9蓝",
+          "id": "zhaoyunzhe.jianguang",
+          "target": "enemy",
+          "cost": { "mp": 9 },
+          "charge": 0,
+          "cooldown": 0,
+          "passive": false,
+          "ops": [
+            { "op": "damage", "type": "magic", "value": 10, "times": 10, "noBreak": true }
+          ],
+          "status": "implemented",
+          "unsupported": "",
+          "tests": ["9 蓝以下不可释放", "10 段各算眩晕值、不加击溃值"],
+          "notes": "原文 10×10 法伤，算眩晕值；每段独立 round5。"
+        },
+        {
+          "name": "彻底疯狂",
+          "condition": "2蓄力",
+          "id": "zhaoyunzhe.chedi",
+          "target": "self",
+          "cost": { "mp": 0 },
+          "charge": 2,
+          "cooldown": 0,
+          "passive": false,
+          "ops": [
+            { "op": "status", "kind": "chedi", "who": "self", "rounds": 12, "label": "彻底疯狂" }
+          ],
+          "hooks": {
+            "damageDealt": [
+              {
+                "op": "if",
+                "cond": { "status": "chedi" },
+                "then": [
+                  { "op": "mark", "who": "self", "key": "hit4", "delta": 1 },
+                  {
+                    "op": "if",
+                    "cond": { "left": { "mark": "hit4" }, "op": "ge", "right": 4 },
+                    "then": [
+                      { "op": "mark", "who": "self", "key": "hit4", "delta": -4 },
+                      { "op": "damage", "who": "allEnemies", "type": "true", "value": 65 },
+                      { "op": "status", "kind": "stun", "who": "allEnemies", "rounds": 1, "label": "彻底疯狂" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "implemented",
+          "unsupported": "",
+          "tests": ["2 次伤害不触发、4 次触发 65 群真伤并眩晕", "12 标准回合后失效"],
+          "notes": "每次造成伤害计数，满 4 清空并触发；眩晕 1 标准回合。"
+        },
+        {
+          "name": "嬉皮笑脸",
+          "condition": "4回合冷却",
+          "id": "zhaoyunzhe.xipi",
+          "target": "enemy",
+          "cost": { "mp": 0 },
+          "charge": 0,
+          "cooldown": 4,
+          "passive": false,
+          "ops": [
+            { "op": "damage", "type": "true", "value": 65 },
+            { "op": "status", "kind": "xipi", "who": "self", "rounds": 2, "label": "嬉皮笑脸" }
+          ],
+          "hooks": {
+            "basicHit": [
+              {
+                "op": "if",
+                "cond": { "status": "xipi" },
+                "then": [{ "op": "damage", "type": "true", "value": 15 }]
+              }
+            ]
+          },
+          "status": "implemented",
+          "unsupported": "",
+          "tests": ["65 真伤", "之后 2 标准回合普攻追加 15 直伤（有击溃值）"],
+          "notes": "追加伤害走 basicHit，默认目标为普攻目标。"
+        },
+        {
+          "name": "高冷如冰",
+          "condition": "被动",
+          "id": "zhaoyunzhe.gaoleng",
+          "target": "self",
+          "cost": { "mp": 0 },
+          "charge": 0,
+          "cooldown": 0,
+          "passive": true,
+          "ops": [],
+          "status": "unsupported",
+          "unsupported": "需要法伤专属易伤与卅力清空机制；现有 buff 只有全类型脆弱，没有「下次法伤×2」",
+          "tests": [],
+          "notes": "普攻不造成击溃值 + 掷 6 妖力 + 5 层法伤×2；本版只保留说明。"
+        }
+      ]
+    }
+  ],
+  "marks": {
+    "赵云哲": [
+      { "key": "hit4", "name": "伤害次数", "max": 4, "init": 0 }
+    ]
+  },
+  "summons": {}
+}

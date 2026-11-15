@@ -38,6 +38,7 @@
 | 跑或写端到端测试（`_local/tests`） | `site-e2e-tests` |
 | 改样式或调整视觉 | `guitu-design` |
 | 改 rpg6.0 战斗引擎、技能库、召唤物或对局页 | `rpg6-battle` |
+| 批量加角色/技能、评估剩余角色、做角色批次方案 | `rpg6-character-batch` |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |
 
@@ -70,7 +71,7 @@ node _local/tests/engine/batch.mjs --pairs=smoke --seeds=1
 node _local/tests/run-all.mjs --group=回合制
 ```
 
-改规则要升 `data/config.js` 的 `engineVersion`；同步 `test.html` 提示、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`_local/docs` 的角色机制文档（`_local` 不推送）。召唤物/新钩子要进状态指纹与回放。
+改规则要升 `data/config.js` 的 `engineVersion`；同步 `test.html` 提示、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`_local/docs` 的角色机制文档（`_local` 不推送）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`，用它的盘点/分诊/plan/验收流程；本节命令是它的验收子集。
 
 ## 文档与配图
 

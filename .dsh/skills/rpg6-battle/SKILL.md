@@ -11,6 +11,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 改伤害、取整、速度条、击溃、Buff、标记这类规则
 - 对局页（`rpg6.0/test.html`）或战报（`battles.html`）出问题
 - 要跑引擎单测 / 批量压测，或怀疑数值对不上
+- 要**批量**加一批角色（选人、逐条确认逻辑、可行性分诊、plan、验收）时，先加载 `rpg6-character-batch`；本 skill 负责 DSL 与引擎细节
 
 ## 代码地图
 
@@ -37,6 +38,8 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 19 人 / 67 条技能，引擎 `6.0-engine.6`；`test.html` 用 22 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。
 
 ## 加一个能上场的角色
+
+单个角色可按本节手写；批量/多角色用 `rpg6-character-batch` 的 `plan.mjs`/`--scaffold`/`verify.ps1`，避免漏技能、漏 unsupported 原因和计数漂移。
 
 1. 档案里已经有这个角色（`rpg6.0` 的角色表或 `data/characters.js` 兜底），`skills[]` 有名称与条件文本。
 2. 在 `data/battle-skills.js` 的 `characters` 下加一个角色块，每条技能：

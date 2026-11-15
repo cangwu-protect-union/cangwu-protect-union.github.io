@@ -1,0 +1,372 @@
+import fs from "node:fs";
+import path from "node:path";
+import {
+  argValue,
+  findRoot,
+  flattenLibrary,
+  hasFlag,
+  loadLibrary,
+  loadSeed,
+  norm,
+  seedStats
+} from "./lib.mjs";
+
+const argv = process.argv.slice(2);
+const root = findRoot(argv);
+const checkFile = argValue(argv, "--check");
+const scaffoldFile = argValue(argv, "--scaffold");
+const file = checkFile || scaffoldFile;
+if (!file) {
+  console.error("用法：node plan.mjs --check plan.json | --scaffold plan.json [--out 文件] [--root 仓库]");
+  process.exit(2);
+}
+
+const plan = JSON.parse(fs.readFileSync(path.resolve(file), "utf8"));
+const seed = loadSeed(root);
+const lib = loadLibrary(root);
+const { all: libSkills, byId: libById } = flattenLibrary(lib);
+const seedByName = new Map(seed.map((c) => [c.name, c]));
+const errors = [];
+const warnings = [];
+const engineVersion = readEngineVersion(root);
+const opNames = readOpNames(root);
+const hookNames = new Set([
+  "battleStart", "basicGate", "basicMod", "basicMode", "basicHit",
+  "beforeDamage", "damageDealt", "damageTaken", "statDrained", "afterAction"
+]);
+
+if (!plan || typeof plan !== "object") fail("plan 不是对象");
+if (!Array.isArray(plan.characters)) fail("plan.characters 必须是数组");
+const allowExisting = !!plan.allowExisting;
+
+let projectedSkills = libSkills.length;
+let projectedUnsupported = libSkills.filter((s) => s.unsupported).length;
+const newCharacters = [];
+const seenIds = new Set();
+
+for (const [index, character] of (plan.characters || []).entries()) {
+  const where = "characters[" + index + "]";
+  if (!character || !character.name) {
+    fail(where + " 缺少 name");
+    continue;
+  }
+  const seedChar = seedByName.get(character.name);
+  if (!seedChar) {
+    fail(where + " 的角色不在 seed 的 33 人里：" + character.name);
+    continue;
+  }
+  const inLibrary = Object.hasOwn(lib.characters || {}, character.name);
+  if (inLibrary && !allowExisting) fail(character.name + " 已在技能库里；更新已有角色要显式 allowExisting:true");
+  if (!inLibrary) newCharacters.push(character.name);
+
+  const stats = character.stats || {};
+  for (const [key, value] of Object.entries(seedStats(seedChar))) {
+    if (String(stats[key]) !== String(value)) {
+      fail(character.name + " 的 stats." + key + " 与 seed 不一致：" + stats[key] + " != " + value);
+    }
+  }
+  if (character.gender !== seedChar.gender) fail(character.name + " 的 gender 与 seed 不一致");
+  if (character.occupation !== seedChar.occupation) fail(character.name + " 的 occupation 与 seed 不一致");
+  if ((character.sideJob || "") !== (seedChar.side_job || "")) {
+    fail(character.name + " 的 sideJob 与 seed 不一致");
+  }
+
+  if (!Array.isArray(character.skills)) {
+    fail(character.name + " 缺少 skills 数组");
+    continue;
+  }
+  const planByName = new Map();
+  for (const skill of character.skills) {
+    if (!skill || !skill.name) {
+      fail(character.name + " 有技能缺少 name");
+      continue;
+    }
+    if (planByName.has(norm(skill.name))) fail(character.name + " 技能重名：" + skill.name);
+    planByName.set(norm(skill.name), skill);
+  }
+
+  const seedSkills = Array.isArray(seedChar.skills) ? seedChar.skills : [];
+  for (const source of seedSkills) {
+    if (!planByName.has(norm(source.name))) {
+      fail(character.name + " 漏了档案技能：" + source.name + "（不做的也要写 status/unsupported）");
+    }
+  }
+  for (const skill of character.skills) {
+    if (!seedSkills.some((s) => norm(s.name) === norm(skill.name))) {
+      fail(character.name + " 的 plan 技能不在档案里：" + skill.name);
+      continue;
+    }
+    const source = seedSkills.find((s) => norm(s.name) === norm(skill.name));
+    if (norm(skill.condition) !== norm(source.condition)) {
+      fail(character.name + " · " + skill.name + " 的 condition 与档案不一致");
+    }
+    validateSkill(character.name, skill, source);
+  }
+}
+
+projectedSkills += (plan.characters || []).reduce(
+  (n, c) => n + (c.skills || []).length,
+  0
+);
+
+for (const [owner, marks] of Object.entries(plan.marks || {})) {
+  if (!Array.isArray(marks)) {
+    fail("marks." + owner + " 必须是数组");
+    continue;
+  }
+  for (const mark of marks) {
+    if (!mark || !mark.key) fail("marks." + owner + " 有标记缺少 key");
+    if (mark.max != null && !(Number(mark.max) >= 0)) fail("marks." + owner + " · " + mark.key + " max 非法");
+    if (mark.init != null && !(Number(mark.init) >= 0)) fail("marks." + owner + " · " + mark.key + " init 非法");
+  }
+}
+
+for (const [key, summon] of Object.entries(plan.summons || {})) {
+  if (!summon || typeof summon !== "object") {
+    fail("summons." + key + " 不是对象");
+    continue;
+  }
+  if (summon.stats && typeof summon.stats !== "object") fail("summons." + key + " stats 非法");
+  for (const hook of ["aura", "attack", "onExpire"]) walkOps(summon[hook], "summons." + key + "." + hook);
+}
+
+for (const character of plan.characters || []) {
+  for (const skill of character.skills || []) validateSummonKeys(character.name + " · " + skill.name, skill);
+}
+
+const engineGap = (plan.characters || []).some((c) =>
+  (c.skills || []).some((s) => s.status === "engine-gap")
+);
+const changes = Array.isArray(plan.engine && plan.engine.changes) ? plan.engine.changes : [];
+if (!plan.engine || !plan.engine.version) {
+  warnings.push("plan.engine.version 缺省；应写当前或目标 engineVersion");
+} else if (plan.engine.version !== engineVersion) {
+  if (!changes.length) fail("plan.engine.version 变了但 engine.changes 为空");
+} else if (changes.length) {
+  warnings.push("engine.changes 非空但 engine.version 没变；改规则应升版本");
+}
+if (engineGap && !changes.length) fail("有 engine-gap 技能，但 plan.engine.changes 为空");
+
+if (plan.docs) {
+  const expectedChars = libCharactersCount() + newCharacters.length;
+  const expectedSkills = projectedSkills;
+  if (plan.docs.expectedCharacters != null && Number(plan.docs.expectedCharacters) !== expectedChars) {
+    fail("plan.docs.expectedCharacters 应为 " + expectedChars);
+  }
+  if (plan.docs.expectedSkills != null && Number(plan.docs.expectedSkills) !== expectedSkills) {
+    fail("plan.docs.expectedSkills 应为 " + expectedSkills);
+  }
+}
+
+const projected = {
+  characters: libCharactersCount() + newCharacters.length,
+  skills: projectedSkills,
+  implemented: libSkills.filter((s) => !s.unsupported).length +
+    (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status === "implemented").length, 0),
+  unsupported: projectedUnsupported +
+    (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status && s.status !== "implemented").length, 0)
+};
+
+for (const warning of warnings) console.warn("WARN " + warning);
+if (errors.length) {
+  for (const error of errors) console.error("ERROR " + error);
+  console.error("\n计划未通过：" + errors.length + " 个错误");
+  process.exit(1);
+}
+
+console.log("计划通过：" + plan.characters.length + " 名角色 / " +
+  plan.characters.reduce((n, c) => n + (c.skills || []).length, 0) + " 条技能");
+console.log("预计总量：角色 " + projected.characters + " / 技能 " + projected.skills +
+  "（implemented " + projected.implemented + " / unsupported " + projected.unsupported + "）");
+if (plan.engine) console.log("引擎：" + plan.engine.version + (changes.length ? "，变更 " + changes.length + " 项" : ""));
+
+if (scaffoldFile) {
+  const text = scaffold(plan);
+  const out = argValue(argv, "--out");
+  if (out) {
+    fs.writeFileSync(path.resolve(out), text, "utf8");
+    console.log("脚手架写到 " + path.resolve(out));
+  } else {
+    console.log("\n" + text);
+  }
+}
+
+function validateSkill(owner, skill, source) {
+  const name = owner + " · " + skill.name;
+  if (!skill.id) fail(name + " 缺少 id");
+  else {
+    if (seenIds.has(skill.id)) fail(name + " 的 id 重复：" + skill.id);
+    seenIds.add(skill.id);
+    if (libById[skill.id] && !allowExisting) fail(name + " 的 id 已在技能库：" + skill.id);
+  }
+  if (!["enemy", "ally", "self", "allEnemies", "allAllies", "any"].includes(skill.target)) {
+    fail(name + " target 非法：" + skill.target);
+  }
+  if (skill.cost != null && typeof skill.cost !== "object") fail(name + " cost 必须是对象");
+  if (skill.cost && skill.cost.mp != null && !(Number(skill.cost.mp) >= 0)) fail(name + " cost.mp 非法");
+  if (skill.cost && skill.cost.hp != null && !(Number(skill.cost.hp) >= 0)) fail(name + " cost.hp 非法");
+  if (skill.charge != null && !(Number(skill.charge) >= 0)) fail(name + " charge 非法");
+  if (skill.cooldown != null && !(Number(skill.cooldown) >= 0)) fail(name + " cooldown 非法");
+  if (norm(source.condition) === "被动" && !skill.passive) fail(name + " 条件是被动，但 passive 不是 true");
+  if (norm(source.condition) !== "被动" && skill.passive) fail(name + " 条件是主动，但 passive=true");
+  if (!["implemented", "unsupported", "engine-gap"].includes(skill.status)) {
+    fail(name + " status 非法：" + skill.status);
+  }
+  if (skill.status === "implemented") {
+    if (skill.unsupported) fail(name + " 已实现却写了 unsupported");
+    if (!Array.isArray(skill.tests) || !skill.tests.length) fail(name + " 已实现但没有 tests");
+    if (!Array.isArray(skill.ops)) fail(name + " 缺少 ops 数组");
+    if (skill.hooks != null && typeof skill.hooks !== "object") fail(name + " hooks 非法");
+  } else {
+    if (!skill.unsupported) fail(name + " 未实现但没有 unsupported 原因");
+    if (!Array.isArray(skill.ops)) warn(name + " 未实现且没有 ops（可为空）");
+  }
+  walkOps(skill.ops, name + ".ops");
+  walkOps(skill.chargeOps, name + ".chargeOps");
+  for (const [hook, ops] of Object.entries(skill.hooks || {})) {
+    if (!hookNames.has(hook)) fail(name + " 未知 hook：" + hook);
+    walkOps(ops, name + ".hooks." + hook);
+  }
+  for (const choice of skill.choices || []) walkOps(choice.ops, name + ".choices");
+}
+
+function validateSummonKeys(where, skill) {
+  const lists = [skill.ops, skill.chargeOps, ...Object.values(skill.hooks || {})];
+  for (const choice of skill.choices || []) lists.push(choice.ops);
+  for (const ops of lists) walkOps(ops, (op) => {
+    if (op.op !== "summon" || !op.key) return;
+    const known = (plan.summons && plan.summons[op.key]) || (lib.summons && lib.summons[op.key]);
+    if (!known) fail(where + " 的 summon.key 没有定义：" + op.key);
+  });
+}
+
+function walkOps(list, where) {
+  if (list == null) return;
+  if (!Array.isArray(list)) {
+    fail(where + " 必须是数组");
+    return;
+  }
+  for (const op of list) {
+    if (!op || typeof op !== "object") {
+      fail(where + " 有非对象 op");
+      continue;
+    }
+    if (!opNames.has(op.op)) fail(where + " 的 op 不在 effect-ops 里：" + op.op);
+    for (const key of ["then", "else", "ops"]) walkOps(op[key], where + "." + op.op + "." + key);
+    for (const key of ["cases", "choices"]) {
+      if (!Array.isArray(op[key])) continue;
+      for (const item of op[key]) walkOps(item && item.ops, where + "." + op.op + "." + key);
+    }
+  }
+}
+
+function readEngineVersion(repo) {
+  const file = path.join(repo, "rpg6.0/data/config.js");
+  const text = fs.readFileSync(file, "utf8");
+  const m = text.match(/engineVersion:\s*"([^"]+)"/);
+  if (!m) throw new Error("无法从 data/config.js 读到 engineVersion");
+  return m[1];
+}
+
+function readOpNames(repo) {
+  const file = path.join(repo, "rpg6.0/js/engine/effect-ops.js");
+  const text = fs.readFileSync(file, "utf8");
+  const set = new Set();
+  for (const m of text.matchAll(/^\s*case\s+"([^"]+)"/gm)) set.add(m[1]);
+  if (!set.size) throw new Error("无法从 effect-ops.js 读到 op 名");
+  return set;
+}
+
+function libCharactersCount() {
+  return Object.keys(lib.characters || {}).length;
+}
+
+function fail(message) {
+  errors.push(message);
+}
+
+function scaffold(input) {
+  const parts = [];
+  parts.push("// ===== battle-skills.js · characters 追加 =====");
+  for (const [index, character] of input.characters.entries()) {
+    parts.push(JSON.stringify(character.name) + ": [");
+    const list = [];
+    for (const skill of character.skills) {
+      const data = {
+        id: skill.id,
+        name: skill.name,
+        conditionText: skill.condition,
+        passive: !!skill.passive,
+        cost: skill.cost || { mp: 0 },
+        charge: Number(skill.charge) || 0,
+        cooldown: Number(skill.cooldown) || 0,
+        target: skill.target || "enemy",
+        ops: skill.ops || []
+      };
+      if (skill.once) data.once = true;
+      if (skill.costFromLost) data.costFromLost = skill.costFromLost;
+      if (skill.hooks && Object.keys(skill.hooks).length) data.hooks = skill.hooks;
+      if (skill.chargeOps && skill.chargeOps.length) data.chargeOps = skill.chargeOps;
+      if (skill.choices && skill.choices.length) data.choices = skill.choices;
+      if (skill.input) data.input = skill.input;
+      if (skill.requires && skill.requires.length) data.requires = skill.requires;
+      if (skill.unsupported) data.unsupported = skill.unsupported;
+      list.push(JSON.stringify(data, null, 2));
+    }
+    const indented = list.map((item) => item.split("\n").map((line) => "    " + line).join("\n"));
+    parts.push("  " + indented.join(",\n"));
+    parts.push("]");
+    if (index < input.characters.length - 1) parts[parts.length - 1] += ",";
+  }
+
+  if (input.marks && Object.keys(input.marks).length) {
+    parts.push("\n// ===== battle-skills.js · marks 追加 =====");
+    parts.push(JSON.stringify(input.marks, null, 2));
+  }
+  if (input.summons && Object.keys(input.summons).length) {
+    parts.push("\n// ===== battle-skills.js · summons 追加 =====");
+    parts.push(JSON.stringify(input.summons, null, 2));
+  }
+
+  parts.push("\n// ===== skills.test.mjs · SHEET 追加 =====");
+  const sheet = {};
+  for (const character of input.characters) {
+    sheet[character.name] = character.skills.map((s) => [s.name, s.condition]);
+  }
+  parts.push(JSON.stringify(sheet, null, 2));
+
+  parts.push("\n// ===== skills.test.mjs · CHAR fixture =====");
+  for (const [index, character] of input.characters.entries()) {
+    const seedChar = seedByName.get(character.name);
+    const fixture = character.fixture || ("c" + index);
+    const fixtureId = character.fixtureId || ("t-" + fixture);
+    parts.push(JSON.stringify(fixture) + ": { id: " + JSON.stringify(fixtureId) +
+      ", name: " + JSON.stringify(character.name) +
+      ", gender: " + JSON.stringify(seedChar.gender) +
+      ", occupation: " + JSON.stringify(seedChar.occupation) +
+      ", side_job: " + JSON.stringify(seedChar.side_job || "") +
+      ", atk: " + JSON.stringify(String(seedChar.atk)) +
+      ", def: " + JSON.stringify(String(seedChar.def)) +
+      ", mres: " + JSON.stringify(String(seedChar.mres)) +
+      ", hp: " + JSON.stringify(String(seedChar.hp)) +
+      ", mp: " + JSON.stringify(String(seedChar.mp)) +
+      ", spd: " + JSON.stringify(String(seedChar.spd)) + " },");
+  }
+
+  parts.push("\n// ===== 测试清单 =====");
+  for (const character of input.characters) {
+    for (const skill of character.skills) {
+      if (skill.status === "implemented") {
+        parts.push("- " + character.name + " · " + skill.name);
+        for (const test of skill.tests || []) parts.push("  - " + test);
+      }
+    }
+  }
+
+  parts.push("\n// ===== 文档计数（预计） =====");
+  parts.push("// 角色 " + (libCharactersCount() + newCharacters.length) +
+    " / 技能 " + (libSkills.length + input.characters.reduce((n, c) => n + c.skills.length, 0)));
+  parts.push("// 跑 audit-docs.mjs 确认 test.html / 游戏说明 / 架构 / rpg6-battle 全部同步");
+
+  return parts.join("\n");
+}
