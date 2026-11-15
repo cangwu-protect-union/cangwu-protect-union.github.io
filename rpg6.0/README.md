@@ -9,7 +9,7 @@
 2. **没有「新增角色」入口。** 新角色只能由「投稿 → 审核 → 转正」产生。
 3. **审核时的修改不写回投稿。** 改动只写进角色表，投稿行只更新状态、审核人、审核时间与备注。
 4. **规则只能由开发人员改代码。** 正文写在 `data/rule-docs.js`，网页上没有编辑入口，也不进数据库。
-5. **战报只增不改。** 匿名只能插入与读取，没有 update / delete 权限；写错的战报要 service_role 手工删。
+5. **战报只增不改。** 匿名只能插入与读取，没有 update / delete 权限；写错的战报要 service_role 手工删。唯一会删的是 30 天前的旧战报，由 `rpg_battles_purge()` 负责。
 
 ## 页面
 
@@ -23,7 +23,7 @@
 | `rule.html?id=` | 规则正文。内容来自 `data/rule-docs.js`，公开只读 |
 | `provide-tip.html` | 投稿表单，文本 + 图片，不需要验证 |
 | `test.html` | 对局测试：选两名角色开打，1v1 双方手动；结束后战报自动入库，`?record=` 回放，回放可从中间某一步接管继续打。手机竖屏会被「请横屏」遮罩挡住，横屏下走紧凑布局（导航隐藏、双方并排、页面不滚） |
-| `battles.html` | 战报列表，时间倒序，每页 20 条可加载更多，点开即逐步回放 |
+| `battles.html` | 战报列表，所有人共享，可按参与角色筛选；时间倒序，每页 20 条可加载更多，点开即逐步回放；进页面顺手删掉 30 天前的记录 |
 
 ### 编辑区（需要组织验证）
 
@@ -85,7 +85,7 @@ js/
 | `rpg_characters` | 角色。软删除用 `deleted`，作者与人员字段都在这里 |
 | `rpg_character_versions` | 旧档案，只增不改，`applied` 标记已应用 |
 | `rpg_submissions` | 投稿，`status` ∈ pending / approved / rejected |
-| `rpg_battles` | 战报：种子 + 双方角色 id + 归一化动作序列 + 最终指纹；匿名只读、只插，不可改删 |
+| `rpg_battles` | 战报：种子 + 双方角色 id + 归一化动作序列 + 最终指纹；匿名只读、只插，不可改删；30 天前的记录由 `rpg_battles_purge()` 删除 |
 
 两个只读函数：`rpg_search`（筛选 + 分页 + 总数）、`rpg_facets`（筛选下拉的选项）。
 迁移脚本在 `_local/sql/rpg-setup.sql`，旧档案导入在 `_local/sql/rpg-seed-characters.sql`。
@@ -157,7 +157,8 @@ test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步�
 - 改了引擎规则要顺手把 `data/config.js` 的 `engineVersion` 加一版，旧战报会被标成「旧引擎战报」；不升版本就只能靠指纹对不上来发现。
 - 面板数值（攻/防/法抗/血上限/速）统一向下取 5 的倍数（`B.rules.panelRound`），斗士 105×1.5=157.5 变 155；蓝上限例外，只向下取整到个位，否则「蓝上限 ±3」这类改动会被吃掉。
 - 旧引擎战报在新规则下可能算不下去：`BattleRecord.states` 在第一个失败的动作处停下，页面标「只能回放到第 N 步」。
-- 匿名对战报只有 select / insert 权限，PATCH 与 DELETE 返回 `401 42501`；写错的战报只能 service_role 手工删。
+- 匿名对战报只有 select / insert 权限，PATCH 与 DELETE 返回 `401 42501`；写错的战报只能 service_role 手工删。唯一例外是 `rpc/rpg_battles_purge`：它 `security definer`、期限写死 30 天、不收参数，所以匿名调它也只能删过期的行。
+- 清理搭在 `battles.html` 的加载路径上（与 `gui_tokens`、`site_suggest_hits` 同一个做法）：没人打开列表就不会清，旧行留着也不影响任何人看到的内容。
 - 中途刷新靠 `localStorage` 的 `rpg6-live-battle` 恢复，和数据库无关；结束后保存成功才清掉它。
 - 手机适配的断点是 `(orientation: landscape) and (max-height: 520px)`，不是 `max-width`：手机横屏宽 844px，用宽度断点会误判成竖屏。竖屏遮罩的条件带 `(pointer: coarse)`，桌面窄窗口不该弹。三项细节（速度条 details、技能效果展开、Buff 气泡）见 [游戏说明.md](游戏说明.md) 第十节。
 - `docgen` 只扫模块根下的 `js/*.js`，`js/engine/`、`js/battle/` 不进架构图，说明写在 [架构.md](架构.md) 的「战斗引擎」一节。

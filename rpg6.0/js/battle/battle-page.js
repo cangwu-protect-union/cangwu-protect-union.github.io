@@ -426,7 +426,13 @@
       else if (e.type === "buffAdd") parts.push("附加 " + (BUFF_NAME[e.kind] || e.kind) + " " + e.percent + "%");
       else if (e.type === "statusAdd") parts.push("附加 " + (e.label || e.kind) + " " + e.remain + " 回合");
       else if (e.type === "charg") parts.push("蓄力 " + e.amount + "/" + (e.need || "?"));
-      else if (e.type === "mark") parts.push(e.name + " " + e.value + "/" + e.max);
+      else if (e.type === "mark") parts.push(e.name + " " + e.value + (e.hideMax ? "" : "/" + e.max));
+      else if (e.type === "misfire") parts.push(e.label || "哑火");
+      else if (e.type === "dodge") parts.push(B.state.unitOf(state, e.uid).name + " 闪避");
+      else if (e.type === "summon") parts.push("召唤「" + e.name + "」");
+      else if (e.type === "summonExpire") parts.push("「" + e.name + "」消失");
+      else if (e.type === "summonDeath") parts.push("「" + e.name + "」被击毁");
+      else if (e.type === "summonBlocked") parts.push("召唤上限，未能召唤");
       else if (e.type === "reflect") parts.push("反弹 " + e.amount);
       else if (e.type === "interrupt" && e.removed.length) parts.push("打断 " + e.removed.length + " 个持续效果");
       else if (e.type === "dispel" && e.removed.length) parts.push("清除 " + e.removed.length + " 个负面效果");
@@ -445,26 +451,59 @@
     return B.state.unitOf(state, state.turnUid);
   }
 
+  function enemySideOf(unit) {
+    return B.state.otherSide(state, B.state.sideOf(state, unit.uid));
+  }
+
+  function enemyHeroUid(unit) {
+    var hero = B.state.heroOf(state, enemySideOf(unit));
+    return hero ? hero.uid : "";
+  }
+
+  function allowedEnemyUids(unit) {
+    var list = B.state.combatantsOf(state, enemySideOf(unit));
+    if (B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)) {
+      return list.map(function (u) { return u.uid; });
+    }
+    var max = -Infinity;
+    list.forEach(function (u) { max = Math.max(max, Number(u.taunt) || 0); });
+    return list.filter(function (u) { return (Number(u.taunt) || 0) === max; })
+      .map(function (u) { return u.uid; });
+  }
+
   function onBasic(kind) {
     var unit = currentUnit();
     if (!unit) return;
-    var other = B.state.otherUid(state, unit.uid);
     if (kind === "chargeMp") {
       applyAction({ kind: "basic", type: "chargeMp" });
       return;
     }
+    var healUid = B.skills.basicHealTarget ? B.skills.basicHealTarget(state, unit) : null;
+    if (healUid) {
+      applyAction({ kind: "basic", type: "attack", target: healUid });
+      setHint("给「" + B.state.unitOf(state, healUid).name + "」回血");
+      return;
+    }
     if (kind === "break") {
-      var target = B.state.unitOf(state, other);
-      if (target.breakValue < B.rules.CONFIG.breakThreshold) {
-        setHint("击溃值不足 " + B.rules.CONFIG.breakThreshold + "（现在 " + target.breakValue + "）");
+      var breakTargets = allowedEnemyUids(unit).filter(function (uid) {
+        var target = B.state.unitOf(state, uid);
+        return !target.breakImmune && target.breakValue >= B.rules.CONFIG.breakThreshold;
+      });
+      if (!breakTargets.length) {
+        setHint("目标击溃值不足 " + B.rules.CONFIG.breakThreshold + " 或免疫击溃");
         return;
       }
-      root.BattlePick.begin(pick, { mode: "basic", type: "break", targets: [other] });
+      root.BattlePick.begin(pick, { mode: "basic", type: "break", targets: breakTargets });
       setHint("选择要击溃的角色");
       render();
       return;
     }
-    var targets = unit.trait && unit.trait.canHitAlly ? [unit.uid, other] : [other];
+    var targets = allowedEnemyUids(unit);
+    if (unit.trait && unit.trait.canHitAlly) targets = [unit.uid].concat(targets);
+    if (!targets.length) {
+      setHint("没有合法目标");
+      return;
+    }
     root.BattlePick.begin(pick, { mode: "basic", type: "attack", targets: targets });
     setHint("选择普攻目标");
     render();
@@ -487,13 +526,19 @@
     if (check.needsCharge) {
       var amount = (unit.charge && unit.charge.skillId === skill.id ? unit.charge.amount : 0) + 1;
       if (applyAction({ kind: "skill", skillId: skill.id, target: defaultTarget(unit, skill) })) {
-        setHint("为「" + skill.name + "」蓄力 " + amount + "/" + skill.charge);
+        setHint("为「" + skill.name + "」蓄力 " + amount + "/" + (check.effective ? check.effective.charge : skill.charge));
       }
       return;
     }
     var targets = targetsOf(unit, skill);
     if (!targets.length) {
       setHint("这个技能没有合法目标");
+      return;
+    }
+    if (targets.length === 1 && skill.input) {
+      root.BattlePick.begin(pick, { mode: "input", id: skill.id, targets: [targets[0]] });
+      setHint("输入「" + skill.name + "」要支付的蓝");
+      render();
       return;
     }
     if (targets.length === 1 && skill.choices && skill.choices.length) {
@@ -513,30 +558,64 @@
 
   function defaultTarget(unit, skill) {
     if (skill.target === "self" || skill.target === "ally" || skill.target === "allAllies") return unit.uid;
-    return B.state.otherUid(state, unit.uid);
+    if (skill.target === "allEnemies") return enemyHeroUid(unit);
+    var allowed = allowedEnemyUids(unit);
+    return allowed[0] || enemyHeroUid(unit);
   }
 
   function targetsOf(unit, skill) {
-    var other = B.state.otherUid(state, unit.uid);
     if (skill.target === "self" || skill.target === "ally" || skill.target === "allAllies") return [unit.uid];
-    if (skill.target === "enemy" || skill.target === "allEnemies") return [other];
-    if (skill.target === "any") return [unit.uid, other];
-    return [other];
+    if (skill.target === "allEnemies") return [enemyHeroUid(unit)];
+    if (skill.target === "any") return [unit.uid].concat(allowedEnemyUids(unit));
+    return allowedEnemyUids(unit);
   }
 
   function onUnitClick(uid) {
     if (!root.BattlePick.isActive(pick)) return;
     if (!root.BattlePick.allows(pick, uid)) {
-      root.BattlePick.cancel(pick);
-      setHint("这个目标不合法，已取消");
-      render();
+      setHint("这个目标不合法，请选择高亮的目标");
       return;
     }
     if (pick.mode === "basic") {
       applyAction({ kind: "basic", type: pick.type, target: uid });
       return;
     }
-    applyAction({ kind: "skill", skillId: pick.id, target: uid });
+    if (pick.mode === "skill") {
+      applyAction({ kind: "skill", skillId: pick.id, target: uid });
+      return;
+    }
+    setHint("请在技能行里完成选择");
+  }
+
+  function onSummonClick(uid) {
+    if (!state) return;
+    var summon = null;
+    try { summon = B.state.unitOf(state, uid); } catch (err) { return; }
+    if (!root.BattlePick.isActive(pick)) {
+      var detail = summon.name + (summon.targetable ? "：" + summon.hp + "/" + summon.base.maxHp : "");
+      if (summon.ttl) detail += "，剩余 " + summon.ttl.remain + " 回合";
+      setHint(detail);
+      return;
+    }
+    if (!summon.targetable) {
+      setHint("「" + summon.name + "」不可选中");
+      return;
+    }
+    if (!root.BattlePick.allows(pick, uid)) {
+      var unit = currentUnit();
+      var enemy = unit && B.state.sideOf(state, uid) !== B.state.sideOf(state, unit.uid);
+      setHint(enemy ? "被嘲讽保护，必须选择嘲讽最高的目标" : "这个目标不合法");
+      return;
+    }
+    if (pick.mode === "basic") {
+      applyAction({ kind: "basic", type: pick.type, target: uid });
+      return;
+    }
+    if (pick.mode === "skill") {
+      applyAction({ kind: "skill", skillId: pick.id, target: uid });
+      return;
+    }
+    setHint("请在技能行里完成选择");
   }
 
   function onBuffEnter(key) {
@@ -798,6 +877,12 @@
         onSkill(skill.getAttribute("data-skill"));
         return;
       }
+      var summonChip = event.target.closest("[data-summon]");
+      if (summonChip) {
+        event.preventDefault();
+        onSummonClick(summonChip.getAttribute("data-summon"));
+        return;
+      }
       var choice = event.target.closest("[data-choice]");
       if (choice) {
         event.preventDefault();
@@ -810,6 +895,20 @@
         });
         return;
       }
+      var inputGo = event.target.closest("[data-input-go]");
+      if (inputGo) {
+        event.preventDefault();
+        var inputBox = inputGo.closest(".bq-input");
+        var inputEl = inputBox ? inputBox.querySelector("[data-input-n]") : null;
+        applyAction({
+          kind: "skill",
+          skillId: pick.id,
+          target: (pick.targets && pick.targets[0]) || "",
+          n: Math.floor(Number(inputEl ? inputEl.value : NaN))
+        });
+        return;
+      }
+      if (event.target.closest(".bq-input")) return;
       var unit = event.target.closest("[data-unit]");
       if (unit) {
         event.preventDefault();

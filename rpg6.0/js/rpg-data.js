@@ -197,6 +197,7 @@
       occupation: r.occupation || "",
       side_job: r.side_job || "",
       rating: r.rating || "",
+      gender: r.gender || "",
       review_mark: r.review_mark || "",
       atk: r.atk || "",
       def: r.def || "",
@@ -253,6 +254,7 @@
       occupation: trim(obj.occupation),
       side_job: trim(obj.side_job),
       rating: trim(obj.rating),
+      gender: trim(obj.gender),
       review_mark: trim(obj.review_mark),
       atk: trim(obj.atk),
       def: trim(obj.def),
@@ -816,7 +818,7 @@
 
   function emptyCharacter() {
     var obj = {
-      name: "", aliases: [], occupation: "", side_job: "", rating: "",
+      name: "", aliases: [], occupation: "", side_job: "", rating: "", gender: "",
       review_mark: "", images: [], skills: [], author: "", note: ""
     };
     STAT_KEYS.forEach(function (k) { obj[k] = ""; });
@@ -842,6 +844,9 @@
     else if (trim(obj.occupation).length > 20) problems.push("主职业超过 20 字");
     if (trim(obj.side_job).length > 20) problems.push("副业超过 20 字");
     if (trim(obj.rating).length > 8) problems.push("强度评级超过 8 字");
+    if (trim(obj.gender) && trim(obj.gender) !== "男" && trim(obj.gender) !== "女") {
+      problems.push("性别只能填男或女");
+    }
 
     STAT_KEYS.forEach(function (k) {
       if (trim(obj[k]).length > 40) problems.push(STAT_LABELS[k] + "超过 40 字");
@@ -906,6 +911,14 @@
     var path = c.battles +
       "?select=id,engine_version,seed,character_a,character_b,name_a,name_b,result,steps,rounds,created_at" +
       "&order=created_at.desc&limit=" + limit + "&offset=" + offset;
+
+    /* 任意一方是该角色即命中；两侧都要比值，所以用 or 而不是 eq */
+    var who = trim(opts && opts.character);
+    if (who) {
+      path += "&or=(character_a.eq." + encodeURIComponent(who) +
+        ",character_b.eq." + encodeURIComponent(who) + ")";
+    }
+
     return get(c, path).then(function (rows) {
       return (Array.isArray(rows) ? rows : []).map(mapBattle);
     }).catch(function (err) {
@@ -953,6 +966,26 @@
     });
   }
 
+  /* 删掉 30 天前的战报；期限写死在数据库函数里，前端不传参数。
+     失败不抛错：清理是顺手做的事，不该把列表挡住。 */
+  function purgeBattles() {
+    var c = cfg();
+    if (!c) return Promise.resolve(0);
+    return withTimeout(
+      fetch(c.rest + "rpc/rpg_battles_purge", {
+        method: "POST",
+        headers: headers(c),
+        body: "{}"
+      }),
+      TIMEOUT_MS
+    ).then(readJson).then(function (n) {
+      return Number(n) || 0;
+    }).catch(function (err) {
+      console.warn("[战报] 旧战报清理失败：", err.message);
+      return 0;
+    });
+  }
+
   window.RpgData = {
     PAGE_SIZE: PAGE_SIZE,
     MEMBERS: MEMBERS,
@@ -978,6 +1011,7 @@
     listBattles: listBattles,
     getBattle: getBattle,
     createBattle: createBattle,
+    purgeBattles: purgeBattles,
 
     addSubmission: addSubmission,
     rejectSubmission: rejectSubmission,

@@ -30,6 +30,7 @@
       uid: uid,
       charId: character.id || "",
       name: character.name || uid,
+      gender: character.gender || "",
       job: character.occupation || "",
       subJob: character.side_job || "",
       charging: null,
@@ -52,6 +53,8 @@
       flags: {},
       stats: { hitsDealt: 0, hitsTaken: 0, casts: 0, turns: 0 },
       hpLog: [],
+      hpLost: 0,
+      side: "",
       lastDamageType: "",
       marks: {},
       skills: []
@@ -66,11 +69,65 @@
     for (var i = 0; i < state.units.length; i++) {
       if (state.units[i].uid === uid) return state.units[i];
     }
+    var summons = state.summons || [];
+    for (var j = 0; j < summons.length; j++) {
+      if (summons[j].uid === uid) return summons[j];
+    }
     throw new Error("找不到单位：" + uid);
   }
 
   function otherUid(state, uid) {
     return state.units[0].uid === uid ? state.units[1].uid : state.units[0].uid;
+  }
+
+  function sideOf(state, uid) {
+    for (var i = 0; i < state.units.length; i++) {
+      if (state.units[i].uid === uid) return state.units[i].side;
+    }
+    var summons = state.summons || [];
+    for (var j = 0; j < summons.length; j++) {
+      if (summons[j].uid === uid) return summons[j].side;
+    }
+    throw new Error("找不到单位：" + uid);
+  }
+
+  function otherSide(state, side) {
+    return side === "a" ? "b" : "a";
+  }
+
+  function heroOf(state, side) {
+    for (var i = 0; i < state.units.length; i++) {
+      if (state.units[i].side === side) return state.units[i];
+    }
+    return state.units[side === "a" ? 0 : 1];
+  }
+
+  function summonsOf(state, side) {
+    var out = [];
+    var list = state.summons || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].side === side && list[i].hp > 0) out.push(list[i]);
+    }
+    return out;
+  }
+
+  function combatantsOf(state, side) {
+    var out = [];
+    var hero = heroOf(state, side);
+    if (hero && hero.hp > 0) out.push(hero);
+    return out.concat(summonsOf(state, side));
+  }
+
+  function markHpLoss(unit, beforeHp) {
+    var lost = Math.max(0, Number(beforeHp) || 0) - Math.max(0, unit.hp);
+    if (lost > 0) unit.hpLost = (unit.hpLost || 0) + lost;
+    return lost;
+  }
+
+  function clampHpToMax(unit) {
+    var before = unit.hp;
+    unit.hp = Math.min(unit.hp, maxHpOf(unit));
+    return markHpLoss(unit, before);
   }
 
   function modValue(unit, stat) {
@@ -147,7 +204,7 @@
   }
 
   function canAct(unit) {
-    return !hasStatus(unit, "break") && !hasStatus(unit, "stun");
+    return !hasStatus(unit, "break") && !hasStatus(unit, "stun") && !hasStatus(unit, "cannotAct");
   }
 
   function addMod(unit, mod) {
@@ -164,10 +221,13 @@
     return entry;
   }
 
-  function removeModsBySource(unit, source) {
+  function removeModsBySource(unit, source, stats) {
     var kept = [];
+    var filter = Array.isArray(stats) && stats.length ? stats : null;
     for (var i = 0; i < unit.mods.length; i++) {
-      if (unit.mods[i].source !== source) kept.push(unit.mods[i]);
+      var mod = unit.mods[i];
+      if (mod.source === source && (!filter || filter.indexOf(mod.stat) >= 0)) continue;
+      kept.push(mod);
     }
     unit.mods = kept;
   }
@@ -201,10 +261,12 @@
       remain: status.remain == null ? 0 : status.remain,
       unit: status.unit || "standard",
       source: status.source || "",
+      skillId: status.skillId || "",
       label: status.label || ""
     };
     for (var i = 0; i < unit.statuses.length; i++) {
-      if (unit.statuses[i].kind === entry.kind) {
+      if (unit.statuses[i].kind === entry.kind &&
+          (unit.statuses[i].skillId || "") === entry.skillId) {
         unit.statuses[i].remain = Math.max(unit.statuses[i].remain, entry.remain);
         return unit.statuses[i];
       }
@@ -215,6 +277,9 @@
 
   /* 进入击溃：击溃值固定为 0，击溃状态期间也不会再增加 */
   function enterBreak(unit, remain, source, label) {
+    if (unit.breakImmune) {
+      return { kind: "break", remain: 0, unit: "standard", source: source || "", skillId: "", label: (label || "击溃") + "（免疫）" };
+    }
     unit.breakValue = 0;
     return addStatus(unit, {
       kind: "break",
@@ -261,8 +326,12 @@
       queue: [],
       turnUid: null,
       units: [makeUnit(opts.a, "a"), makeUnit(opts.b, "b")],
+      summons: [],
+      summonSeq: 0,
       log: []
     };
+    state.units[0].side = "a";
+    state.units[1].side = "b";
     decideOrder(state);
     return state;
   }
@@ -307,9 +376,31 @@
         u.uid, u.hp, u.mp, u.gauge, u.actionsLeft, u.breakValue, u.stunValue,
         u.charge ? u.charge.skillId + ":" + u.charge.amount : "-",
         buffs.join(","), mods.join(","), st.join(","), eff.join(","),
-        u.scheduled.length, u.lastDamageType, marks.join(",")
+        u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0
       ].join("|"));
     }
+    var summonParts = [];
+    var summons = state.summons || [];
+    for (var si = 0; si < summons.length; si++) {
+      var su = summons[si];
+      var sb = [];
+      for (var sb1 = 0; sb1 < su.buffs.length; sb1++) sb.push(su.buffs[sb1].kind + su.buffs[sb1].percent + su.buffs[sb1].remain);
+      var sm = [];
+      for (var sm1 = 0; sm1 < su.mods.length; sm1++) sm.push(su.mods[sm1].stat + su.mods[sm1].mode + su.mods[sm1].value + su.mods[sm1].remain);
+      var ss = [];
+      for (var ss1 = 0; ss1 < su.statuses.length; ss1++) ss.push(su.statuses[ss1].kind + su.statuses[ss1].remain);
+      var se = [];
+      for (var se1 = 0; se1 < su.effects.length; se1++) se.push(su.effects[se1].id + su.effects[se1].remain);
+      var smark = [];
+      var smKeys = Object.keys(su.marks || {});
+      for (var smk = 0; smk < smKeys.length; smk++) smark.push(smKeys[smk] + su.marks[smKeys[smk]].value);
+      summonParts.push([
+        su.uid, su.side, su.summonKey, su.hp, su.breakValue, su.stunValue,
+        su.ttl ? su.ttl.remain : "-",
+        sb.join(","), sm.join(","), ss.join(","), se.join(","), smark.join(","), su.hpLost || 0
+      ].join("|"));
+    }
+    parts.push("S:" + summonParts.join(";"));
     return fnv1a(parts.join(";"));
   }
 
@@ -318,6 +409,13 @@
   api.makeUnit = makeUnit;
   api.unitOf = unitOf;
   api.otherUid = otherUid;
+  api.sideOf = sideOf;
+  api.otherSide = otherSide;
+  api.heroOf = heroOf;
+  api.summonsOf = summonsOf;
+  api.combatantsOf = combatantsOf;
+  api.markHpLoss = markHpLoss;
+  api.clampHpToMax = clampHpToMax;
   api.statOf = statOf;
   api.maxHpOf = maxHpOf;
   api.maxMpOf = maxMpOf;

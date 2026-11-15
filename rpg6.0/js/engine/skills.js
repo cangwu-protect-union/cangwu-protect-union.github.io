@@ -10,6 +10,7 @@
   var byOwner = {};
   var all = [];
   var markDefs = {};
+  var summonDefs = {};
 
   function norm(text) {
     return String(text == null ? "" : text).replace(/\s+/g, "");
@@ -20,6 +21,7 @@
     byOwner = {};
     all = [];
     markDefs = (library && library.marks) || {};
+    summonDefs = (library && library.summons) || {};
     var chars = library && library.characters ? library.characters : {};
     Object.keys(chars).forEach(function (owner) {
       chars[owner].forEach(function (skill) {
@@ -40,6 +42,24 @@
     return byId[id] || null;
   }
 
+  function summonDef(key) {
+    return summonDefs[key] || null;
+  }
+
+  /* 动态费用：按「累计已损失血量」每 per 点降 1 蓝 1 力，最低 0 */
+  function effectiveCost(unit, skill) {
+    var mp = skill && skill.cost && skill.cost.mp ? Number(skill.cost.mp) : 0;
+    var charge = skill && skill.charge ? Number(skill.charge) : 0;
+    var steps = 0;
+    if (skill && skill.costFromLost) {
+      var per = Number(skill.costFromLost.per) || 100;
+      steps = Math.floor((unit && unit.hpLost ? unit.hpLost : 0) / per);
+      mp = Math.max(0, mp - steps);
+      charge = Math.max(0, charge - steps);
+    }
+    return { mp: mp, charge: charge, steps: steps };
+  }
+
   /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作 */
   function initUnit(unit) {
     var defs = markDefs[unit.name] || [];
@@ -49,7 +69,8 @@
       unit.marks[def.key] = {
         value: Number(def.init) || 0,
         name: def.name || def.key,
-        max: def.max == null ? 99 : Number(def.max)
+        max: def.max == null ? 99 : Number(def.max),
+        hideMax: !!def.hideMax
       };
     }
   }
@@ -90,8 +111,31 @@
     return copy;
   }
 
+  function maxTauntUids(state, side) {
+    var list = B.state.combatantsOf(state, side);
+    var max = -Infinity;
+    for (var i = 0; i < list.length; i++) max = Math.max(max, Number(list[i].taunt) || 0);
+    var out = [];
+    for (var j = 0; j < list.length; j++) {
+      if ((Number(list[j].taunt) || 0) === max) out.push(list[j].uid);
+    }
+    return out;
+  }
+
+  function checkTaunt(state, unit, targetUid) {
+    if (B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)) return;
+    var target = B.state.unitOf(state, targetUid);
+    var side = B.state.sideOf(state, target.uid);
+    var allowed = maxTauntUids(state, side);
+    if (allowed.indexOf(target.uid) < 0) {
+      throw new Error("必须选择嘲讽最高的目标");
+    }
+  }
+
   function resolveTarget(state, unit, skill, requested) {
-    var other = B.state.otherUid(state, unit.uid);
+    var mySide = B.state.sideOf(state, unit.uid);
+    var enemySide = B.state.otherSide(state, mySide);
+    var enemyHero = B.state.heroOf(state, enemySide);
     var kind = skill.target || "enemy";
     if (kind === "self") {
       if (requested && requested !== unit.uid) throw new Error("这个技能只能对自己使用");
@@ -102,17 +146,40 @@
       return unit.uid;
     }
     if (kind === "allAllies") return unit.uid;
-    if (kind === "allEnemies") return other;
+    if (kind === "allEnemies") return enemyHero ? enemyHero.uid : "";
     if (kind === "any") {
       if (!requested) throw new Error("没有选目标");
-      if (requested !== "a" && requested !== "b") throw new Error("目标非法：" + requested);
       B.state.unitOf(state, requested);
+      if (requested === unit.uid) return requested;
+      if (B.state.sideOf(state, requested) === enemySide) checkTaunt(state, unit, requested);
       return requested;
     }
     if (!requested) throw new Error("没有选目标");
-    if (requested !== "a" && requested !== "b") throw new Error("目标非法：" + requested);
+    B.state.unitOf(state, requested);
     if (requested === unit.uid) throw new Error("这个技能不能对自己使用");
+    if (B.state.sideOf(state, requested) !== enemySide) throw new Error("目标不是敌方单位");
+    checkTaunt(state, unit, requested);
     return requested;
+  }
+
+  function basicMode(state, unit, target, events) {
+    var ctx = {
+      sourceUid: unit.uid,
+      targetUid: target ? target.uid : "",
+      skillId: "passive.basicMode",
+      label: "普攻模式",
+      mode: {}
+    };
+    runHooks(state, unit, "basicMode", ctx, events || []);
+    return ctx.mode;
+  }
+
+  function basicHealTarget(state, unit) {
+    var mode = basicMode(state, unit, null, []);
+    if (!mode || !mode.healSummonKey) return null;
+    var side = B.state.sideOf(state, unit.uid);
+    var summon = B.summons && B.summons.findKey ? B.summons.findKey(state, side, mode.healSummonKey) : null;
+    return summon ? summon.uid : null;
   }
 
   function chargeSkill(state, unit, skill, action, events) {
@@ -128,7 +195,7 @@
       uid: unit.uid,
       skillId: skill.id,
       amount: unit.charge.amount,
-      need: skill.charge || 0
+      need: effectiveCost(unit, skill).charge
     });
     if (skill.chargeOps) {
       var tUid = skill.target === "self" || skill.target === "ally" ? unit.uid : (action.target || unit.uid);
@@ -161,13 +228,34 @@
       sourceUid: unit.uid,
       targetUid: targetUid,
       skillId: skill.id,
-      label: skill.name
+      label: skill.name,
+      scope: skill.target === "allEnemies" ? "allEnemies" : (skill.target === "allAllies" ? "allAllies" : ""),
+      input: {}
     };
 
-    var mpCost = skill.cost && skill.cost.mp ? skill.cost.mp : 0;
+    var mpCost = effectiveCost(unit, skill).mp;
+    var inputValue = 0;
+    if (skill.input) {
+      var key = skill.input.key || "n";
+      var min = Number(skill.input.min) || 1;
+      var max = unit.mp - mpCost;
+      if (skill.input.max != null && skill.input.max !== "mp") {
+        max = Math.min(max, Number(skill.input.max));
+      }
+      var n = Math.floor(Number(action ? action[key] : NaN));
+      if (!isFinite(n) || n < min || n > max) {
+        throw new Error("需要支付 " + min + " 到 " + Math.max(min, max) + " 蓝");
+      }
+      inputValue = n;
+      ctx.input[key] = n;
+    }
     if (mpCost > 0) {
       unit.mp = Math.max(0, unit.mp - mpCost);
       events.push({ type: "mp", round: state.round, uid: unit.uid, delta: -mpCost, mp: unit.mp, reason: "cost" });
+    }
+    if (inputValue > 0) {
+      unit.mp = Math.max(0, unit.mp - inputValue);
+      events.push({ type: "mp", round: state.round, uid: unit.uid, delta: -inputValue, mp: unit.mp, reason: "costInput" });
     }
     if (skill.cost && skill.cost.hp) {
       B.damage.directLoss(state, {
@@ -201,6 +289,7 @@
     B.effectOps.runOps(state, ctx, prepareOps(choice.ops, unit), events);
     var done = { kind: "skill", skillId: skill.id, target: targetUid };
     if (choice.key) done.choice = choice.key;
+    if (skill.input) done[skill.input.key || "n"] = inputValue;
     return done;
   }
 
@@ -218,6 +307,8 @@
   }
 
   function runHooks(state, unit, kind, ctx, events) {
+    ctx.ownerUid = unit.uid;
+    ctx.ownerName = unit.name;
     var list = byOwner[unit.name] || [];
     for (var i = 0; i < list.length; i++) {
       var hooks = list[i].hooks;
@@ -227,7 +318,20 @@
     }
   }
 
-  /* 普攻前的被动修正：返回 {type, factor, healInstead}，没有被动时返回空对象 */
+  function runBattleStart(state, events) {
+    for (var i = 0; i < state.units.length; i++) {
+      var unit = state.units[i];
+      if (unit.hp <= 0) continue;
+      runHooks(state, unit, "battleStart", {
+        sourceUid: unit.uid,
+        targetUid: B.state.otherUid(state, unit.uid),
+        skillId: "passive.battleStart",
+        label: "开局被动"
+      }, events);
+    }
+  }
+
+  /* 普攻前的被动修正：返回 {type, factor, healInstead, hits, noBreak, misfire} */
   function basicMod(state, unit, target, events) {
     var ctx = {
       sourceUid: unit.uid,
@@ -238,6 +342,20 @@
     };
     runHooks(state, unit, "basicMod", ctx, events);
     return ctx.mod;
+  }
+
+  /* 普攻门槛：返回 {allow, reason}，由角色的 basicGate 被动决定 */
+  function basicGate(state, unit, targetUid, events) {
+    var ctx = {
+      sourceUid: unit.uid,
+      targetUid: targetUid || "",
+      skillId: "passive.basicGate",
+      label: "普攻前置",
+      denied: false,
+      reason: ""
+    };
+    runHooks(state, unit, "basicGate", ctx, events || []);
+    return { allow: !ctx.denied, reason: ctx.reason || "" };
   }
 
   function validate(characters) {
@@ -286,14 +404,22 @@
 
   api.load = load;
   api.find = find;
+  api.summonDef = summonDef;
+  api.effectiveCost = effectiveCost;
   api.forUnit = forUnit;
   api.has = has;
   api.initUnit = initUnit;
   api.execute = execute;
   api.resolveTarget = resolveTarget;
+  api.maxTauntUids = maxTauntUids;
+  api.checkTaunt = checkTaunt;
   api.prepareOps = prepareOps;
   api.runHooks = runHooks;
+  api.runBattleStart = runBattleStart;
   api.basicMod = basicMod;
+  api.basicGate = basicGate;
+  api.basicMode = basicMode;
+  api.basicHealTarget = basicHealTarget;
   api.validate = validate;
   api.statusOf = statusOf;
   api.all = function () { return all.slice(); };

@@ -29,6 +29,13 @@
       out.reason = "本版未实现：" + skill.unsupported;
       return out;
     }
+    if (skill.passive) {
+      out.ok = false;
+      out.reason = "被动技能，不需要释放";
+      out.canCharge = false;
+      out.canRelease = false;
+      return out;
+    }
     if (skill.once && unit.flags["used." + skill.id]) {
       out.ok = false;
       out.reason = "这个技能只能用一次";
@@ -36,10 +43,31 @@
       out.canRelease = false;
       return out;
     }
-    var mpCost = skill.cost && skill.cost.mp ? skill.cost.mp : 0;
-    if (B.state.hasStatus(unit, "noSkill")) {
+    var eff = B.skills && B.skills.effectiveCost
+      ? B.skills.effectiveCost(unit, skill)
+      : { mp: (skill.cost && skill.cost.mp) || 0, charge: skill.charge || 0, steps: 0 };
+    out.effective = eff;
+    var mpCost = eff.mp;
+    if (B.state.hasStatus(unit, "onlyBasic")) {
       out.ok = false;
-      out.reason = "被封锁，无法释放技能";
+      out.reason = "现在只能普攻";
+      out.canCharge = false;
+      out.canRelease = false;
+      return out;
+    }
+    var blocker = null;
+    for (var s = 0; s < unit.statuses.length; s++) {
+      var st = unit.statuses[s];
+      if (st.kind === "noSkill" && (!st.skillId || st.skillId === skill.id)) {
+        blocker = st;
+        break;
+      }
+    }
+    if (blocker) {
+      out.ok = false;
+      out.reason = blocker.skillId
+        ? "被「" + (blocker.label || "技能") + "」封锁"
+        : "被封锁，无法释放技能";
       out.canCharge = false;
       out.canRelease = false;
       return out;
@@ -51,6 +79,16 @@
       out.canRelease = false;
       return out;
     }
+    if (skill.input) {
+      var needMp = mpCost + (Number(skill.input.min) || 0);
+      if (unit.mp < needMp) {
+        out.ok = false;
+        out.reason = "需要至少 " + needMp + " 蓝";
+        out.canCharge = false;
+        out.canRelease = false;
+        return out;
+      }
+    }
     if (!cooldownReady(state, unit, skill)) {
       var last = unit.cooldowns[skill.id];
       var left = skill.cooldown - (state.round - last);
@@ -60,7 +98,7 @@
       out.canRelease = false;
       return out;
     }
-    var need = skill.charge || 0;
+    var need = eff.charge;
     if (skill.requires) {
       for (var r = 0; r < skill.requires.length; r++) {
         var req = skill.requires[r];

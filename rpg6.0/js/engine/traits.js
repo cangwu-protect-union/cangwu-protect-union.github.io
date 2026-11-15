@@ -89,6 +89,10 @@
     return !!(unit && unit.trait && unit.trait.chargeUnbreakable);
   }
 
+  function ignoreTaunt(unit) {
+    return !!(unit && unit.trait && unit.trait.ignoreTaunt);
+  }
+
   api.JOBS = JOBS;
   api.SIDE_JOBS = SIDE_JOBS;
   api.resolve = resolve;
@@ -96,6 +100,7 @@
   api.basicType = basicType;
   api.actionsPerTurn = actionsPerTurn;
   api.chargeUnbreakable = chargeUnbreakable;
+  api.ignoreTaunt = ignoreTaunt;
 
   if (typeof module === "object" && module.exports) module.exports = B;
 })(typeof globalThis !== "undefined" ? globalThis : this);

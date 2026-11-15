@@ -28,9 +28,17 @@
 
     <section class="battle-setup">
       <h1>战报</h1>
-      <p class="lead">每一次打完的对局都会留在这里，点开就是逐步回放。</p>
+      <p class="lead">所有人的对局都留在这里，点开就是逐步回放；只保留最近 30 天。</p>
       <p><a class="btn" href="test.html">开一局</a></p>
     </section>
+
+    <div class="setup-row">
+      <label for="battle-filter-character">参与角色
+        <select id="battle-filter-character" data-filter-character>
+          <option value="">全部角色</option>
+        </select>
+      </label>
+    </div>
 
     <section data-list class="battle-list">
       <p class="setup-note">正在读取战报…</p>

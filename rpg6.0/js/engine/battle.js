@@ -15,6 +15,7 @@
   function create(opts) {
     var state = B.state.createBattle(opts);
     var events = [];
+    B.skills.runBattleStart(state, events);
     B.timeline.beginTurn(state, events);
     appendLog(state, events);
     return { state: state, events: events };

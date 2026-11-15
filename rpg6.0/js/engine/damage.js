@@ -61,8 +61,16 @@
       pushEvent(events, { type: "noDeath", round: state.round, uid: unit.uid });
       return false;
     }
-    B.state.finish(state, B.state.otherUid(state, unit.uid));
+    if (unit.isSummon) {
+      if (B.summons && B.summons.remove) B.summons.remove(state, unit.uid, "death", events);
+      pushEvent(events, { type: "summonDeath", round: state.round, uid: unit.uid, name: unit.name, ownerUid: unit.ownerUid });
+      return false;
+    }
+    var winnerSide = B.state.otherSide(state, unit.side);
+    var winner = B.state.heroOf(state, winnerSide);
+    B.state.finish(state, winner ? winner.uid : winnerSide);
     pushEvent(events, { type: "death", round: state.round, uid: unit.uid });
+    if (B.summons && B.summons.clearSide) B.summons.clearSide(state, unit.side, "ownerDeath", events);
     return true;
   }
 
@@ -84,7 +92,38 @@
     var dmg = B.rules.finalDamage(raw, mul);
     var fromBuff = !!spec.fromBuff;
     var noBreak = !!spec.noBreak;
+    var noStun = !!spec.noStun;
+    if (source && source.isSummon) {
+      noBreak = true;
+      noStun = true;
+    }
     if (source && B.state.hasStatus(source, "noBreakOut")) noBreak = true;
+
+    if (dmg > 0 && !spec.noReaction && B.skills && B.skills.runHooks) {
+      var pre = {
+        sourceUid: spec.sourceUid || "",
+        targetUid: target.uid,
+        skillId: "passive.beforeDamage",
+        label: "受击判定",
+        damageType: type,
+        amount: dmg,
+        dodge: false
+      };
+      B.skills.runHooks(state, target, "beforeDamage", pre, events);
+      if (pre.dodge) {
+        spec.dodged = true;
+        pushEvent(events, {
+          type: "dodge",
+          round: state.round,
+          uid: target.uid,
+          sourceUid: spec.sourceUid || "",
+          label: pre.label || "闪避",
+          skillId: spec.skillId || ""
+        });
+        return 0;
+      }
+      if (state.phase === "finished") return 0;
+    }
 
     if (dmg > 0 && target.reflect && target.charge && !spec.reflected) {
       pushEvent(events, {
@@ -102,6 +141,7 @@
           type: type,
           amount: dmg * (target.reflect.factor || 2),
           noBreak: true,
+          noReaction: true,
           reflected: true,
           skillId: spec.skillId
         }, events);
@@ -126,7 +166,9 @@
       return 0;
     }
 
+    var beforeHp = target.hp;
     target.hp = Math.max(0, target.hp - dmg);
+    B.state.markHpLoss(target, beforeHp);
     target.lastDamageType = type;
     if (dmg > 0) {
       target.stats.hitsTaken += 1;
@@ -152,7 +194,7 @@
 
     if (dmg > 0 && !noBreak && !fromBuff) {
       addBreakValue(state, target, events);
-      addStunValue(state, target, events);
+      if (!noStun) addStunValue(state, target, events);
     }
     if (dmg > 0 && !fromBuff && canBreakCharge(target)) {
       clearCharge(state, target, "damage", events);
@@ -161,6 +203,19 @@
       heal(state, { uid: source.uid, amount: dmg, rounding: "none", reason: "healBack" }, events);
     }
     resolveDeath(state, target, events);
+    if (dmg > 0 && state.phase !== "finished" && B.skills && B.skills.runHooks) {
+      var post = {
+        sourceUid: spec.sourceUid || "",
+        targetUid: target.uid,
+        skillId: "passive.afterDamage",
+        label: "伤害结算后",
+        damageType: type,
+        amount: dmg,
+        fromBuff: fromBuff
+      };
+      if (source) B.skills.runHooks(state, source, "damageDealt", post, events);
+      if (state.phase !== "finished") B.skills.runHooks(state, target, "damageTaken", post, events);
+    }
     return dmg;
   }
 
@@ -168,7 +223,9 @@
     var target = B.state.unitOf(state, spec.targetUid);
     var amount = B.rules.round5(Number(spec.amount) || 0);
     if (amount <= 0) return 0;
+    var beforeHp = target.hp;
     target.hp = Math.max(0, target.hp - amount);
+    B.state.markHpLoss(target, beforeHp);
     B.state.addHpLog(target, state.round, -amount);
     pushEvent(events, {
       type: "directLoss",

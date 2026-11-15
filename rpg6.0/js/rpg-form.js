@@ -112,6 +112,14 @@
               esc(val(value, "occupation")) + '"></label>' +
           '<label class="field"><span class="field-label">副业<span class="field-hint">可以留空</span></span>' +
             '<input type="text" name="side_job" maxlength="20" value="' + esc(val(value, "side_job")) + '"></label>' +
+          '<label class="field field-narrow"><span class="field-label">性别</span>' +
+            '<select name="gender">' +
+              ["", "男", "女"].map(function (g) {
+                return '<option value="' + g + '"' +
+                  (val(value, "gender") === g ? " selected" : "") + ">" +
+                  (g || "未填") + "</option>";
+              }).join("") +
+            "</select></label>" +
           '<label class="field field-narrow"><span class="field-label">强度评级</span>' +
             '<input type="text" name="rating" maxlength="8" list="rpgRatingList" value="' +
               esc(val(value, "rating")) + '"></label>' +
@@ -306,6 +314,7 @@
       occupation: get("occupation"),
       side_job: get("side_job"),
       rating: get("rating"),
+      gender: get("gender"),
       skills: skills,
       images: (state.images || []).slice(),
       author: get("author"),
