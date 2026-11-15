@@ -89,3 +89,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 4. **生成文档过期**：`build-docs --check` 是硬失败，改完页面不重生成一定红。
 5. **产物进了仓库**：`runs/`、`preview/` 之类要么进 `_local`，要么加进 `.gitignore`，否则 `check.ps1` 的文件扫描会越来越多。
 6. **归档不是终点**：交接里要写清楚"下一轮先做什么"，否则下一个会话会重做一遍已经做完的事。
+7. **新增模块后要改脚本**：新目录或新 skill 要把路径前缀加进 `tools/archive-check.mjs` 的 `AREAS`，否则盘点会把它归到「其他」，也就不会提醒你补 skill。
