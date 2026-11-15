@@ -201,6 +201,18 @@
     for (var ti = 0; ti < targets.length; ti++) {
       var target = targets[ti];
       var tctx = ctxFor(ctx, target);
+      var immune = B.skills && B.skills.immuneBuffs ? B.skills.immuneBuffs(target) : [];
+      if (op.kind && immune.indexOf(op.kind) >= 0) {
+        pushEvent(state, events, {
+          type: "buffImmune",
+          uid: target.uid,
+          kind: op.kind,
+          percent: evalValue(state, tctx, op.percent),
+          label: tctx.label || "",
+          blocked: true
+        });
+        continue;
+      }
       if (op.kind && DEBUFF_KINDS[op.kind] && target.reflect) {
         target = sideUnit(state, tctx, "self");
         if (!target) continue;
@@ -554,7 +566,7 @@
             amount: total,
             rounding: "none",
             skillId: hctx.skillId || "",
-            label: hctx.label || ""
+            label: op.label || hctx.label || ""
           }, events);
         }
         return;
@@ -1041,7 +1053,44 @@
   }
 
   function roundStart(state, events) {
+    for (var i = 0; i < state.units.length; i++) {
+      var unit = state.units[i];
+      if (unit.hp <= 0) continue;
+      stripImmuneBuffs(state, unit, events);
+      if (B.skills && B.skills.runHooks) {
+        B.skills.runHooks(state, unit, "roundStart", {
+          sourceUid: unit.uid,
+          targetUid: B.state.otherUid(state, unit.uid),
+          skillId: "passive.roundStart",
+          label: "标准回合开始"
+        }, events);
+      }
+      if (state.phase === "finished") return events;
+    }
     return events;
+  }
+
+  /* 免疫的 Buff 正常加不进来，这里每标准回合开始再兜底清一次 */
+  function stripImmuneBuffs(state, unit, events) {
+    var kinds = B.skills && B.skills.immuneBuffs ? B.skills.immuneBuffs(unit) : [];
+    if (!kinds.length || !unit.buffs.length) return;
+    var kept = [];
+    for (var i = 0; i < unit.buffs.length; i++) {
+      var buff = unit.buffs[i];
+      if (kinds.indexOf(buff.kind) >= 0) {
+        pushEvent(state, events, {
+          type: "buffImmune",
+          uid: unit.uid,
+          kind: buff.kind,
+          percent: buff.percent,
+          label: buff.label || "",
+          blocked: false
+        });
+      } else {
+        kept.push(buff);
+      }
+    }
+    unit.buffs = kept;
   }
 
   function roundEnd(state, events) {

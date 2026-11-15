@@ -7,7 +7,7 @@
   var api = B.traits = B.traits || {};
 
   var JOBS = {
-    "盾卫": { taunt: 2, basicType: "phys", chargeUnbreakable: false },
+    "盾卫": { taunt: 2, basicType: "phys", chargeUnbreakable: true },
     "重装": { taunt: 2, basicType: "magic", chargeUnbreakable: true },
     "强攻手": { taunt: 1, basicType: "phys" },
     "冲锋手": { taunt: 1, basicType: "phys" },

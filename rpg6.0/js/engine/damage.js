@@ -99,6 +99,23 @@
     }
     if (source && B.state.hasStatus(source, "noBreakOut")) noBreak = true;
 
+    /* 受击掷骰免疫：任何伤害（含 Buff 持续伤害、反弹与被动强制普攻）都先掷骰 */
+    if (dmg > 0 && B.skills && B.skills.rollDodge) {
+      var dodgeLabel = B.skills.rollDodge(state, target, events);
+      if (dodgeLabel) {
+        spec.dodged = true;
+        pushEvent(events, {
+          type: "dodge",
+          round: state.round,
+          uid: target.uid,
+          sourceUid: spec.sourceUid || "",
+          label: dodgeLabel,
+          skillId: spec.skillId || ""
+        });
+        return 0;
+      }
+    }
+
     if (dmg > 0 && !spec.noReaction && B.skills && B.skills.runHooks) {
       var pre = {
         sourceUid: spec.sourceUid || "",

@@ -83,6 +83,45 @@
     return !!(byOwner[unit.name] && byOwner[unit.name].length);
   }
 
+  /* 受击掷骰免疫：伤害结算前先掷骰，掷出 values 里的点数就整体免疫。
+     不放在 beforeDamage 钩子里，因为那条路径对 noReaction 的二次伤害（反弹、被动强制普攻）会被跳过。 */
+  function rollDodge(state, unit, events) {
+    var list = byOwner[unit.name] || [];
+    for (var i = 0; i < list.length; i++) {
+      var def = list[i].rollDodge;
+      if (!def) continue;
+      var sides = Number(def.sides) || B.rules.CONFIG.diceSides;
+      var values = def.values || [];
+      var roll = B.rng.dice(state, sides);
+      if (events) {
+        events.push({
+          type: "dice",
+          round: state.round,
+          uid: unit.uid,
+          sides: sides,
+          value: roll,
+          label: list[i].name,
+          skillId: list[i].id
+        });
+      }
+      if (values.indexOf(roll) >= 0) return list[i].name;
+    }
+    return "";
+  }
+
+  /* 随身 Buff 免疫：技能上的 buffImmune 列表，加 Buff 时拦截、标准回合开始再清一次兜底 */
+  function immuneBuffs(unit) {
+    var list = byOwner[unit.name] || [];
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var kinds = list[i].buffImmune || [];
+      for (var j = 0; j < kinds.length; j++) {
+        if (out.indexOf(kinds[j]) < 0) out.push(kinds[j]);
+      }
+    }
+    return out;
+  }
+
   function walk(value, visit) {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) {
@@ -408,6 +447,8 @@
   api.effectiveCost = effectiveCost;
   api.forUnit = forUnit;
   api.has = has;
+  api.rollDodge = rollDodge;
+  api.immuneBuffs = immuneBuffs;
   api.initUnit = initUnit;
   api.execute = execute;
   api.resolveTarget = resolveTarget;

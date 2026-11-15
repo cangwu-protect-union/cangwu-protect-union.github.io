@@ -709,7 +709,17 @@ window.RPG6_SKILLS = {
         charge: 0,
         cooldown: 0,
         target: "self",
-        unsupported: "受击免疫要在伤害结算前拦截，本批未实现",
+        rollDodge: { sides: 6, values: [1, 3, 5] },
+        buffImmune: ["panic", "fragile"],
+        hooks: {
+          roundStart: [
+            {
+              op: "if",
+              cond: { left: { stat: "self.hp" }, op: "le", right: 600 },
+              then: [{ op: "heal", who: "self", value: 25, rounding: "none", label: "皮糙肉厚" }]
+            }
+          ]
+        },
         ops: []
       }
     ],

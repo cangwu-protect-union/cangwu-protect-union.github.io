@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 19 人 / 67 条技能，引擎 `6.0-engine.6`；`test.html` 用 22 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 19 人 / 67 条技能，引擎 `6.0-engine.7`；`test.html` 用 22 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。
 
 ## 加一个能上场的角色
 
@@ -93,6 +93,10 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 嘲讽 | 单体选目标取该侧最高；召唤物默认 0；射手 `ignoreTaunt` 例外 |
 | 动态费用 | `costFromLost:{per}` 按累计失血每 per 点降 1 蓝 1 力，最低 0；费用在每次蓄力/释放时重算 |
 | 标准回合 | 持续效果施加当回合就扣一层；空标准回合也会推进（一次 `apply` 可能跨多个 `roundEnd`） |
+| 蓄力打断 | 受到非 Buff 伤害清空力；**盾卫与重装例外**（`traits.chargeUnbreakable`），「肥肥反弹」蓄力时也不打断 |
+| 受击掷骰免疫 | `rollDodge:{sides,values}` 在 `damage.hit` 最前面、每段伤害各掷一次；命中就整体不结算（不掉血、不加击溃/眩晕值、不清蓄力、不触发命中后被动）；对 Buff 持续伤害、反弹、被动强制普攻同样生效；强扣不是伤害，不掷 |
+| Buff 免疫 | `buffImmune:[kind]` 由 `skills.immuneBuffs` 汇总，`addBuff` 拦截并推 `buffImmune` 事件；标准回合开始再兜底清一次。与召唤物的 `breakImmune` 不是一回事 |
+| 标准回合开始钩子 | `roundStart`，在速度条结算之前跑（宋知远血 ≤600 回 25） |
 
 ## 手机横屏与折叠（对局页）
 
@@ -119,7 +123,7 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 & powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 138 条、浏览器 12 条；19 人 4 seed 压测 0 引擎异常。
+压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 143 条、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
 
 ## 踩过的坑
 
@@ -151,6 +155,9 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 26. **召唤物点击要先于 `[data-unit]`**：召唤物 chip 在角色卡内部，事件委托先查 `[data-summon]` 再查 `[data-unit]`；不可选中的 chip 要提示「不可选中」，不要误报「被嘲讽保护」。
 27. **e2e 的步数要数角色回合，不是循环次数**：速度条让 20 速角色每 5 个标准回合才动一次，循环里 `i` 会把对手回合也算进去；用 `steps` 只在该角色行动时 +1，否则会在错误的回合点技能、把蓄力放掉。
 28. **gitleaks 只扫 commit**：`check.ps1` 在工作区干净、还没提交时能过，提交后再跑会扫到新 commit。`battle-skills.js` 里的 `key: "zhengyingli.kuihua2"` 这类数据 id 会被 `generic-api-key` 误报；在 `.gitleaks.toml` 按 `paths` + 行正则放行这两个 key，不要放行整个文件或所有 `key:` 行。
+29. **受击掷骰免疫别写 `beforeDamage`**：`damage.hit` 在 `noReaction` 时整段跳过钩子（江雨轩「肥肥反弹」的反弹伤害、被动 `strike`），毛毛就挡不住这些伤害。走 `damage.hit` 最前面的 `skills.rollDodge`，与钩子无关；`buffImmune` 同理走 `skills.immuneBuffs` 在 `addBuff` 里拦，不要靠 `dispel`（它会把负向属性修正一起清掉）。
+30. **回血 op 的 `label`**：`heal` 现在优先用 `op.label`，否则用上下文 label；写在 `roundStart` 钩子里的回血不带 `label` 会显示成「标准回合开始 · 宋知远 +25」。
+31. **`buffImmune` 是随身属性，不进 `state.hash`**：它由技能库按角色名推导，回放时技能库一致就不会漂；如果以后做成可变的（如「剃发为僧」期间免疫），要把它写进 `state` 与指纹。
 
 ## 交付前检查
 

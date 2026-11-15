@@ -200,6 +200,9 @@
       case "buffExpire":
         line = { text: round + who + " 的「" + ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[e.kind] + "」结束", cls: "is-mute" };
         break;
+      case "buffImmune":
+        line = { text: round + who + " 免疫「" + ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[e.kind] + "」", cls: "is-cancel" };
+        break;
       case "dispel":
         if (e.removed && e.removed.length) line = { text: round + who + " 清除 " + e.removed.length + " 项", cls: "is-mute" };
         break;

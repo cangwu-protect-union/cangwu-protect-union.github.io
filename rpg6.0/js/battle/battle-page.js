@@ -424,6 +424,7 @@
       else if (e.type === "directLoss") parts.push("强扣 " + e.amount);
       else if (e.type === "heal") parts.push("回复 " + e.amount);
       else if (e.type === "buffAdd") parts.push("附加 " + (BUFF_NAME[e.kind] || e.kind) + " " + e.percent + "%");
+      else if (e.type === "buffImmune") parts.push("免疫 " + (BUFF_NAME[e.kind] || e.kind));
       else if (e.type === "statusAdd") parts.push("附加 " + (e.label || e.kind) + " " + e.remain + " 回合");
       else if (e.type === "charg") parts.push("蓄力 " + e.amount + "/" + (e.need || "?"));
       else if (e.type === "mark") parts.push(e.name + " " + e.value + (e.hideMax ? "" : "/" + e.max));
