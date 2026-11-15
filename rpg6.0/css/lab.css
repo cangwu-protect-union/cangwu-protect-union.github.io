@@ -1,0 +1,193 @@
+/* 策略实验室页面样式。只作用于 .lab-* 与 #lab-*，不碰全站类。 */
+
+.lab-page {
+  padding-top: 28px;
+  padding-bottom: 48px;
+}
+
+.lab-head h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.lab-lead {
+  max-width: 720px;
+  margin: 0 0 6px;
+}
+
+.lab-hint,
+.lab-meta,
+.lab-note,
+.lab-status,
+.lab-empty {
+  color: #77726a;
+  font-size: 13px;
+}
+
+.lab-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  margin: 18px 0 10px;
+}
+
+.lab-toolbar label {
+  display: block;
+  font-size: 12px;
+  color: #77726a;
+  margin-bottom: 4px;
+}
+
+#lab-run-select {
+  min-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid #d8d3c8;
+  background: #fffdf7;
+  color: inherit;
+  font: inherit;
+}
+
+.lab-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lab-filters button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid #d8d3c8;
+  background: #fffdf7;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lab-filters button[aria-pressed="true"] {
+  background: #24211c;
+  border-color: #24211c;
+  color: #fffdf7;
+}
+
+.lab-counts {
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+
+.lab-summary {
+  margin-bottom: 14px;
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.lab-card {
+  border: 1px solid #d8d3c8;
+  background: #fffdf7;
+  padding: 14px;
+}
+
+.lab-card h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.lab-badge {
+  font-size: 12px;
+  font-weight: 400;
+  padding: 1px 6px;
+  border: 1px solid #d8d3c8;
+}
+
+.lab-badge-still { border-color: #2f6f4f; color: #2f6f4f; }
+.lab-badge-loop { border-color: #8a6d1f; color: #8a6d1f; }
+.lab-badge-open { border-color: #7a4a72; color: #7a4a72; }
+
+.lab-matrix {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 6px 0 10px;
+}
+
+.lab-matrix th,
+.lab-matrix td {
+  border: 1px solid #d8d3c8;
+  padding: 3px 7px;
+  text-align: center;
+  min-width: 52px;
+}
+
+.lab-matrix th {
+  color: #77726a;
+  font-weight: 400;
+}
+
+.lab-matrix td.lab-saddle {
+  outline: 2px solid #24211c;
+  outline-offset: -2px;
+}
+
+.lab-toggle {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border: 1px solid #d8d3c8;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lab-policy-box {
+  display: none;
+  margin-top: 10px;
+}
+
+.lab-card.is-open .lab-policy-box {
+  display: block;
+}
+
+.lab-policy-box h3 {
+  font-size: 12px;
+  font-weight: 400;
+  color: #77726a;
+  margin: 10px 0 2px;
+}
+
+.lab-policies {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #77726a;
+}
+
+.lab-policies li {
+  margin-bottom: 8px;
+}
+
+.lab-policies code {
+  color: #24211c;
+}
+
+.lab-back {
+  margin-top: 28px;
+}
+
+@media (max-width: 640px) {
+  .lab-matrix th,
+  .lab-matrix td {
+    padding: 2px 4px;
+    min-width: 44px;
+  }
+
+  .lab-card h2 {
+    font-size: 14px;
+  }
+}

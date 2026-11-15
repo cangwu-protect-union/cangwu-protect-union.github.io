@@ -27,3 +27,6 @@ Thumbs.db
 
 # Office 打开文件时生成的临时锁文件，形如 ~$README.md
 ~$*
+
+# 策略实验室的运行产物（报告、矩阵、策略库都是可重跑的中间结果）
+rpg6.0/strategy-lab/runs/
