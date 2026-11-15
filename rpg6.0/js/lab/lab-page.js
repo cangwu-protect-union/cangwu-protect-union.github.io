@@ -209,7 +209,7 @@
     }
     state.runs = [snap];
     selectRun(0);
-    byId("lab-note").textContent = "数据库暂时读不到，当前显示的是随站点发布的快照。";
+    byId("lab-note").textContent = "当前显示随站点发布的最新快照。";
   }
 
   function init() {
