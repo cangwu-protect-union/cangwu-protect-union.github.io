@@ -37,6 +37,7 @@
 | 改完页面要实测 | `guitu-browser-test` |
 | 跑或写端到端测试（`_local/tests`） | `site-e2e-tests` |
 | 改样式或调整视觉 | `guitu-design` |
+| 改 rpg6.0 战斗引擎、技能库、召唤物或对局页 | `rpg6-battle` |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |
 
@@ -59,6 +60,30 @@ node _local/tests/run-all.mjs --group=数据源
 node _local/tests/run-all.mjs --group=导航
 ```
 
+### 回合制 6.0
+
+改 `rpg6.0/js/engine`、`data/battle-skills.js`、召唤物、对局页或战报时，加载 `rpg6-battle`，并在 `check.ps1` 之外跑：
+
+```
+node _local/tests/engine/run.mjs
+node _local/tests/engine/batch.mjs --pairs=smoke --seeds=1
+node _local/tests/run-all.mjs --group=回合制
+```
+
+改规则要升 `data/config.js` 的 `engineVersion`；同步 `test.html` 提示、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`_local/docs` 的角色机制文档（`_local` 不推送）。召唤物/新钩子要进状态指纹与回放。
+
 ## 文档与配图
 
 项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成每个模块（含主站）的 `架构.md`、`访客流程图.md` 与 `preview/` 的 PNG 索引。`check.ps1` 会调 `build-docs.js --check` 比对文档与源码，过期即失败。
+
+回合制 6.0 的角色/技能数还要同步 `test.html`、`游戏说明.md`、`架构.md`、`README.md` 与 `_local/docs/回合制6.0测试功能-角色机制.md`；机制文档在 `_local`，不推送，但必须更新。
+
+## 提交前
+
+`git status --short` 逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。
+
+提交后再跑一次 `tools/check.ps1`：gitleaks 只扫 commit，工作区通过不代表提交后通过；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
+
+## 归档或交接前
+
+把本会话新增的规则、测试命令、踩过的坑写进对应 skill 和本文件，再提交并推送。技能文件 `.dsh/skills/*/SKILL.md` 受版本管理，不能只留在对话或本地；`_local/` 仍然不推送。

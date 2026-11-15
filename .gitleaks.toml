@@ -20,3 +20,11 @@ regexes = ['''publishableKey''']
 description = "天地图浏览器端 tk，设计上出现在前端，靠域名白名单限制"
 regexTarget = "line"
 regexes = ['''tiandituKey''']
+
+# 技能数据里的 summon key 是数据 id（如 zhengyingli.kuihua2），不是密钥。
+# 只放行 battle-skills.js 里这两个召唤物 key，不放行整个文件或所有 key: 行。
+[[allowlists]]
+description = "battle-skills 的召唤物 key 是数据 id，不是 API key"
+paths = ['''rpg6\.0/data/battle-skills\.js''']
+regexTarget = "line"
+regexes = ['''key:\s*"zhengyingli\.kuihua[24]"''']
