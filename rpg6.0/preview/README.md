@@ -12,7 +12,7 @@ node _local/tools/build-docs.js
 
 ## 清单
 
-共 11 张，合计 1338 KB。
+共 10 张，合计 1301 KB。
 
 | 文件 | 内容 |
 |---|---|
@@ -26,4 +26,3 @@ node _local/tools/build-docs.js
 | `review.png` | 投稿审核：待审 |
 | `approve.png` | 审核转正表单 |
 | `edit-list.png` | 编撰档案列表 |
-| `old-archive.png` | 旧档案 |

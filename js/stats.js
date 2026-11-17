@@ -10,12 +10,6 @@
 (function () {
   "use strict";
 
-  var RANGES = [
-    { days: 7, label: "最近一周" },
-    { days: 30, label: "最近一个月" },
-    { days: 365, label: "最近一年" }
-  ];
-
   var ACTIONS = [
     { key: "create", label: "新增" },
     { key: "update", label: "修改" },
@@ -23,13 +17,6 @@
     { key: "delete", label: "删除" },
     { key: "other", label: "其余" }
   ];
-
-  var MODULE_LABELS = {
-    guitu: "鬼图鉴",
-    quyu: "异常区域档案",
-    suggest: "站点建议",
-    "rpg6.0": "回合制正传6.0"
-  };
 
   var days = 7;
 

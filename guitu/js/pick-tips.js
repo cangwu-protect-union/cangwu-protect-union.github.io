@@ -45,9 +45,6 @@
   }
 
   function itemHtml(t) {
-    var tags = (t.tags || []).slice(0, 3).map(function (x) {
-      return "<li>" + esc(x) + "</li>";
-    }).join("");
     var imgCount = window.guiImagesFor(t).length;
     var isOn = !!selected[t.id];
 

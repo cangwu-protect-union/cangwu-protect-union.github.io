@@ -34,10 +34,6 @@
     return selectEl ? String(selectEl.value || "").trim() : "";
   }
 
-  function needsMember() {
-    return members().length === 0;
-  }
-
   /* opts: { title, text, confirmText, danger, note, placeholder }
      note 为 true 时多一个备注输入框（可留空） */
   function ask(opts) {

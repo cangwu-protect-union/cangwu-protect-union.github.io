@@ -92,14 +92,12 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 │   ├── js/                 数据层、表单组件、各页面逻辑
 │   ├── js/engine/          战斗引擎（纯函数，可在 node 里跑）
 │   ├── js/battle/          对局界面：渲染、选中、战报、页面装配
-│   └── archive/            原始角色 txt 与图片（导入后只作核对）
+│   └── archive/            原始角色档案（6.0doc，只作核对）与在线角色图（picture/5–19）
 │
 ├── _local/             ★ 本地工作区（不推送，详见 _local/README.md）
 │   ├── sql/                数据库迁移脚本
-│   ├── docs/               任务文档、更新记录
+│   ├── docs/               需求规格与机制文档
 │   ├── notes/              说明文档、私人笔记
-│   ├── assets/             本地素材
-│   └── preview/            页面截图
 │
 ├── 改动索引.md          常见改动要动哪些文件、连带改什么
 ├── .gitattributes      换行符统一为 LF

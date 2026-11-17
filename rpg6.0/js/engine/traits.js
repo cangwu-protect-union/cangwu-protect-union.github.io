@@ -1,6 +1,5 @@
 /* 回合制正传 6.0 · 战斗引擎 · 职业与副业
-   这里只给静态属性与钩子清单；M3 把 onCalcStat / onAfterDamage 这类钩子接进结算。
-   数据来源：_local/docs/职业介绍.txt。 */
+   这里只给静态属性与钩子清单；钩子接在 damage.js 与 timeline.js。 */
 (function (root) {
   "use strict";
   var B = root.RPG6B || (root.RPG6B = {});

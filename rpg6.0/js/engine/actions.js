@@ -1,5 +1,5 @@
 /* 回合制正传 6.0 · 战斗引擎 · 动作
-   M1 只做普攻、击溃、蓄蓝；技能的合法性与结算在 M4 接进来。 */
+   普攻、击溃、蓄蓝；技能执行与档案校验在 skills.js。 */
 (function (root) {
   "use strict";
   var B = root.RPG6B || (root.RPG6B = {});

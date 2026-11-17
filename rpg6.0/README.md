@@ -167,6 +167,5 @@ test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步�
 
 ## 原始资料
 
-`archive/doc/*.txt` 是 33 份原始角色档案，`archive/picture/*.jpeg` 是对应图片（1–19，其中 1–4 未被角色引用）。
-角色与图片按人物对应，同一张合影可对应多名角色。
-导入数据库后 txt 不再参与渲染，保留作核对依据。规则两份底稿在 `_local/docs/规则介绍.txt`、`_local/docs/职业介绍.txt`。
+`archive/6.0doc/回合制角色/*.txt` 是 44 份原始角色档案（技能原文，编号与出处见 `0 清单.txt`），导入数据库后不再参与渲染，保留作核对依据。
+`archive/picture/5–19.jpeg` 被 `data/characters.js` 直接引用；角色与图片按人物对应，同一张合影可对应多名角色。

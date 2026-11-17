@@ -12,7 +12,7 @@ node _local/tools/build-docs.js
 
 ## 清单
 
-共 31 张，合计 1972 KB。
+共 27 张，合计 1862 KB。
 
 | 文件 | 内容 |
 |---|---|
@@ -32,9 +32,6 @@ node _local/tools/build-docs.js
 | `gui-addgate.png` | 增加条目页的组织验证 |
 | `edit-gate.png` | 编辑图鉴的组织验证 |
 | `edit-list.png` | 编辑图鉴列表 |
-| `old-gui.png` | 旧图鉴 |
-| `final-old-gui.png` | 旧图鉴（定稿） |
-| `old-gui-gray.png` | 旧图鉴：灰色方格表示条目已删除 |
 | `version-view.png` | 查看单个历史版本 |
 | `ver-save.png` | 保存版本后的编辑列表 |
 | `multi-form.png` | 多图上传表单 |
@@ -46,4 +43,3 @@ node _local/tools/build-docs.js
 | `submit-flow.png` | 提交完成界面 |
 | `live-final.png` | 线上最终效果 |
 | `live-cloud-ok.png` | 云端连通验证（图鉴 7 条） |
-| `supabase-result.png` | 已弃用：早期 Supabase 连通测试失败 |
