@@ -114,6 +114,17 @@
     if (roster.length > 1) dom.pickB.selectedIndex = 1;
     dom.source.textContent = "角色数据：" + source + " · 可上场 " + roster.length +
       (total ? " / 共 " + total + " 名" : "");
+    if (dom.coverage) dom.coverage.textContent = coverageText();
+  }
+
+  /* 页面上的角色数/技能数只在这里算，不写字面量：技能库一加人，提示自动跟上 */
+  function coverageText() {
+    var lib = window.RPG6_SKILLS && window.RPG6_SKILLS.characters ? window.RPG6_SKILLS.characters : null;
+    var chars = lib ? Object.keys(lib).length : 0;
+    var skills = B.skills && B.skills.all ? B.skills.all().length : 0;
+    if (!chars || !skills) return "技能库没有加载成功，对局功能不可用。";
+    return "技能库覆盖 " + chars + " 名角色、" + skills + " 条技能，其余角色不会出现在列表里。" +
+      "同一种子加同一串操作必然复现同一局。对局结束后战报自动入库，刷新中途可以从「继续上一局」接着打。";
   }
 
   function applyRoster(result) {
@@ -1018,6 +1029,7 @@
     dom.undo = $("[data-undo]");
     dom.restart = $("[data-restart]");
     dom.source = $("[data-source]");
+    dom.coverage = $("[data-coverage]");
     dom.turnEl = $("[data-turn]");
     dom.hintEl = $("[data-hint]");
     dom.replayBox = $("[data-replay]");
@@ -1033,6 +1045,7 @@
 
     if (!B || !B.battle || !B.skills || !window.RPG6_SKILLS) {
       dom.source.textContent = "引擎或技能库没有加载成功，对局功能不可用。";
+      if (dom.coverage) dom.coverage.textContent = "技能库没有加载成功，对局功能不可用。";
       dom.start.disabled = true;
       return;
     }

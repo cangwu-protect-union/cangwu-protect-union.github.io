@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 19 人 / 67 条技能，引擎 `6.0-engine.7`；`test.html` 用 22 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 用 <!-- RPG6-STATS:START scripts -->23<!-- RPG6-STATS:END scripts --> 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -51,12 +51,13 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
    - 在同文件的 `summons` 块加定义（`stats`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`、`attack`、`onExpire`）；
    - 技能 ops 写 `{op:"summon", key:"..."}`；
    - 记住无血计时物 `targetable:false`，有血单位才会进单体目标列表。
-5. 跑 `run.mjs`，把新角色补进 `skills.test.mjs` 的 `SHEET` 与 `CHAR`，再跑一次批量压测冒烟；有召唤物/目标选择就补一条浏览器用例。
-6. 同步 `test.html` 提示、`游戏说明.md`、`架构.md`、机制文档与 `README.md` 的角色/技能数。
+5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`，把新角色补进 `skills.test.mjs` 的 `SHEET` 与 `CHAR`，再跑一次批量压测冒烟；有召唤物/目标选择就补一条浏览器用例。
+6. 在机制文档里给每条技能加锚点 `<!-- skill:角色拼音.技能 -->`（`### 1.1 技能名（条件） <!-- skill:... -->` 或 `- **技能名（条件）** <!-- skill:... -->：`），漏了 lint 会按「缺少锚点」报。
+7. 跑 `node _local/tools/rpg6-stats.js --write` 把 `test.html` 之外的计数写回 `游戏说明.md`、`架构.md` 机制文档、`README.md` 和本 skill；`test.html` 的数字是运行时算的，不用改。计数不要手写，`--check` 会抓住。
 
 ## 技能 DSL 速查
 
-- op 全表见 plan 第 5 节（v1 19 个，后续追加）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`noStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`、`buff`、`status`、`breakValue`、`forceBreak`、`tick`、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
+- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 `effect-ops.js` 的 `opNames`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`noStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`、`buff`、`status`、`breakValue`、`forceBreak`、`tick`、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`。
@@ -119,11 +120,15 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 & $node _local/tests/engine/run.mjs
 & $node _local/tests/engine/batch.mjs --pairs=smoke --seeds=1
 & $node _local/tests/engine/batch.mjs --seeds=4
+& $node _local/tools/rpg6-lint.js
+& $node _local/tools/rpg6-stats.js --check
 & $node _local/tests/run-all.mjs --group=回合制
 & powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 143 条、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
+压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 143 条（含 `lint.test.mjs` 14 条）、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
+
+`rpg6-lint.js` 与 `rpg6-stats.js --check` 已经挂在 `check.ps1` 里，单跑是为了看细项。`--warn` 只提醒不阻断，`--json` 给机器读；`rpg6-stats.js --write` 改数字，手改会被 `--check` 抓。
 
 ## 踩过的坑
 
@@ -163,9 +168,11 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 
 - [ ] `run.mjs` 全绿
 - [ ] `batch --pairs=smoke` 无引擎异常
+- [ ] `rpg6-lint.js` 退出码 0（结构、锚点、版本号）
+- [ ] `rpg6-stats.js --check` 退出码 0（文档数字；改了数据先 `--write`）
 - [ ] `run-all.mjs --group=回合制` 全绿（含 `844×390` 横屏用例；带召唤物时一屏）
 - [ ] `check.ps1` 退出码 0
-- [ ] 文档里的角色数/技能数同步（`test.html` 提示、`rpg6.0/README.md`、`游戏说明.md`、`架构.md`、plan、机制文档）
-- [ ] 新角色写进机制文档，`unsupported` 的技能写明原因；召唤物写进 `summons` 块与 `state.hash`
+- [ ] 文档里的角色数/技能数由 `rpg6-stats.js --write` 写回，没有手写数字（`test.html` 是运行时算的）
+- [ ] 新角色写进机制文档并带 `<!-- skill:id -->` 锚点，`unsupported` 的技能写明原因；召唤物写进 `summons` 块与 `state.hash`
 - [ ] 动过对局页：桌面 1280×900 与手机 844×390 各截一张图核对，确认没有任何一块要横向滚动
 - [ ] 会话要归档时，把新增口径/命令/坑写进本 skill 和根 `AGENTS.md`，再推送

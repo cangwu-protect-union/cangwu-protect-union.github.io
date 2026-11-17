@@ -315,7 +315,7 @@
     var state = {
       version: (opts && opts.version) ||
         (root.RPG_APP && root.RPG_APP.engineVersion) ||
-        "6.0-engine.3",
+        B.ENGINE_VERSION,
       seed: rawSeed,
       rng: B.rng.init(rawSeed),
       round: 0,

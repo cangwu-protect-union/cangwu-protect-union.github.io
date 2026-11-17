@@ -1097,6 +1097,16 @@
     standardRoundEnd(state, events);
   }
 
+  /* op 全表：技能库里 op 的合法取值。文档的 op 表与 _local/tools/rpg6-lint.js 都读这里，
+     新增 case 必须同步本数组；lint 单测会比对本数组与 runOp 里的 case 集合。 */
+  api.opNames = [
+    "damage", "directLoss", "heal", "healFull", "mp", "maxHp", "maxMp", "stat", "buff",
+    "status", "breakValue", "stunValue", "forceBreak", "dice", "roll", "strike", "deny",
+    "if", "dispel", "tick", "reflect", "interrupt", "schedule", "mark", "markClear",
+    "taunt", "counter", "use", "setBasicMod", "clearMods", "summon", "setBasicMode",
+    "dodge", "note"
+  ];
+
   api.runOps = runOps;
   api.runOp = runOp;
   api.actionGate = actionGate;

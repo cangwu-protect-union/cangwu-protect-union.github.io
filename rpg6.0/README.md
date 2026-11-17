@@ -54,15 +54,17 @@ js/
 ├── old-character.js   某角色的历史版本
 ├── version.js         单版本查看
 ├── engine/            战斗引擎（纯函数，不碰 DOM）
+│   ├── version.js     引擎版本号，唯一来源
 │   ├── rng.js         种子随机
 │   ├── rules.js       数值与公式（取整、三种伤害、速度条）
 │   ├── traits.js      8 主业 + 6 副业
 │   ├── state.js       建局、面板结算、深拷贝、状态指纹
 │   ├── damage.js      伤害/回血/强扣/死亡
-│   ├── effect-ops.js  效果解释器（27 个 op）
+│   ├── effect-ops.js  效果解释器（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
 │   ├── skills.js      技能执行与档案校验
+│   ├── summons.js     召唤物：创建、计时、光环、自动攻击
 │   ├── actions.js     普攻/击溃/蓄蓝
 │   └── battle.js      门面：create / apply / available / hash / replay
 └── battle/            对局界面
