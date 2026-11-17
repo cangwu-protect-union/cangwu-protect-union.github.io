@@ -4,11 +4,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { classify } from "./lib/analyze.mjs";
+import { classify, nashOf, sensitivityOf } from "./lib/analyze.mjs";
+import { behaviorSignature } from "./lib/battle.mjs";
 import { buildCalibration, loadCalibration, writeCalibration } from "./lib/calibration.mjs";
 import { LAB_DIR, loadEngine, ROOT, roster } from "./lib/engine.mjs";
 import { estimatePair, makeSeeds, rateAgainst, summarize } from "./lib/matrix.mjs";
-import { makeRng, randomWeights } from "./lib/policy.mjs";
+import { makeRng, policyKey, randomWeights, readablePolicy } from "./lib/policy.mjs";
 import { writeReport } from "./lib/report.mjs";
 import { writeHtml } from "./lib/report-html.mjs";
 import { trainPair } from "./lib/train.mjs";
@@ -21,12 +22,13 @@ const { values } = parseArgs({
     pairs: { type: "string", default: "" },
     games: { type: "string", default: "400" },
     mingames: { type: "string", default: "40" },
-    gens: { type: "string", default: "4" },
-    pop: { type: "string", default: "12" },
+    gens: { type: "string", default: "5" },
+    pop: { type: "string", default: "10" },
     screen: { type: "string", default: "6" },
-    confirm: { type: "string", default: "16" },
-    rounds: { type: "string", default: "2" },
-    strategies: { type: "string", default: "3" },
+    confirm: { type: "string", default: "12" },
+    strategies: { type: "string", default: "4" },
+    oracles: { type: "string", default: "6" },
+    eps: { type: "string", default: "0.02" },
     cap: { type: "string", default: "400" },
     seed: { type: "string", default: "1000" },
     out: { type: "string", default: "" },
@@ -140,12 +142,13 @@ async function main() {
   const config = {
     games: num("games", 400),
     minGames: num("mingames", 40),
-    gens: num("gens", 4),
-    pop: num("pop", 12),
+    gens: num("gens", 5),
+    pop: num("pop", 10),
     screen: num("screen", 6),
-    confirm: num("confirm", 16),
-    rounds: num("rounds", 2),
-    strategies: num("strategies", 3),
+    confirm: num("confirm", 12),
+    strategies: num("strategies", 4),
+    oracles: num("oracles", 6),
+    eps: isFinite(Number(values.eps)) && Number(values.eps) > 0 ? Number(values.eps) : 0.02,
     cap: num("cap", 400),
     baseSeed: num("seed", 1000)
   };
@@ -157,27 +160,136 @@ async function main() {
   const results = [];
   const started = Date.now();
   const B = loadEngine().B;
+  const TRAIN_SEEDS = 3;
+  const MERGE_CAP = 12;
+  const PRUNE_KEEP = 8;
+  const scoreMat = (cells) => cells.map((row) => row.map((c) => (c.n ? (c.a + 0.5 * c.d) / c.n : 0)));
+
   for (const [a, b] of pairs) {
     const t0 = Date.now();
     process.stdout.write("训练 " + a.name + " vs " + b.name + " … ");
-    const trained = trainPair(B, a, b, { ...config, calib });
+    /* 多种子合并：同一对跑 TRAIN_SEEDS 个训练种子，合并策略池再重判 */
+    const allA = [];
+    const allB = [];
+    const metas = [];
+    const traces = [];
+    for (let s = 0; s < TRAIN_SEEDS; s++) {
+      const t = trainPair(B, a, b, { ...config, calib, baseSeed: config.baseSeed + s * 1000 });
+      for (const p of t.a) allA.push(p.w);
+      for (const p of t.b) allB.push(p.w);
+      metas.push(t.meta);
+      traces.push({ seed: config.baseSeed + s * 1000, trace: t.trace });
+    }
+    const dedupe = (list) => {
+      const seen = new Set();
+      const out = [];
+      for (const p of list) {
+        const k = policyKey(p);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(p);
+      }
+      return out.slice(0, MERGE_CAP);
+    };
+    const uniqA = dedupe(allA);
+    const uniqB = dedupe(allB);
+    /* 修剪：按「对敌方池的最差胜率」保留最强的 PRUNE_KEEP 套 */
+    const pruneSeeds = makeSeeds(12, config.baseSeed + 7000);
+    const prune = (mine, foes, mineIsA) => {
+      if (mine.length <= PRUNE_KEEP) return mine;
+      const scored = mine.map((p, i) => {
+        let min = 1;
+        for (const q of foes) {
+          const r = rateAgainst(B, mineIsA ? a : b, mineIsA ? b : a, p, q, pruneSeeds, { calib, cap: config.cap }).rate;
+          min = Math.min(min, mineIsA ? r : 1 - r);
+        }
+        return { p, i, min };
+      });
+      scored.sort((x, y) => y.min - x.min);
+      return scored.slice(0, PRUNE_KEEP).sort((x, y) => x.i - y.i).map((x) => x.p);
+    };
+    const poolA = prune(uniqA, uniqB, true);
+    const poolB = prune(uniqB, uniqA, false);
+
     const seeds = makeSeeds(config.games, config.baseSeed);
-    const matrix = estimatePair(B, a, b, trained.a.map((p) => p.w), trained.b.map((p) => p.w), seeds,
+    const matrix = estimatePair(B, a, b, poolA, poolB, seeds,
       { calib, cap: config.cap, minGames: config.minGames, adaptive: !values.noadaptive });
     const verdict = classify(matrix.cells);
+    verdict.sensitive = sensitivityOf(matrix.cells, verdict);
+    const eq = nashOf(scoreMat(matrix.cells));
+    /* 混合均衡的 x/y 是支撑相对数组，展开成全长度对齐策略池 */
+    const expand = (mix, idxs, total) => {
+      const out = new Array(total).fill(0);
+      (idxs || mix.map((_, i) => i)).forEach((idx, k) => { out[idx] = mix[k]; });
+      return out;
+    };
+    const xFull = eq.S ? expand(eq.x, eq.S, poolA.length) : eq.x;
+    const yFull = eq.T ? expand(eq.y, eq.T, poolB.length) : eq.y;
     const summary = summarize(matrix.cells);
 
-    /* 留出校验：最优打法对两套没参与训练的随机打法，防训练把策略练废 */
-    const rnd = makeRng(config.baseSeed + a.name.length * 13 + b.name.length);
-    const probes = [randomWeights(rnd), randomWeights(rnd)];
-    const holdSeeds = makeSeeds(60, config.baseSeed + 5000);
-    const holdA = probes.reduce((sum, p) => sum + rateAgainst(B, a, b, trained.a[0].w, p, holdSeeds, { calib, cap: config.cap }).rate, 0) / probes.length;
-    const holdB = probes.reduce((sum, p) => sum + rateAgainst(B, b, a, trained.b[0].w, p, holdSeeds, { calib, cap: config.cap }).rate, 0) / probes.length;
+    const packSide = (pool, foes, mineChar, foeChar, mix) => {
+      const evalSeeds = makeSeeds(config.confirm, config.baseSeed + 611);
+      return pool.map((p, i) => {
+        const profile = foes.map((q) => rateAgainst(B, mineChar, foeChar, p, q, evalSeeds, { calib, cap: config.cap }).rate);
+        return {
+          id: mineChar.name + ".vs." + foeChar.name + "." + i,
+          w: p,
+          obj: +mix.reduce((s, x, j) => s + x * profile[j], 0).toFixed(3),
+          min: +Math.min(...profile).toFixed(3),
+          signature: behaviorSignature(B, mineChar, foeChar, p, makeSeeds(4, config.baseSeed + 7), calib),
+          readable: readablePolicy(p)
+        };
+      });
+    };
+    const policiesA = packSide(poolA, poolB, a, b, yFull);
+    const policiesB = packSide(poolB, poolA, b, a, xFull);
 
-    results.push({ a: a.name, b: b.name, verdict, summary, cells: matrix.cells, policiesA: trained.a, policiesB: trained.b, trace: trained.trace, holdout: { a: holdA, b: holdB } });
+    results.push({
+      a: a.name, b: b.name, verdict, summary,
+      cells: matrix.cells, policiesA, policiesB,
+      trace: traces,
+      meta: {
+        v: +eq.v.toFixed(4),
+        x: xFull.map((v) => +v.toFixed(4)),
+        y: yFull.map((v) => +v.toFixed(4)),
+        pure: eq.pure === true,
+        seeds: TRAIN_SEEDS,
+        iterations: Math.max(...metas.map((m) => m.iterations)),
+        exploitability: Math.max(...metas.map((m) => m.exploitability)),
+        stopReasons: metas.map((m) => m.stopReason)
+      }
+    });
     console.log(verdict.state + (verdict.strength ? "（" + verdict.strength + "）" : "")
       + " · 确定性 " + summary.certainCells + "/" + summary.cells
+      + " · 灵敏 " + (verdict.sensitive.stable ? "稳" : "翻")
+      + " · 榨取值 " + (metas.length ? Math.max(...metas.map((m) => m.exploitability)) : "—")
       + " · " + ((Date.now() - t0) / 1000).toFixed(1) + "s");
+  }
+
+  /* 留出验证：最优打法 vs 该对手在其它配对里练出的策略池（跨配对泛化） */
+  const poolOf = {};
+  for (const p of results) {
+    (poolOf[p.a] = poolOf[p.a] || []).push({ key: p.a + "+" + p.b, list: p.policiesA });
+    (poolOf[p.b] = poolOf[p.b] || []).push({ key: p.a + "+" + p.b, list: p.policiesB });
+  }
+  const holdSeeds = makeSeeds(40, config.baseSeed + 5000);
+  for (const p of results) {
+    const key = p.a + "+" + p.b;
+    const foePoolB = (poolOf[p.b] || []).filter((x) => x.key !== key).flatMap((x) => x.list.map((q) => q.w));
+    const foePoolA = (poolOf[p.a] || []).filter((x) => x.key !== key).flatMap((x) => x.list.map((q) => q.w));
+    const a = chars.find((c) => c.name === p.a);
+    const b = chars.find((c) => c.name === p.b);
+    const bestA = p.policiesA[p.meta.x.indexOf(Math.max(...p.meta.x))];
+    const bestB = p.policiesB[p.meta.y.indexOf(Math.max(...p.meta.y))];
+    const fallback = (name) => {
+      const rnd = makeRng(config.baseSeed + name.length * 13);
+      return [randomWeights(rnd), randomWeights(rnd)];
+    };
+    const poolB = foePoolB.length ? foePoolB : fallback(p.b);
+    const poolA = foePoolA.length ? foePoolA : fallback(p.a);
+    const holdA = poolB.reduce((s, q) => s + rateAgainst(B, a, b, bestA.w, q, holdSeeds, { calib, cap: config.cap }).rate, 0) / poolB.length;
+    const holdB = 1 - poolA.reduce((s, q) => s + rateAgainst(B, a, b, q, bestB.w, holdSeeds, { calib, cap: config.cap }).rate, 0) / poolA.length;
+    p.holdout = { a: holdA, b: holdB };
   }
 
   const result = {
@@ -189,7 +301,7 @@ async function main() {
   };
   fs.writeFileSync(path.join(outDir, "policies.json"), JSON.stringify({
     engineVersion,
-    pairs: results.map((p) => ({ a: p.a, b: p.b, a_policies: p.policiesA, b_policies: p.policiesB, trace: p.trace }))
+    pairs: results.map((p) => ({ a: p.a, b: p.b, a_policies: p.policiesA, b_policies: p.policiesB, trace: p.trace, meta: p.meta }))
   }, null, 2) + "\n", "utf8");
   writeReport(outDir, result);
   const htmlFile = writeHtml(outDir, result);

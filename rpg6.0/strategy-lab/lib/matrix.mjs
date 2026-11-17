@@ -36,26 +36,29 @@ export function rateAgainst(B, charMine, charFoe, weightsMine, weightsFoe, seeds
   return { rate: total / seeds.length, stalled, games: seeds.length };
 }
 
-export function estimatePair(B, charA, charB, policiesA, policiesB, seeds, options = {}) {
+/* 单格采样：自适应早停，供 estimatePair 与训练里的增量矩阵复用 */
+export function sampleCell(B, charA, charB, wa, wb, seeds, options = {}) {
   const minGames = options.minGames == null ? 40 : options.minGames;
   const adaptive = options.adaptive !== false;
-  const cells = policiesA.map((wa) => policiesB.map((wb) => {
-    const cell = emptyCell();
-    for (let i = 0; i < seeds.length; i++) {
-      const row = play(B, charA, charB, wa, wb, seeds[i], options);
-      cell.n += 1;
-      const half = cell.halves[i % 2];
-      half.n += 1;
-      if (row.result === "a") { cell.a += 1; half.a += 1; }
-      else if (row.result === "b") { cell.b += 1; half.b += 1; }
-      else { cell.d += 1; half.d += 1; }
-      if (adaptive && cell.n >= minGames && (cell.a === cell.n || cell.b === cell.n || cell.d === cell.n)) {
-        cell.certain = true;
-        break;
-      }
+  const cell = emptyCell();
+  for (let i = 0; i < seeds.length; i++) {
+    const row = play(B, charA, charB, wa, wb, seeds[i], options);
+    cell.n += 1;
+    const half = cell.halves[i % 2];
+    half.n += 1;
+    if (row.result === "a") { cell.a += 1; half.a += 1; }
+    else if (row.result === "b") { cell.b += 1; half.b += 1; }
+    else { cell.d += 1; half.d += 1; }
+    if (adaptive && cell.n >= minGames && (cell.a === cell.n || cell.b === cell.n || cell.d === cell.n)) {
+      cell.certain = true;
+      break;
     }
-    return cell;
-  }));
+  }
+  return cell;
+}
+
+export function estimatePair(B, charA, charB, policiesA, policiesB, seeds, options = {}) {
+  const cells = policiesA.map((wa) => policiesB.map((wb) => sampleCell(B, charA, charB, wa, wb, seeds, options)));
   return {
     rows: policiesA.map((_, i) => "A" + i),
     cols: policiesB.map((_, i) => "B" + i),

@@ -69,7 +69,7 @@ function stateText(verdict) {
     if (verdict.mode === "多重最优") return "静止 · 多重最优";
     return "静止 · 唯一最优";
   }
-  if (verdict.state === "封闭") return "封闭 · 克制循环";
+  if (verdict.state === "封闭") return "封闭 · 克制循环" + (verdict.strength ? "（" + verdict.strength + "）" : "");
   if (verdict.mode === "弱鞍点") return "开放 · 弱鞍点";
   if (verdict.mode && verdict.mode.indexOf("单向") === 0) return "开放 · 单向选择";
   return "开放 · 平坦";
@@ -105,7 +105,11 @@ function card(pair) {
   el.innerHTML = "<h2>" + pair.a + " vs " + pair.b +
     '<span class="badge ' + stateClass(pair.verdict) + '">' + stateText(pair.verdict) + "</span></h2>" +
     '<div class="kv">平均胜率 ' + pct(pair.summary.winA) + " · 平局 " + pct(pair.summary.draw) +
-    " · 极差 " + pair.verdict.spread + " · 对局 " + pair.summary.games + " 局" +
+    " · 极差 " + pair.verdict.spread +
+    (pair.verdict.depth != null ? " · 深度分 " + pair.verdict.depth : "") +
+    (pair.verdict.value != null ? " · 均衡值 " + pair.verdict.value : "") +
+    (pair.meta && pair.meta.exploitability != null ? " · 榨取值 " + pair.meta.exploitability : "") +
+    " · 对局 " + pair.summary.games + " 局" +
     (pair.summary.certainCells ? "（" + pair.summary.certainCells + "/" + pair.summary.cells + " 格提前收手）" : "") + "</div>" +
     matrixHtml(pair) +
     '<button class="toggle">打法与规则</button>' +

@@ -13,7 +13,9 @@ function stateLabel(verdict) {
     if (verdict.mode === "多重最优") return "静止（多重最优）";
     return "静止（唯一最优）";
   }
-  if (verdict.state === "封闭") return "封闭";
+  if (verdict.state === "封闭") {
+    return "封闭" + (verdict.strength ? "（" + verdict.strength + "）" : "");
+  }
   if (verdict.mode === "弱鞍点") return "开放（弱鞍点）";
   if (verdict.mode && verdict.mode.indexOf("单向") === 0) return "开放（单向）";
   return "开放（平坦）";
@@ -34,14 +36,14 @@ export function buildMarkdown(result) {
   lines.push("");
   lines.push("## 总表");
   lines.push("");
-  lines.push("| 对局 | 状态 | 平均胜率 | 平局率 | 强度 | 稳定性 | 极差 | 保底 vs 随机 |");
-  lines.push("|---|---|---|---|---|---|---|---|");
+  lines.push("| 对局 | 状态 | 平均胜率 | 平局率 | 强度 | 稳定性 | 极差 | 深度分 | 最优 vs 别处打法池 |");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
   for (const p of result.pairs) {
     const hold = p.holdout ? (p.holdout.a * 100).toFixed(0) + "% / " + (p.holdout.b * 100).toFixed(0) + "%" : "—";
     lines.push("| " + p.a + " vs " + p.b + " | " + stateLabel(p.verdict) + " | "
       + pct(p.summary.winA) + " | " + pct(p.summary.draw) + " | "
       + (p.verdict.strength || "—") + " | " + (p.verdict.stable ? "稳定" : "不稳定") + " | "
-      + p.verdict.spread + " | " + hold + " |");
+      + p.verdict.spread + " | " + (p.verdict.depth == null ? "—" : p.verdict.depth) + " | " + hold + " |");
   }
   lines.push("");
   for (const p of result.pairs) {
@@ -50,6 +52,16 @@ export function buildMarkdown(result) {
     lines.push("状态 **" + stateLabel(p.verdict) + "**，证据：极差 " + p.verdict.spread
       + "，鞍点 " + (p.verdict.cell ? "(" + p.verdict.cell.join(",") + ")" : "无")
       + "，支撑 " + (p.verdict.support || []).join("/")
+      + "，深度分 " + (p.verdict.depth == null ? "—" : p.verdict.depth)
+      + "，均衡值 " + (p.verdict.value == null ? "—" : p.verdict.value)
+      + "，被支配打法 A " + (p.verdict.dominated ? (p.verdict.dominated.rows.join(",") || "无") : "—")
+      + " / B " + (p.verdict.dominated ? (p.verdict.dominated.cols.join(",") || "无") : "—")
+      + "，灵敏性 " + (p.verdict.sensitive
+        ? (p.verdict.sensitive.stable ? "区间内稳定" : "区间内翻转（lo=" + p.verdict.sensitive.lo.join("·") + "，hi=" + p.verdict.sensitive.hi.join("·") + "）")
+        : "—")
+      + "，训练 " + (p.meta
+        ? p.meta.seeds + " 种子 · 迭代 " + p.meta.iterations + "（" + (p.meta.stopReasons || []).join("/") + "）· 榨取值 " + p.meta.exploitability
+        : "—")
       + "，确定性 " + p.summary.certainCells + "/" + p.summary.cells
       + "，对半复核 " + p.verdict.halves.join(" / ") + "。");
     lines.push("");
@@ -77,7 +89,7 @@ export function buildMarkdown(result) {
   }
   lines.push("## 边界");
   lines.push("");
-  lines.push("- 结论只对本次训练出的 " + result.config.strategies + " 套打法成立，换策略库结论会变。");
+  lines.push("- 结论只对本次训练出的策略库成立，换策略库结论会变。");
   lines.push("- 只看单挑，三方克制循环测不出来。");
   lines.push("- 判定基于前后两半种子分别复核，不一致记「预算不足」。");
   return lines.join("\n") + "\n";

@@ -9,9 +9,9 @@
 ## 它做什么
 
 ```
-角色表 → 训练打法（双方轮流，进化搜索）
-        → 3×3 胜率矩阵（自适应采样）
-        → 状态判定（极差 → 鞍点 → 子类）
+角色表 → 双 oracle 训练（PSRO-lite，3 种子合并策略池，条件规则打法）
+        → 胜率矩阵（自适应采样）
+        → 均衡判定（极差 → 纯鞍点 → 混合均衡，Wilson 灵敏性）
         → report.md / report.html / run.json
 ```
 
@@ -20,8 +20,8 @@
 ## 快速开始
 
 ```
-node rpg6.0/strategy-lab/selftest.mjs          # 自检，8 项
-node rpg6.0/strategy-lab/lab.mjs --chars=5     # 跑一次，约 2 分钟
+node rpg6.0/strategy-lab/selftest.mjs          # 自检，19 项
+node rpg6.0/strategy-lab/lab.mjs --chars=5     # 跑一次，10 对约 2.5 分钟
 ```
 
 产物写到 `_local/strategy-lab/runs/<时间戳>/`（`_local` 不推送）：
@@ -99,13 +99,14 @@ rpg6.0/data/lab-snapshot.js     兜底快照（生成物）
 
 ## 已知限制
 
-- 结论只对训练出的那几套打法成立，不是"这个角色的绝对强弱"。
-- 策略是 18 个权重的线性打分函数，表达不了"留技能等反击"这类条件分支；矩阵极差为 0 时说明这套空间分不出差别，不代表游戏没有深度。
+- 结论只对训练出的策略库成立，不是"这个角色的绝对强弱"。
+- 策略是条件规则表（默认权重 + ≤4 条「8 特征条件→权重」规则），表达不了长序列规划；最佳回应是进化搜索，可能局部最优。
 - 只看单挑，三方克制循环测不出来。
-- 单进程跑，19 角色 171 对约 30 分钟；需要更快再加 worker 池。
+- 单进程跑，15 对约 3.5 分钟；需要更快再加 worker 池。
 
 ## 交接要点
 
-- 判定口径与三处历史 bug（先鞍点、极差归零、优势算错）写在 `实现方案.md` 第 12 节。
-- 算法优化（更丰富的策略空间、PSRO）留给后续会话，接口边界见 `架构.md` 第四节。
+- 判定口径与均衡求解器在 `lib/analyze.mjs`（`labelOf`/`nashOf`/`solveMixed`/`sensitivityOf`），口径表见本目录 `使用说明.md`。
+- 训练在 `lib/train.mjs`（双 oracle 循环），策略空间在 `lib/policy.mjs`（条件规则 DSL）。
+- 元博弈层（alpha-rank 全角色排序 + 三角循环）尚未做，接口边界见 `架构.md` 第四节。
 - 改完跑 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`。
