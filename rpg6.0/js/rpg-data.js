@@ -1,53 +1,41 @@
-/* ============================================================
-   rpg-data.js —— 回合制正传 6.0 角色档案的数据访问层
-   ------------------------------------------------------------
-   数据库是唯一数据源。云端不可用时，公开列表与详情退回
-   data/characters.js 里的 33 条内置副本（只作兜底）。
-
-   云端接口（CloudBase PostgreSQL / PostgREST）：
-     POST /v1/rdb/rest/rpc/rpg_search     列表检索
-     POST /v1/rdb/rest/rpc/rpg_facets     筛选选项
-     GET  /v1/rdb/rest/rpg_characters     角色
-     GET  /v1/rdb/rest/rpg_character_versions  旧档案
-     GET  /v1/rdb/rest/rpg_submissions    投稿
-
-   写操作必须带组织验证令牌：令牌放在 Prefer 头里，
-   由数据库的 gui_token_ok() 读取。
-   ============================================================ */
+/* 回合制正传 6.0 · 角色档案的数据访问层
+   数据库是唯一数据源；云端不可用时退回 data/characters.js 的内置副本。
+   拆成 3 个文件按顺序加载：rpg-data-write.js → rpg-data-battles.js → rpg-data.js，函数都挂在 window.RpgData 上。 */
 (function () {
   "use strict";
+  var P = window.RpgData = window.RpgData || {};
 
-  var TIMEOUT_MS = 6000;
-  var BREAK_MS = 5 * 60 * 1000;
-  var downUntil = 0;
+  P.TIMEOUT_MS = 6000;
+  P.BREAK_MS = 5 * 60 * 1000;
+  P.downUntil = 0;
 
-  var PAGE_SIZE = 12;
+  P.PAGE_SIZE = 12;
   /* 相邻角色一次取 100 位（rpg_search 的上限），最多 50 页 */
-  var SIBLING_PAGE_SIZE = 100;
-  var SIBLING_MAX_PAGES = 50;
+  P.SIBLING_PAGE_SIZE = 100;
+  P.SIBLING_MAX_PAGES = 50;
 
   /* 成员名单的唯一定义在 js/members.js；页面没加载它时退回这份副本 */
-  var MEMBERS = (window.CPU_MEMBERS && window.CPU_MEMBERS.length)
+  P.MEMBERS = (window.CPU_MEMBERS && window.CPU_MEMBERS.length)
     ? window.CPU_MEMBERS.slice()
     : ["Forever", "苏橘AA", "全能天鬼", "漪珩BV1fy4y1L7Rq"];
-  var MARKS = ["√", "O", "X"];
-  var STAT_KEYS = ["atk", "def", "mres", "hp", "mp", "spd"];
-  var STAT_LABELS = {
+  P.MARKS = ["√", "O", "X"];
+  P.STAT_KEYS = ["atk", "def", "mres", "hp", "mp", "spd"];
+  P.STAT_LABELS = {
     atk: "攻击", def: "防御", mres: "法抗",
     hp: "血量", mp: "蓝上限", spd: "速度"
   };
-  var RATING_SUGGESTIONS = ["E", "D", "C", "B", "A", "S", "SS", "SSS", "SB"];
+  P.RATING_SUGGESTIONS = ["E", "D", "C", "B", "A", "S", "SS", "SSS", "SB"];
 
-  var STATUS_TEXT = {
+  P.STATUS_TEXT = {
     pending: "待审",
     approved: "已通过",
     rejected: "已驳回"
   };
 
-  function isDown() { return Date.now() < downUntil; }
-  function markDown() { downUntil = Date.now() + BREAK_MS; }
+  P.isDown = function () { return Date.now() < P.downUntil; }
+  P.markDown = function () { P.downUntil = Date.now() + P.BREAK_MS; }
 
-  function cfg() {
+  P.cfg = function () {
     var base = window.GUI_CLOUDBASE || {};
     var app = window.RPG_APP || {};
     if (!base.envId || !base.publishableKey) return null;
@@ -62,33 +50,33 @@
     };
   }
 
-  function accessToken() {
+  P.accessToken = function () {
     if (window.GuiGate && typeof window.GuiGate.token === "function") {
       return window.GuiGate.token();
     }
     return "";
   }
 
-  function headers(c, extra) {
+  P.headers = function (c, extra) {
     var h = {
       "Authorization": "Bearer " + c.key,
       "Content-Type": "application/json"
     };
     if (extra) for (var k in extra) h[k] = extra[k];
 
-    var tok = accessToken();
+    var tok = P.accessToken();
     if (tok) {
       h["Prefer"] = (h["Prefer"] ? h["Prefer"] + ", " : "") + "gui-token=" + tok;
     }
     return h;
   }
 
-  function isAuthError(err) {
+  P.isAuthError = function (err) {
     var msg = String((err && (err.body || err.message)) || "");
     return /42501|row-level security|JWT|permission denied/i.test(msg);
   }
 
-  function withTimeout(promise, ms) {
+  P.withTimeout = function (promise, ms) {
     return Promise.race([
       promise,
       new Promise(function (_, reject) {
@@ -97,23 +85,23 @@
     ]);
   }
 
-  function retryOnceOnTimeout(fn) {
+  P.retryOnceOnTimeout = function (fn) {
     return fn().catch(function (err) {
       if (!/超时/.test(String(err && err.message))) throw err;
       return fn();
     });
   }
 
-  function nowIso() { return new Date().toISOString(); }
+  P.nowIso = function () { return new Date().toISOString(); }
 
-  function newId(prefix) {
+  P.newId = function (prefix) {
     return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   }
 
-  function trim(v) { return String(v == null ? "" : v).trim(); }
+  P.trim = function (v) { return String(v == null ? "" : v).trim(); }
 
   /* 写一条编辑日志给统计页；页面没加载 js/edit-log.js 时静默跳过 */
-  function logEdit(ev) {
+  P.logEdit = function (ev) {
     if (window.EditLog && typeof window.EditLog.log === "function") {
       return window.EditLog.log(ev);
     }
@@ -122,7 +110,7 @@
 
   /* ---------------- 请求 ---------------- */
 
-  function readJson(res) {
+  P.readJson = function (res) {
     if (res.ok) return res.json();
     return res.text().then(function (txt) {
       var err = new Error("云端返回 " + res.status + " " + txt.slice(0, 160));
@@ -132,24 +120,24 @@
     });
   }
 
-  function get(c, path) {
-    return withTimeout(fetch(c.rest + path, { headers: headers(c) }), TIMEOUT_MS)
-      .then(readJson);
+  P.get = function (c, path) {
+    return P.withTimeout(fetch(c.rest + path, { headers: P.headers(c) }), P.TIMEOUT_MS)
+      .then(P.readJson);
   }
 
   /* 写：缺列时自动去掉该列重试，保证「先发代码、后跑 SQL」不会整页失败 */
-  function send(c, url, method, payload) {
+  P.send = function (c, url, method, payload) {
     var body = {};
     for (var k in payload) body[k] = payload[k];
 
     function attempt(left) {
-      return withTimeout(
+      return P.withTimeout(
         fetch(url, {
           method: method,
-          headers: headers(c, { "Prefer": "return=minimal" }),
+          headers: P.headers(c, { "Prefer": "return=minimal" }),
           body: JSON.stringify(body)
         }),
-        TIMEOUT_MS
+        P.TIMEOUT_MS
       ).then(function (res) {
         if (res.ok) return res;
         return res.text().then(function (txt) {
@@ -166,7 +154,7 @@
           var err = new Error("保存失败 HTTP " + res.status + " " + txt.slice(0, 160));
           err.status = res.status;
           err.body = txt;
-          if (isAuthError(err)) {
+          if (P.isAuthError(err)) {
             if (window.GuiGate && window.GuiGate.clearVerified) window.GuiGate.clearVerified();
             err.message = "验证已失效，请重新验证后再试。";
           }
@@ -185,15 +173,15 @@
 
   /* ---------------- 行 → 对象 ---------------- */
 
-  function asArray(v) { return Array.isArray(v) ? v.slice() : []; }
+  P.asArray = function (v) { return Array.isArray(v) ? v.slice() : []; }
 
-  function mapCharacter(r) {
+  P.mapCharacter = function (r) {
     if (!r) return null;
     return {
       id: r.id,
       seq: r.seq,
       name: r.name || "",
-      aliases: asArray(r.aliases),
+      aliases: P.asArray(r.aliases),
       occupation: r.occupation || "",
       side_job: r.side_job || "",
       rating: r.rating || "",
@@ -205,10 +193,10 @@
       hp: r.hp || "",
       mp: r.mp || "",
       spd: r.spd || "",
-      skills: asArray(r.skills),
+      skills: P.asArray(r.skills),
       raw_head: r.raw_head || "",
       raw_skills: r.raw_skills || "",
-      images: asArray(r.images),
+      images: P.asArray(r.images),
       reviewer: r.reviewer || "",
       reviewed_at: r.reviewed_at || null,
       review_note: r.review_note || "",
@@ -223,8 +211,8 @@
     };
   }
 
-  function mapVersion(r) {
-    var v = mapCharacter(r);
+  P.mapVersion = function (r) {
+    var v = P.mapCharacter(r);
     if (!v) return null;
     v.version_id = r.version_id;
     v.character_id = r.character_id;
@@ -234,9 +222,9 @@
     return v;
   }
 
-  function mapSubmission(r) {
+  P.mapSubmission = function (r) {
     if (!r) return null;
-    var s = mapCharacter(r);
+    var s = P.mapCharacter(r);
     s.author = r.author || "";
     s.note = r.note || "";
     s.status = r.status || "pending";
@@ -247,43 +235,43 @@
 
   /* ---------------- 写 payload ---------------- */
 
-  function toRow(obj) {
+  P.toRow = function (obj) {
     return {
-      name: trim(obj.name),
-      aliases: asArray(obj.aliases),
-      occupation: trim(obj.occupation),
-      side_job: trim(obj.side_job),
-      rating: trim(obj.rating),
-      gender: trim(obj.gender),
-      review_mark: trim(obj.review_mark),
-      atk: trim(obj.atk),
-      def: trim(obj.def),
-      mres: trim(obj.mres),
-      hp: trim(obj.hp),
-      mp: trim(obj.mp),
-      spd: trim(obj.spd),
-      skills: asArray(obj.skills).map(function (s) {
+      name: P.trim(obj.name),
+      aliases: P.asArray(obj.aliases),
+      occupation: P.trim(obj.occupation),
+      side_job: P.trim(obj.side_job),
+      rating: P.trim(obj.rating),
+      gender: P.trim(obj.gender),
+      review_mark: P.trim(obj.review_mark),
+      atk: P.trim(obj.atk),
+      def: P.trim(obj.def),
+      mres: P.trim(obj.mres),
+      hp: P.trim(obj.hp),
+      mp: P.trim(obj.mp),
+      spd: P.trim(obj.spd),
+      skills: P.asArray(obj.skills).map(function (s) {
         return {
-          name: trim(s.name),
-          condition: trim(s.condition),
-          effect: trim(s.effect),
-          note: trim(s.note)
+          name: P.trim(s.name),
+          condition: P.trim(s.condition),
+          effect: P.trim(s.effect),
+          note: P.trim(s.note)
         };
       }),
-      images: asArray(obj.images),
-      raw_head: trim(obj.raw_head),
+      images: P.asArray(obj.images),
+      raw_head: P.trim(obj.raw_head),
       raw_skills: String(obj.raw_skills == null ? "" : obj.raw_skills)
     };
   }
 
   /* ---------------- 兜底：内置 33 条 ---------------- */
 
-  function seedAll() {
+  P.seedAll = function () {
     var list = window.RPG_SEED_CHARACTERS || [];
-    return list.map(mapCharacter).filter(function (x) { return x && !x.deleted; });
+    return list.map(P.mapCharacter).filter(function (x) { return x && !x.deleted; });
   }
 
-  function sortList(list, order) {
+  P.sortList = function (list, order) {
     var copy = list.slice();
     copy.sort(function (a, b) {
       var ta = String(a.created_at || "");
@@ -294,7 +282,7 @@
     return copy;
   }
 
-  function matches(item, q, rating, occ) {
+  P.matches = function (item, q, rating, occ) {
     if (rating && item.rating !== rating) return false;
     if (occ && item.occupation !== occ && item.side_job !== occ) return false;
     if (!q) return true;
@@ -310,22 +298,22 @@
     return hay.indexOf(low) !== -1;
   }
 
-  function searchSeed(opts) {
+  P.searchSeed = function (opts) {
     var page = Math.max(1, parseInt(opts.page, 10) || 1);
-    var size = Math.max(1, parseInt(opts.pageSize, 10) || PAGE_SIZE);
-    var shown = seedAll().filter(function (x) {
-      return matches(x, trim(opts.q), trim(opts.rating), trim(opts.occ));
+    var size = Math.max(1, parseInt(opts.pageSize, 10) || P.PAGE_SIZE);
+    var shown = P.seedAll().filter(function (x) {
+      return P.matches(x, P.trim(opts.q), P.trim(opts.rating), P.trim(opts.occ));
     });
-    shown = sortList(shown, opts.order === "desc" ? "desc" : "asc");
+    shown = P.sortList(shown, opts.order === "desc" ? "desc" : "asc");
     return {
       items: shown.slice((page - 1) * size, page * size),
       total: shown.length
     };
   }
 
-  function seedFacets() {
+  P.seedFacets = function () {
     var ratings = {}, occs = {};
-    seedAll().forEach(function (x) {
+    P.seedAll().forEach(function (x) {
       if (x.rating) ratings[x.rating] = 1;
       if (x.occupation) occs[x.occupation] = 1;
       if (x.side_job) occs[x.side_job] = 1;
@@ -338,111 +326,111 @@
 
   /* ---------------- 读：列表 ---------------- */
 
-  function search(opts) {
+  P.search = function (opts) {
     opts = opts || {};
-    var c = cfg();
+    var c = P.cfg();
     var payload = {
-      p_q: trim(opts.q),
-      p_rating: trim(opts.rating),
-      p_occ: trim(opts.occ),
+      p_q: P.trim(opts.q),
+      p_rating: P.trim(opts.rating),
+      p_occ: P.trim(opts.occ),
       p_order: opts.order === "desc" ? "desc" : "asc",
-      p_limit: Math.max(1, parseInt(opts.pageSize, 10) || PAGE_SIZE),
+      p_limit: Math.max(1, parseInt(opts.pageSize, 10) || P.PAGE_SIZE),
       p_offset: Math.max(0, ((Math.max(1, parseInt(opts.page, 10) || 1)) - 1) *
-        (Math.max(1, parseInt(opts.pageSize, 10) || PAGE_SIZE)))
+        (Math.max(1, parseInt(opts.pageSize, 10) || P.PAGE_SIZE)))
     };
 
-    if (!c || isDown()) {
-      var local = searchSeed(opts);
+    if (!c || P.isDown()) {
+      var local = P.searchSeed(opts);
       local.fallback = true;
       return Promise.resolve(local);
     }
 
-    return retryOnceOnTimeout(function () {
-      return withTimeout(
+    return P.retryOnceOnTimeout(function () {
+      return P.withTimeout(
         fetch(c.rest + "rpc/rpg_search", {
           method: "POST",
-          headers: headers(c),
+          headers: P.headers(c),
           body: JSON.stringify(payload)
         }),
-        TIMEOUT_MS
-      ).then(readJson);
+        P.TIMEOUT_MS
+      ).then(P.readJson);
     }).then(function (data) {
       return {
-        items: (data.items || []).map(mapCharacter),
+        items: (data.items || []).map(P.mapCharacter),
         total: typeof data.total === "number" ? data.total : (data.items || []).length,
         fallback: false
       };
     }).catch(function (err) {
-      markDown();
+      P.markDown();
       console.warn("[角色档案] 云端检索失败，改用内置副本：", err.message);
-      var local = searchSeed(opts);
+      var local = P.searchSeed(opts);
       local.fallback = true;
       return local;
     });
   }
 
-  function facets() {
-    var c = cfg();
-    if (!c || isDown()) return Promise.resolve(seedFacets());
+  P.facets = function () {
+    var c = P.cfg();
+    if (!c || P.isDown()) return Promise.resolve(P.seedFacets());
 
-    return retryOnceOnTimeout(function () {
-      return withTimeout(
+    return P.retryOnceOnTimeout(function () {
+      return P.withTimeout(
         fetch(c.rest + "rpc/rpg_facets", {
           method: "POST",
-          headers: headers(c),
+          headers: P.headers(c),
           body: "{}"
         }),
-        TIMEOUT_MS
-      ).then(readJson);
+        P.TIMEOUT_MS
+      ).then(P.readJson);
     }).then(function (data) {
       return {
-        ratings: asArray(data.ratings),
-        occupations: asArray(data.occupations)
+        ratings: P.asArray(data.ratings),
+        occupations: P.asArray(data.occupations)
       };
     }).catch(function (err) {
       console.warn("[角色档案] 筛选选项读取失败：", err.message);
-      return seedFacets();
+      return P.seedFacets();
     });
   }
 
   /* ---------------- 读：单条 ---------------- */
 
-  function getCharacter(id) {
+  P.getCharacter = function (id) {
     if (!id) return Promise.resolve(null);
-    var c = cfg();
+    var c = P.cfg();
 
     function fallback() {
-      var all = (window.RPG_SEED_CHARACTERS || []).map(mapCharacter);
+      var all = (window.RPG_SEED_CHARACTERS || []).map(P.mapCharacter);
       var hit = all.filter(function (x) { return x && x.id === id; })[0];
       return hit || null;
     }
 
-    if (!c || isDown()) return Promise.resolve(fallback());
+    if (!c || P.isDown()) return Promise.resolve(fallback());
 
-    return retryOnceOnTimeout(function () {
-      return get(c, c.characters + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1");
+    return P.retryOnceOnTimeout(function () {
+      return P.get(c, c.characters + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1");
     }).then(function (rows) {
       var row = (Array.isArray(rows) ? rows : [])[0];
-      return row ? mapCharacter(row) : null;
+      return row ? P.mapCharacter(row) : null;
     }).catch(function (err) {
-      markDown();
+      P.markDown();
       console.warn("[角色档案] 读取角色失败，改用内置副本：", err.message);
       return fallback();
     });
   }
 
-  function listAll() {
-    var c = cfg();
-    if (!c || isDown()) return Promise.resolve((window.RPG_SEED_CHARACTERS || []).map(mapCharacter));
+  P.listAll = function () {
+    var c = P.cfg();
+    if (!c || P.isDown()) return Promise.resolve((window.RPG_SEED_CHARACTERS || []).map(P.mapCharacter));
 
-    return retryOnceOnTimeout(function () {
-      return get(c, c.characters + "?select=*&order=created_at.asc&limit=1000");
+    return P.retryOnceOnTimeout(function () {
+      return P.get(c, c.characters + "?select=*&order=created_at.asc&limit=1000");
     }).then(function (rows) {
-      return (Array.isArray(rows) ? rows : []).map(mapCharacter);
+      return (Array.isArray(rows) ? rows : []).map(P.mapCharacter);
     }).catch(function (err) {
-      markDown();
+      P.markDown();
       console.warn("[角色档案] 读取全部角色失败：", err.message);
-      return (window.RPG_SEED_CHARACTERS || []).map(mapCharacter);
+      return (window.RPG_SEED_CHARACTERS || []).map(P.mapCharacter);
     });
   }
 
@@ -450,12 +438,12 @@
 
   /* 按列表同样的筛选与排序把结果收齐，返回当前角色在其中的位置。
      当前角色不在结果集（筛选失效、已删除）时 index 为 -1。 */
-  function listSiblings(item, opts) {
+  P.listSiblings = function (item, opts) {
     opts = opts || {};
     var empty = { ids: [], index: -1, total: 0 };
 
     if (!item || item.deleted) return Promise.resolve(empty);
-    if (!matches(item, trim(opts.q), trim(opts.rating), trim(opts.occ))) {
+    if (!P.matches(item, P.trim(opts.q), P.trim(opts.rating), P.trim(opts.occ))) {
       return Promise.resolve(empty);
     }
 
@@ -463,19 +451,19 @@
     var total = 0;
 
     function step(page) {
-      return search({
+      return P.search({
         q: opts.q,
         rating: opts.rating,
         occ: opts.occ,
         order: opts.order,
         page: page,
-        pageSize: SIBLING_PAGE_SIZE
+        pageSize: P.SIBLING_PAGE_SIZE
       }).then(function (res) {
         var items = res.items || [];
         collected = collected.concat(items);
         total = typeof res.total === "number" ? res.total : collected.length;
 
-        if (!items.length || collected.length >= total || page >= SIBLING_MAX_PAGES) {
+        if (!items.length || collected.length >= total || page >= P.SIBLING_MAX_PAGES) {
           var ids = collected.map(function (x) { return x.id; });
           return { ids: ids, index: ids.indexOf(item.id), total: ids.length };
         }
@@ -486,551 +474,91 @@
     return step(1);
   }
 
-  function findCharacterBySubmission(submissionId) {
-    var c = cfg();
-    if (!c || !submissionId) return Promise.resolve(null);
-    return get(c, c.characters + "?select=*&source_submission_id=eq." +
-      encodeURIComponent(submissionId) + "&limit=1")
-      .then(function (rows) {
-        var row = (Array.isArray(rows) ? rows : [])[0];
-        return row ? mapCharacter(row) : null;
-      })
-      .catch(function () { return null; });
-  }
 
-  function nextSeq() {
-    var c = cfg();
-    var seedMax = (window.RPG_SEED_CHARACTERS || []).reduce(function (max, x) {
-      return Math.max(max, parseInt(x.seq, 10) || 0);
-    }, 0);
-
-    if (!c || isDown()) return Promise.resolve(seedMax + 1);
-
-    return get(c, c.characters + "?select=seq&order=seq.desc&limit=1")
-      .then(function (rows) {
-        var row = (Array.isArray(rows) ? rows : [])[0];
-        var max = row ? parseInt(row.seq, 10) || 0 : 0;
-        return Math.max(max, seedMax) + 1;
-      })
-      .catch(function () { return seedMax + 1; });
-  }
 
   /* ---------------- 读：版本 ---------------- */
 
-  function listVersions() {
-    var c = cfg();
-    if (!c || isDown()) return Promise.resolve([]);
 
-    return retryOnceOnTimeout(function () {
-      return get(c, c.versions + "?select=*&applied=eq.false&order=archived_at.desc&limit=2000");
-    }).then(function (rows) {
-      return (Array.isArray(rows) ? rows : []).map(mapVersion);
-    }).catch(function (err) {
-      markDown();
-      console.warn("[角色档案] 读取旧档案失败：", err.message);
-      return [];
-    });
-  }
 
-  function listVersionsOf(characterId) {
-    var c = cfg();
-    if (!c || !characterId || isDown()) return Promise.resolve([]);
-
-    return retryOnceOnTimeout(function () {
-      return get(c, c.versions + "?select=*&character_id=eq." +
-        encodeURIComponent(characterId) + "&order=archived_at.desc&limit=2000");
-    }).then(function (rows) {
-      return (Array.isArray(rows) ? rows : []).map(mapVersion);
-    }).catch(function (err) {
-      markDown();
-      console.warn("[角色档案] 读取版本失败：", err.message);
-      return [];
-    });
-  }
-
-  function getVersion(versionId) {
-    var c = cfg();
-    if (!c || !versionId || isDown()) return Promise.resolve(null);
-
-    return get(c, c.versions + "?select=*&version_id=eq." +
-      encodeURIComponent(versionId) + "&limit=1")
-      .then(function (rows) {
-        var row = (Array.isArray(rows) ? rows : [])[0];
-        return row ? mapVersion(row) : null;
-      })
-      .catch(function () { return null; });
-  }
 
   /* ---------------- 读：投稿 ---------------- */
 
-  function listSubmissions(statuses) {
-    var c = cfg();
-    if (!c || isDown()) return Promise.resolve([]);
 
-    var url = c.submissions + "?select=*&order=created_at.desc&limit=1000";
-    if (statuses && statuses.length) {
-      url += "&status=in.(" + statuses.map(encodeURIComponent).join(",") + ")";
-    }
-
-    return retryOnceOnTimeout(function () {
-      return get(c, url);
-    }).then(function (rows) {
-      return (Array.isArray(rows) ? rows : []).map(mapSubmission);
-    }).catch(function (err) {
-      markDown();
-      console.warn("[角色档案] 读取投稿失败：", err.message);
-      return [];
-    });
-  }
-
-  function getSubmission(id) {
-    var c = cfg();
-    if (!c || !id || isDown()) return Promise.resolve(null);
-
-    return get(c, c.submissions + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1")
-      .then(function (rows) {
-        var row = (Array.isArray(rows) ? rows : [])[0];
-        return row ? mapSubmission(row) : null;
-      })
-      .catch(function (err) {
-        markDown();
-        throw err;
-      });
-  }
 
   /* ---------------- 写：投稿 ---------------- */
 
-  function addSubmission(payload) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置，暂时无法提交。"));
 
-    var row = toRow(payload);
-    row.id = newId("s");
-    row.status = "pending";
-    row.author = trim(payload.author);
-    row.note = trim(payload.note);
-    row.created_at = nowIso();
-
-    return send(c, c.rest + c.submissions, "POST", row).then(function () {
-      return { id: row.id };
-    });
-  }
-
-  function rejectSubmission(id, reviewer, note) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    if (!accessToken()) return Promise.reject(new Error("需要先通过组织验证"));
-
-    var row = {
-      status: "rejected",
-      reviewer: reviewer,
-      reviewed_at: nowIso(),
-      review_note: trim(note)
-    };
-    return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(id), "PATCH", row)
-      .then(function () {
-        return logEdit({
-          module: "rpg6.0", targetType: "submission", targetId: id,
-          targetTitle: "", action: "review", member: reviewer, note: trim(note)
-        });
-      });
-  }
 
   /* 转正：先查是否已建过角色（幂等），再建角色，最后改投稿状态。
      角色建好但状态没改成功时，重试会命中第一步，只补状态。 */
-  function approveSubmission(submissionId, payload, reviewer, mark, note) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    if (!accessToken()) return Promise.reject(new Error("需要先通过组织验证"));
-
-    var characterId = "";
-
-    return getSubmission(submissionId).then(function (sub) {
-      if (!sub) throw new Error("投稿不存在，或当前身份无权读取。");
-      if (sub.status !== "pending") {
-        throw new Error("这条投稿已处理（" + (STATUS_TEXT[sub.status] || sub.status) + "）。");
-      }
-      return findCharacterBySubmission(submissionId);
-    }).then(function (existing) {
-      if (existing) {
-        characterId = existing.id;
-        return null;
-      }
-      return nextSeq().then(function (seq) {
-        var row = toRow(payload);
-        row.id = newId("rp");
-        row.seq = seq;
-        row.reviewer = reviewer;
-        row.review_mark = mark;
-        row.reviewed_at = nowIso();
-        row.review_note = trim(note);
-        row.source_submission_id = submissionId;
-        row.created_at = nowIso();
-        row.editor = reviewer;
-        row.edited_at = row.created_at;
-        row.updated_at = row.created_at;
-        characterId = row.id;
-
-        var patch = {
-          status: "approved",
-          reviewer: reviewer,
-          reviewed_at: row.reviewed_at,
-          review_note: trim(note),
-          approved_character_id: row.id
-        };
-
-        return send(c, c.rest + c.characters, "POST", row).then(function () {
-          return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(submissionId), "PATCH", patch)
-            .then(function () { return { id: row.id, reused: false }; })
-            .catch(function (err) {
-              err.partial = true;
-              err.characterId = row.id;
-              throw err;
-            });
-        });
-      });
-    }).then(function (result) {
-      if (result) return result;
-
-      var patch = {
-        status: "approved",
-        reviewer: reviewer,
-        reviewed_at: nowIso(),
-        review_note: trim(note),
-        approved_character_id: characterId
-      };
-      return send(c, c.rest + c.submissions + "?id=eq." + encodeURIComponent(submissionId), "PATCH", patch)
-        .then(function () { return { id: characterId, reused: true }; });
-    }).then(function (result) {
-      return logEdit({
-        module: "rpg6.0", targetType: "character", targetId: result.id,
-        targetTitle: trim(payload.name), action: "review", member: reviewer, note: trim(note)
-      }).then(function () { return result; });
-    });
-  }
 
   /* ---------------- 写：角色 ---------------- */
 
-  function updateCharacter(id, payload, operator) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    if (!accessToken()) return Promise.reject(new Error("需要先通过组织验证"));
-    if (!operator) return Promise.reject(new Error("请选择保存人"));
 
-    var row = toRow(payload);
-    row.editor = operator;
-    row.edited_at = nowIso();
-    row.updated_at = row.edited_at;
 
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
-      .then(function () {
-        return logEdit({
-          module: "rpg6.0", targetType: "character", targetId: id,
-          targetTitle: trim(payload.name), action: "update", member: operator
-        });
-      });
-  }
 
-  function softDelete(id, operator) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    if (!accessToken()) return Promise.reject(new Error("需要先通过组织验证"));
 
-    var row = {
-      deleted: true,
-      deleter: operator || "",
-      deleted_at: nowIso(),
-      updated_at: nowIso()
-    };
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
-      .then(function () {
-        return logEdit({
-          module: "rpg6.0", targetType: "character", targetId: id,
-          targetTitle: "", action: "delete", member: operator || ""
-        });
-      });
-  }
-
-  function restoreCharacter(id, content, operator) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    if (!accessToken()) return Promise.reject(new Error("需要先通过组织验证"));
-
-    var row = toRow(content);
-    row.deleted = false;
-    row.editor = operator || "";
-    row.edited_at = nowIso();
-    row.updated_at = row.edited_at;
-
-    return send(c, c.rest + c.characters + "?id=eq." + encodeURIComponent(id), "PATCH", row)
-      .then(function () {
-        return logEdit({
-          module: "rpg6.0", targetType: "character", targetId: id,
-          targetTitle: trim(content && content.name), action: "restore", member: operator || ""
-        });
-      });
-  }
-
-  function archiveVersion(character, reason) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-
-    var row = toRow(character);
-    row.version_id = newId("v");
-    row.character_id = character.id;
-    row.reason = reason === "delete" ? "delete" : "edit";
-    row.applied = false;
-    row.archived_at = nowIso();
-
-    return send(c, c.rest + c.versions, "POST", row).then(function () {
-      return row.version_id;
-    });
-  }
-
-  function markVersionApplied(versionId) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置"));
-    return send(c, c.rest + c.versions + "?version_id=eq." + encodeURIComponent(versionId),
-      "PATCH", { applied: true });
-  }
 
   /* ---------------- 工具 ---------------- */
 
-  function parseAliases(text) {
-    var seen = {};
-    return trim(text).split(/[,，]/).map(function (s) { return s.trim(); })
-      .filter(function (s) {
-        if (!s || seen[s]) return false;
-        seen[s] = 1;
-        return true;
-      })
-      .slice(0, 8);
-  }
 
-  function parseStatLine(text) {
-    var parts = String(text == null ? "" : text).split("/");
-    var out = {};
-    STAT_KEYS.forEach(function (k, i) {
-      out[k] = trim(parts[i]);
-    });
-    return out;
-  }
 
-  function emptyCharacter() {
-    var obj = {
-      name: "", aliases: [], occupation: "", side_job: "", rating: "", gender: "",
-      review_mark: "", images: [], skills: [], author: "", note: ""
-    };
-    STAT_KEYS.forEach(function (k) { obj[k] = ""; });
-    for (var i = 0; i < 3; i++) {
-      obj.skills.push({ name: "", condition: "", effect: "", note: "" });
-    }
-    return obj;
-  }
 
-  function validateCharacter(obj, opts) {
-    opts = opts || {};
-    var problems = [];
-
-    if (!trim(obj.name)) problems.push("角色名称不能为空");
-    else if (trim(obj.name).length > 40) problems.push("角色名称超过 40 字");
-
-    if (asArray(obj.aliases).length > 8) problems.push("别名最多 8 个");
-    asArray(obj.aliases).forEach(function (a) {
-      if (trim(a).length > 12) problems.push("别名「" + trim(a) + "」超过 12 字");
-    });
-
-    if (!trim(obj.occupation)) problems.push("主职业不能为空");
-    else if (trim(obj.occupation).length > 20) problems.push("主职业超过 20 字");
-    if (trim(obj.side_job).length > 20) problems.push("副业超过 20 字");
-    if (trim(obj.rating).length > 8) problems.push("强度评级超过 8 字");
-    if (trim(obj.gender) && trim(obj.gender) !== "男" && trim(obj.gender) !== "女") {
-      problems.push("性别只能填男或女");
-    }
-
-    STAT_KEYS.forEach(function (k) {
-      if (trim(obj[k]).length > 40) problems.push(STAT_LABELS[k] + "超过 40 字");
-    });
-
-    var skills = asArray(obj.skills);
-    var filled = skills.filter(function (s) {
-      return trim(s.name) || trim(s.effect);
-    });
-    if (!filled.length) problems.push("至少要写一个技能");
-    if (skills.length > 12) problems.push("技能最多 12 条");
-    skills.forEach(function (s, i) {
-      var n = i + 1;
-      if (trim(s.name).length > 40) problems.push("技能 " + n + " 名称超过 40 字");
-      if (trim(s.condition).length > 40) problems.push("技能 " + n + " 释放条件超过 40 字");
-      if (trim(s.effect).length > 400) problems.push("技能 " + n + " 效果超过 400 字");
-      if (trim(s.note).length > 200) problems.push("技能 " + n + " 备注超过 200 字");
-    });
-
-    if (asArray(obj.images).length > 9) problems.push("图片最多 9 张");
-    if (trim(obj.author).length > 30) problems.push("署名超过 30 字");
-    if (trim(obj.note).length > 500) problems.push("备注超过 500 字");
-    if (trim(obj.review_note).length > 200) problems.push("审核备注超过 200 字");
-
-    if (opts.requireReview) {
-      if (!trim(obj.reviewer)) problems.push("请选择审核人");
-      if (!trim(obj.review_mark)) problems.push("请选择审核评价");
-    }
-    if (opts.requireOperator && !trim(obj.operator)) {
-      problems.push("请选择保存人");
-    }
-
-    return problems;
-  }
 
   /* ---------------- 战报 ---------------- */
 
-  function mapBattle(r) {
-    if (!r) return null;
-    return {
-      id: r.id || "",
-      engine_version: r.engine_version || "",
-      seed: Number(r.seed) || 0,
-      character_a: r.character_a || "",
-      character_b: r.character_b || "",
-      name_a: r.name_a || "",
-      name_b: r.name_b || "",
-      actions: Array.isArray(r.actions) ? r.actions : [],
-      result: r.result || "unfinished",
-      steps: Number(r.steps) || 0,
-      rounds: Number(r.rounds) || 0,
-      final_hash: r.final_hash || "",
-      created_at: r.created_at || null
-    };
-  }
 
-  function listBattles(opts) {
-    var c = cfg();
-    if (!c) return Promise.resolve([]);
-    var limit = Math.min(Math.max(Number(opts && opts.limit) || 20, 1), 50);
-    var offset = Math.max(Number(opts && opts.offset) || 0, 0);
-    var path = c.battles +
-      "?select=id,engine_version,seed,character_a,character_b,name_a,name_b,result,steps,rounds,created_at" +
-      "&order=created_at.desc&limit=" + limit + "&offset=" + offset;
 
-    /* 任意一方是该角色即命中；两侧都要比值，所以用 or 而不是 eq */
-    var who = trim(opts && opts.character);
-    if (who) {
-      path += "&or=(character_a.eq." + encodeURIComponent(who) +
-        ",character_b.eq." + encodeURIComponent(who) + ")";
-    }
 
-    return get(c, path).then(function (rows) {
-      return (Array.isArray(rows) ? rows : []).map(mapBattle);
-    }).catch(function (err) {
-      console.warn("[战报] 列表读取失败：", err.message);
-      throw err;
-    });
-  }
-
-  function getBattle(id) {
-    if (!id) return Promise.resolve(null);
-    var c = cfg();
-    if (!c) return Promise.resolve(null);
-    return get(c, c.battles + "?select=*&id=eq." + encodeURIComponent(id) + "&limit=1")
-      .then(function (rows) {
-        var row = (Array.isArray(rows) ? rows : [])[0];
-        return row ? mapBattle(row) : null;
-      })
-      .catch(function (err) {
-        console.warn("[战报] 读取失败：", err.message);
-        return null;
-      });
-  }
-
-  function createBattle(record) {
-    var c = cfg();
-    if (!c) return Promise.reject(new Error("云服务未配置，战报无法保存。"));
-
-    var row = {
-      id: trim(record.id) || newId("b"),
-      engine_version: trim(record.engine_version),
-      seed: Math.abs(Number(record.seed) || 0),
-      character_a: trim(record.character_a),
-      character_b: trim(record.character_b),
-      name_a: trim(record.name_a),
-      name_b: trim(record.name_b),
-      actions: Array.isArray(record.actions) ? record.actions : [],
-      result: trim(record.result) || "unfinished",
-      steps: Number(record.steps) || 0,
-      rounds: Number(record.rounds) || 0,
-      final_hash: trim(record.final_hash)
-    };
-
-    return send(c, c.rest + c.battles, "POST", row).then(function () {
-      return { id: row.id };
-    });
-  }
 
   /* 删掉 30 天前的战报；期限写死在数据库函数里，前端不传参数。
      失败不抛错：清理是顺手做的事，不该把列表挡住。 */
-  function purgeBattles() {
-    var c = cfg();
-    if (!c) return Promise.resolve(0);
-    return withTimeout(
-      fetch(c.rest + "rpc/rpg_battles_purge", {
-        method: "POST",
-        headers: headers(c),
-        body: "{}"
-      }),
-      TIMEOUT_MS
-    ).then(readJson).then(function (n) {
-      return Number(n) || 0;
-    }).catch(function (err) {
-      console.warn("[战报] 旧战报清理失败：", err.message);
-      return 0;
-    });
-  }
 
   window.RpgData = {
-    PAGE_SIZE: PAGE_SIZE,
-    MEMBERS: MEMBERS,
-    MARKS: MARKS,
-    STAT_KEYS: STAT_KEYS,
-    STAT_LABELS: STAT_LABELS,
-    RATING_SUGGESTIONS: RATING_SUGGESTIONS,
-    STATUS_TEXT: STATUS_TEXT,
+    PAGE_SIZE: P.PAGE_SIZE,
+    MEMBERS: P.MEMBERS,
+    MARKS: P.MARKS,
+    STAT_KEYS: P.STAT_KEYS,
+    STAT_LABELS: P.STAT_LABELS,
+    RATING_SUGGESTIONS: P.RATING_SUGGESTIONS,
+    STATUS_TEXT: P.STATUS_TEXT,
 
-    search: search,
-    facets: facets,
-    getCharacter: getCharacter,
-    listAll: listAll,
-    listSiblings: listSiblings,
-    listVersions: listVersions,
-    listVersionsOf: listVersionsOf,
-    getVersion: getVersion,
-    listSubmissions: listSubmissions,
-    getSubmission: getSubmission,
-    nextSeq: nextSeq,
-    findCharacterBySubmission: findCharacterBySubmission,
+    search: P.search,
+    facets: P.facets,
+    getCharacter: P.getCharacter,
+    listAll: P.listAll,
+    listSiblings: P.listSiblings,
+    listVersions: P.listVersions,
+    listVersionsOf: P.listVersionsOf,
+    getVersion: P.getVersion,
+    listSubmissions: P.listSubmissions,
+    getSubmission: P.getSubmission,
+    nextSeq: P.nextSeq,
+    findCharacterBySubmission: P.findCharacterBySubmission,
 
-    listBattles: listBattles,
-    getBattle: getBattle,
-    createBattle: createBattle,
-    purgeBattles: purgeBattles,
+    listBattles: P.listBattles,
+    getBattle: P.getBattle,
+    createBattle: P.createBattle,
+    purgeBattles: P.purgeBattles,
 
-    addSubmission: addSubmission,
-    rejectSubmission: rejectSubmission,
-    approveSubmission: approveSubmission,
-    updateCharacter: updateCharacter,
-    softDelete: softDelete,
-    restoreCharacter: restoreCharacter,
-    archiveVersion: archiveVersion,
-    markVersionApplied: markVersionApplied,
+    addSubmission: P.addSubmission,
+    rejectSubmission: P.rejectSubmission,
+    approveSubmission: P.approveSubmission,
+    updateCharacter: P.updateCharacter,
+    softDelete: P.softDelete,
+    restoreCharacter: P.restoreCharacter,
+    archiveVersion: P.archiveVersion,
+    markVersionApplied: P.markVersionApplied,
 
-    newId: newId,
-    nowIso: nowIso,
-    trim: trim,
-    emptyCharacter: emptyCharacter,
-    validateCharacter: validateCharacter,
-    parseAliases: parseAliases,
-    parseStatLine: parseStatLine,
-    remoteEnabled: function () { return cfg() !== null; },
-    isCloudDown: function () { return isDown(); },
-    toRow: toRow
+    newId: P.newId,
+    nowIso: P.nowIso,
+    trim: P.trim,
+    emptyCharacter: P.emptyCharacter,
+    validateCharacter: P.validateCharacter,
+    parseAliases: P.parseAliases,
+    parseStatLine: P.parseStatLine,
+    remoteEnabled: function () { return P.cfg() !== null; },
+    isCloudDown: function () { return P.isDown(); },
+    toRow: P.toRow
   };
 })();

@@ -40,7 +40,7 @@
 
 ```
 js/
-├── rpg-data.js        数据层：所有数据库读写的唯一出口
+├── rpg-data.js        数据层：所有数据库读写的唯一出口（写入/版本/投稿在 rpg-data-write.js，战报在 rpg-data-battles.js，两片先加载）
 ├── rpg-form.js        表单渲染/收集/校验、人员下拉、确认框、图片上传
 ├── list.js            公开列表
 ├── character.js       角色详情
@@ -60,7 +60,7 @@ js/
 │   ├── traits.js      8 主业 + 6 副业
 │   ├── state.js       建局、面板结算、深拷贝、状态指纹
 │   ├── damage.js      伤害/回血/强扣/死亡
-│   ├── effect-ops.js  效果解释器（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op）
+│   ├── effect-ops.js  效果解释器框架与出口（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op；helpers 与各 op 在 effect-ops-helpers.js、effect-ops-2.js，紧随其后加载）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
 │   ├── skills.js      技能执行与档案校验
@@ -68,10 +68,10 @@ js/
 │   ├── actions.js     普攻/击溃/蓄蓝
 │   └── battle.js      门面：create / apply / available / hash / replay
 └── battle/            对局界面
-    ├── battle-view.js 三板块渲染与速度条预测
+    ├── battle-view.js 三板块渲染与速度条预测（事件行与效果文案在 battle-view-effects.js）
     ├── battle-pick.js 选中状态
     ├── battle-record.js 战报构建与回放
-    ├── battle-page.js 页面装配、存档、回放模式
+    ├── battle-page.js 页面装配（存档/回放在 battle-page-record.js、界面细节在 battle-page-ui.js，两片先加载）
     └── battle-list.js 战报列表
 ```
 
@@ -92,7 +92,9 @@ js/
 两个只读函数：`rpg_search`（筛选 + 分页 + 总数）、`rpg_facets`（筛选下拉的选项）。
 迁移脚本在 `_local/sql/rpg-setup.sql`，旧档案导入在 `_local/sql/rpg-seed-characters.sql`。
 
-`data/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。
+`data/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。副本拆成 4 个文件（characters-2/3/4.js 只做 push，按顺序加载）。
+
+`data/battle-skills.js` 是技能库（角色技能 + marks + summons），拆成 3 个文件按顺序加载。`data/lab-snapshot.js` 是策略实验室的兜底快照，拆成多个文件按顺序加载，重新导出：`node rpg6.0/strategy-lab/lab.mjs --stage=export`。
 
 `data/rule-docs.js` 是规则条目的标题与 HTML 正文，也是规则唯一的来源。改它等于改规则，刷新页面就生效，不写数据库、没有后台界面。
 
@@ -162,7 +164,7 @@ test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步�
 - 匿名对战报只有 select / insert 权限，PATCH 与 DELETE 返回 `401 42501`；写错的战报只能 service_role 手工删。唯一例外是 `rpc/rpg_battles_purge`：它 `security definer`、期限写死 30 天、不收参数，所以匿名调它也只能删过期的行。
 - 清理搭在 `battles.html` 的加载路径上（与 `gui_tokens`、`site_suggest_hits` 同一个做法）：没人打开列表就不会清，旧行留着也不影响任何人看到的内容。
 - 中途刷新靠 `localStorage` 的 `rpg6-live-battle` 恢复，和数据库无关；结束后保存成功才清掉它。
-- 手机适配的断点是 `(orientation: landscape) and (max-height: 520px)`，不是 `max-width`：手机横屏宽 844px，用宽度断点会误判成竖屏。竖屏遮罩的条件带 `(pointer: coarse)`，桌面窄窗口不该弹。三项细节（速度条 details、技能效果展开、Buff 气泡）见 [游戏说明.md](游戏说明.md) 第十节。
+- 手机适配的断点是 `(orientation: landscape) and (max-height: 520px)`，不是 `max-width`：手机横屏宽 844px，用宽度断点会误判成竖屏。竖屏遮罩的条件带 `(pointer: coarse)`，桌面窄窗口不该弹。三项细节（速度条 details、技能效果展开、Buff 气泡）见 [游戏说明-坑.md](游戏说明-坑.md)。
 - `docgen` 只扫模块根下的 `js/*.js`，`js/engine/`、`js/battle/` 不进架构图，说明写在 [架构.md](架构.md) 的「战斗引擎」一节。
 
 ## 原始资料

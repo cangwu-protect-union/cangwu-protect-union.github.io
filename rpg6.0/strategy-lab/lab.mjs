@@ -108,12 +108,48 @@ function writeSnapshot(run) {
       policiesB: (p.policiesB || []).map((x) => ({ id: x.id, obj: x.obj, readable: x.readable }))
     }))
   };
-  const file = path.resolve(ROOT, "rpg6.0", "data", "lab-snapshot.js");
+  const base = {
+    engineVersion: payload.engineVersion,
+    generatedAt: payload.generatedAt,
+    chars: payload.chars,
+    config: payload.config,
+    pairs: []
+  };
+  const LIMIT = 20000;
   const header = "/* 策略实验室兜底快照 · 生成物，不要手改\n"
     + "   重新生成：node rpg6.0/strategy-lab/lab.mjs --stage=export --from=<run 目录>\n"
-    + "   数据库里有记录时页面优先读数据库。 */\n";
-  fs.writeFileSync(file, header + "window.RPG_LAB_SNAPSHOT = " + JSON.stringify(payload) + ";\n", "utf8");
-  return file;
+    + "   数据库里有记录时页面优先读数据库。\n"
+    + "   快照拆成多个文件按顺序加载，分片只 push pairs。 */\n";
+  const mainPre = header + "window.RPG_LAB_SNAPSHOT = " + JSON.stringify(base) + ";\n";
+  const skel = "window.RPG_LAB_SNAPSHOT = window.RPG_LAB_SNAPSHOT || { pairs: [] };\nwindow.RPG_LAB_SNAPSHOT.pairs.push(\n";
+  const close = ");\n";
+  const chunks = [];
+  let cur = [];
+  let size = Buffer.byteLength(mainPre + skel + close, "utf8");
+  for (const entry of payload.pairs) {
+    const text = JSON.stringify(entry);
+    const add = Buffer.byteLength(text, "utf8") + (cur.length ? 1 : 0);
+    if (cur.length && size + add > LIMIT) {
+      chunks.push(cur);
+      cur = [];
+      size = Buffer.byteLength(skel + close, "utf8");
+    }
+    cur.push(text);
+    size += add;
+  }
+  if (cur.length) chunks.push(cur);
+  const dataDir = path.resolve(ROOT, "rpg6.0", "data");
+  for (const old of fs.readdirSync(dataDir)) {
+    if (/^lab-snapshot(?:-\d+)?\.js$/.test(old)) fs.unlinkSync(path.join(dataDir, old));
+  }
+  const files = [];
+  chunks.forEach((list, idx) => {
+    const name = idx === 0 ? "lab-snapshot.js" : "lab-snapshot-" + (idx + 1) + ".js";
+    const pre = idx === 0 ? mainPre + skel : header + skel;
+    fs.writeFileSync(path.join(dataDir, name), pre + list.join(",\n") + close, "utf8");
+    files.push(name);
+  });
+  return files[0];
 }
 
 async function main() {

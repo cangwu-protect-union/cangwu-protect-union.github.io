@@ -22,20 +22,20 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../traits.js` | 8 主业 + 6 副业；主业/副业写反也能查（两张表都找）；`ignoreTaunt` |
 | `.../state.js` | 建单位、面板结算（set→add→mul）、标记、`summons/side/hpLost`、深拷贝、指纹 |
 | `.../damage.js` | 伤害/回血/强扣、击溃值、蓄力打断、不会死亡、英雄/召唤物死亡判定 |
-| `.../effect-ops.js` | 效果解释器（34 个 op）、群体目标 `sideUnits`、持续效果/周期计时、反射、打断、标记 |
+| `.../effect-ops.js` | 效果解释器框架与出口（34 个 op；helpers 与 op 实现拆在 `effect-ops-helpers.js`、`effect-ops-2.js`，按顺序加载）、群体目标 `sideUnits`、持续效果/周期计时、反射、打断、标记 |
 | `.../timeline.js` | 标准回合、速度条、行动队列、跳过无法行动者；空回合会连续推进 |
 | `.../conditions.js` | 技能条件（蓝/力/冷却/封锁/一次性/标记门槛、`costFromLost` 动态费用） |
 | `.../skills.js` | 技能执行、蓄力、校验、动态费用、嘲讽、被动钩子、标记初始化 |
 | `.../summons.js` | 召唤物创建/移除/上限/计时/光环/到期自爆/自动攻击 |
 | `.../actions.js` | 普攻/击溃/蓄蓝、普攻前改判、`afterAction` 行动后钩子 |
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
-| `rpg6.0/data/battle-skills.js` | 角色技能、标记、`summons` 召唤物定义（唯一数据源） |
-| `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配 |
+| `rpg6.0/data/battle-skills.js` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；角色块拆在 battle-skills-2/3.js） |
+| `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放与界面细节拆在 battle-page-record.js / battle-page-ui.js） |
 | `_local/tests/engine/run.mjs` | 引擎单测入口 |
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 用 <!-- RPG6-STATS:START scripts -->23<!-- RPG6-STATS:END scripts --> 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 用 <!-- RPG6-STATS:START scripts -->35<!-- RPG6-STATS:END scripts --> 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -130,40 +130,6 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 
 `rpg6-lint.js` 与 `rpg6-stats.js --check` 已经挂在 `check.ps1` 里，单跑是为了看细项。`--warn` 只提醒不阻断，`--json` 给机器读；`rpg6-stats.js --write` 改数字，手改会被 `--check` 抓。
 
-## 踩过的坑
-
-1. **`state.seed` 存原始种子**，`state.rng` 存随机数状态。把混淆后的值再喂回 `createBattle` 会让回放从第一步发散。
-2. **战报存 `committed` 动作**。点技能但蓄力不足时引擎会把动作归一化成 `charge`，存原始动作会重放出不同结果。
-3. **`set` 不会清掉已有的 `add`**。要封顶就加「差值」而不是 `set` 一个绝对值（宋知远·电摩冲击）。
-4. **回合制效果看 `unit` 字段**（`selfRound`/`targetRound`），以前按 `"turn"` 过滤导致永远不触发；现在由 `isDueForTurn` 判断是谁的回合。
-5. **状态/Buff 事件要带 `label`**，否则界面提示会显示内部 kind。
-6. **标记必须先声明**，没声明就 `return`，不会报错也不会生效。
-7. **技能条件与档案不一致会被禁用**，这是特性不是 bug；改档案后要同步 `conditionText`。
-8. **改了规则就升 `data/config.js` 的 `engineVersion`**，旧战报才会被标成「旧引擎战报」。
-9. **`docgen` 只扫模块根下的 `js/*.js`**，`js/engine/` 与 `js/battle/` 不进架构图，说明写在 `rpg6.0/架构.md` 手写区。
-10. **技能禁用与点击**：只有「不是这个角色的回合」才拦截点击；条件不满足（缺蓝、层数不够）要放行点击并给出原因。
-11. **随机策略跑久了必然撞僵局**（治疗抵平、击溃锁死），先分类再判断是不是 bug。
-12. **取整只做一次**：多段伤害每段各自 round5，Buff 乘算合并成一个乘数再取整。
-13. **折叠控件的点击会触发 `render()` 重建 DOM**：给浮层注入测试行必须先点开再塞，先塞会被一次重绘冲掉。
-14. **遮罩别用纯 CSS `(pointer: coarse)`**：触屏笔记本、平板都会被算进去。Playwright 里 `setViewportSize` 不改 pointer 与触摸点数，要 `Emulation.setDeviceMetricsOverride({mobile:true})` + `setTouchEmulationEnabled` 才测得到。
-15. **`display:none` 的表格仍在 DOM 里**：`querySelectorAll('.fc-table tbody tr')` 照样数到 21 行，断言「收起」要查 `details.open` 或 computed style，别数行数。
-16. **紧凑断点的样式不要提到全局**：桌面吃进去就会变成盖满整页的浮层。桌面和手机共用一份 DOM（靠 `grid-template-areas` 换形），每条手机规则都要想一遍桌面会怎样。
-17. **两个会话同时改 `js/battle/*`**：先在改动前重读文件，chip 的属性名（`data-buff` → `data-detail`）这类重构会被另一端换掉，按旧选择器写的用例会静默失灵。
-18. **`state` 不是 `B.state`**：引擎函数拿到的是状态实例，写 `state.units` / `state.summons`；`B.state` 是模块对象，`B.state.units` 是 `undefined`。`sideUnits` 里写成 `B.state.units.filter` 会报 `Cannot read properties of undefined (reading 'filter')`。
-19. **动态费用函数是两个参数**：`B.skills.effectiveCost(unit, skill)`。视图里误传 `(state, unit, skill)` 会把 `state` 当单位，条件后缀显示「实际 0蓝」，但条件是能过的；看到费用显示不对先查调用签名。
-20. **`battleStart` 的 tick 的 `bornRound` 是 0**：`battleStart` 在 `state.round=0` 时跑，`period` 用 `state.round - bornRound + 1` 会整体错一位（王霸之气会在第 2/5/8 回合跳）。`addTick` 里用 `Math.max(1, state.round)`。
-21. **无血召唤物不是死的**：`hp:0` 的葵花宝典/小刘亦萱靠 `ttl` 活着。`ofSide`/`summons.tick` 用 `targetable ? hp>0 : true`；`combatantsOf`/单体目标只收有血单位。用 `hp>0` 一刀切会让计时物永远不 tick、也不显示。
-22. **召唤物伤害要按来源强制无击溃/眩晕**：`damage.hit` 里 `source.isSummon` 时 `noBreak=true; noStun=true`，不能只靠数据里的 `noBreak`。英雄死亡时 `resolveDeath` 要 `clearSide`；召唤物死亡只移除自己，不判负。
-23. **空标准回合会一次推进多个 `roundEnd`**：`beginTurn` 在队列空时循环 `roundEnd → startRound`，直到有人速度满 100。召唤物 ttl/光环/持续效果会按每个空回合各结算一次；UI 下一次渲染时 ttl 可能从 4 跳到 1 甚至已消失。浏览器用例断言日志和召唤事件，不要断言「刚召唤必见剩 4」。
-24. **`afterAction` 每个动作都跑**：普攻、击溃、蓄蓝、技能蓄力/释放都算；对局已结束就跳过。`actions.strike` 直接调 `basicAttack`，不经过 `execute`，所以不会触发 `afterAction`。刘滨路动能靠它。
-25. **`hpLost` 不只在 `damage` 里加**：`directLoss`、血上限被压低导致当前血下降（`clampHpToMax`）也算；治疗不回退。羊书含墓的减费读它，漏一处就会少减费。
-26. **召唤物点击要先于 `[data-unit]`**：召唤物 chip 在角色卡内部，事件委托先查 `[data-summon]` 再查 `[data-unit]`；不可选中的 chip 要提示「不可选中」，不要误报「被嘲讽保护」。
-27. **e2e 的步数要数角色回合，不是循环次数**：速度条让 20 速角色每 5 个标准回合才动一次，循环里 `i` 会把对手回合也算进去；用 `steps` 只在该角色行动时 +1，否则会在错误的回合点技能、把蓄力放掉。
-28. **gitleaks 只扫 commit**：`check.ps1` 在工作区干净、还没提交时能过，提交后再跑会扫到新 commit。`battle-skills.js` 里的 `key: "zhengyingli.kuihua2"` 这类数据 id 会被 `generic-api-key` 误报；在 `.gitleaks.toml` 按 `paths` + 行正则放行这两个 key，不要放行整个文件或所有 `key:` 行。
-29. **受击掷骰免疫别写 `beforeDamage`**：`damage.hit` 在 `noReaction` 时整段跳过钩子（江雨轩「肥肥反弹」的反弹伤害、被动 `strike`），毛毛就挡不住这些伤害。走 `damage.hit` 最前面的 `skills.rollDodge`，与钩子无关；`buffImmune` 同理走 `skills.immuneBuffs` 在 `addBuff` 里拦，不要靠 `dispel`（它会把负向属性修正一起清掉）。
-30. **回血 op 的 `label`**：`heal` 现在优先用 `op.label`，否则用上下文 label；写在 `roundStart` 钩子里的回血不带 `label` 会显示成「标准回合开始 · 宋知远 +25」。
-31. **`buffImmune` 是随身属性，不进 `state.hash`**：它由技能库按角色名推导，回放时技能库一致就不会漂；如果以后做成可变的（如「剃发为僧」期间免疫），要把它写进 `state` 与指纹。
-
 ## 交付前检查
 
 - [ ] `run.mjs` 全绿
@@ -176,3 +142,8 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 - [ ] 新角色写进机制文档并带 `<!-- skill:id -->` 锚点，`unsupported` 的技能写明原因；召唤物写进 `summons` 块与 `state.hash`
 - [ ] 动过对局页：桌面 1280×900 与手机 844×390 各截一张图核对，确认没有任何一块要横向滚动
 - [ ] 会话要归档时，把新增口径/命令/坑写进本 skill 和根 `AGENTS.md`，再推送
+
+## 踩过的坑
+
+见 同目录 [踩过的坑.md](踩过的坑.md)。
+

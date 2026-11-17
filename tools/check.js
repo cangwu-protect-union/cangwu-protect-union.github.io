@@ -12,6 +12,7 @@
      样式    CSS 大括号配平、url() 本地引用是否存在
      密钥    service_role、secret key、密码、带密码的连接串（publishableKey 放行）
      仓库    已跟踪文件里不该出现的路径
+     体积    代码/文档文件不超过 20480 字节（vendor 目录豁免）
 
    退出码：0 全过，1 有问题。输出格式 路径:行: 代码: 说明
    ============================================================ */
@@ -212,6 +213,41 @@ function checkStaged() {
   if (n === 0) console.log("暂存区干净");
 }
 
+/* ---------- 体积闸 ---------- */
+const SIZE_LIMIT = 20480;
+const SIZE_EXT = new Set([".js", ".mjs", ".css", ".html", ".htm", ".md", ".ps1"]);
+
+function sizeExempt(p) {
+  return /^guitu\/js\/lib\//.test(p) || /^quyu\/vendor\//.test(p);
+}
+
+function sizeBad(p) {
+  const full = path.join(ROOT, p);
+  let st;
+  try { st = fs.statSync(full); } catch { return; }
+  if (st.size > SIZE_LIMIT) {
+    bad(full, 1, "size", `超过 ${SIZE_LIMIT} 字节（${(st.size / 1024).toFixed(1)} KB），请拆分`);
+  }
+}
+
+function checkSizes() {
+  const out = git(["ls-files", "-z"]);
+  if (out === null) return;
+  for (const p of out.split("\0")) {
+    if (!p) continue;
+    if (SIZE_EXT.has(path.extname(p).toLowerCase()) && !sizeExempt(p)) sizeBad(p);
+  }
+}
+
+function checkStagedSizes() {
+  const out = git(["diff", "--cached", "--name-only", "-z"]);
+  if (out === null) return;
+  for (const p of out.split("\0")) {
+    if (!p) continue;
+    if (SIZE_EXT.has(path.extname(p).toLowerCase()) && !sizeExempt(p)) sizeBad(p);
+  }
+}
+
 /* ---------- 主流程 ---------- */
 const files = walk(ROOT, []).sort();
 const SELF = path.join(ROOT, "tools", "check.js");
@@ -230,7 +266,11 @@ for (const file of files) {
 }
 
 checkRepoTracked();
-if (process.argv.includes("--staged")) checkStaged();
+checkSizes();
+if (process.argv.includes("--staged")) {
+  checkStaged();
+  checkStagedSizes();
+}
 
 console.log(`扫描 ${files.length} 个文件：${js} 个 JS、${html} 个 HTML、${css} 个 CSS`);
 

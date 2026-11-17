@@ -23,25 +23,31 @@ export function argValue(argv, name, fallback = "") {
   return fallback;
 }
 
-function runWindowScript(root, relPath, globalName) {
-  const file = path.join(root, relPath);
-  if (!fs.existsSync(file)) throw new Error("找不到文件：" + file);
+function runWindowScript(root, relPaths, globalName) {
+  const paths = Array.isArray(relPaths) ? relPaths : [relPaths];
   const sandbox = { window: {}, console };
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: file });
+  for (const rel of paths) {
+    const file = path.join(root, rel);
+    if (!fs.existsSync(file)) throw new Error("找不到文件：" + file);
+    vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: file });
+  }
   const value = sandbox.window[globalName];
-  if (value == null) throw new Error(relPath + " 没有导出 window." + globalName);
+  if (value == null) throw new Error(paths.join(", ") + " 没有导出 window." + globalName);
   return value;
 }
 
+const SEED_FILES = ["rpg6.0/data/characters.js", "rpg6.0/data/characters-2.js", "rpg6.0/data/characters-3.js", "rpg6.0/data/characters-4.js"];
+const SKILLS_FILES = ["rpg6.0/data/battle-skills.js", "rpg6.0/data/battle-skills-2.js", "rpg6.0/data/battle-skills-3.js"];
+
 export function loadSeed(root) {
-  const list = runWindowScript(root, "rpg6.0/data/characters.js", "RPG_SEED_CHARACTERS");
+  const list = runWindowScript(root, SEED_FILES, "RPG_SEED_CHARACTERS");
   if (!Array.isArray(list)) throw new Error("RPG_SEED_CHARACTERS 不是数组");
   return list;
 }
 
 export function loadLibrary(root) {
-  return runWindowScript(root, "rpg6.0/data/battle-skills.js", "RPG6_SKILLS");
+  return runWindowScript(root, SKILLS_FILES, "RPG6_SKILLS");
 }
 
 export function norm(text) {

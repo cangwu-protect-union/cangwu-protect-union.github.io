@@ -20,8 +20,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
 | CSS | `{` `}` 配平 |
 | 密钥 | `service_role`、`sb_secret_*`、带密码的连接串、硬编码凭据、私钥、AWS key、GitHub / GitLab 令牌、role 不是 `anon` 的 JWT |
 | 仓库 | `git ls-files` 里有没有 `_local/`、`node_modules/`、`.pnpm-store/`、`*.sql`、`*.docx`、`*.zip` |
+| 体积 | 被跟踪的 `*.js` / `*.mjs` / `*.css` / `*.html` / `*.md` / `*.ps1` 不得超过 20480 字节；`guitu/js/lib/` 与 `quyu/vendor/` 豁免。普通模式查全部，`-Staged` 只查暂存区 |
 
-`-Staged` 额外检查 `git diff --cached` 里有没有 `_local/`、SQL、Office 文件。
+`-Staged` 额外检查 `git diff --cached` 里有没有 `_local/`、SQL、Office 文件，以及暂存文件是否超体积。
 
 也可以指向别的目录，用于检查构建产物：
 

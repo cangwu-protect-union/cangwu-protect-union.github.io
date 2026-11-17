@@ -51,7 +51,7 @@ function Test-EngineVersionGuard {
         return $false
     }
     $staged = @(& git diff --cached --name-only 2>$null)
-    $rules = @($staged | Where-Object { $_ -match '^rpg6\.0/js/engine/(rules|damage|state|effect-ops|skills|timeline|actions|conditions|summons|traits)\.js$' })
+    $rules = @($staged | Where-Object { $_ -match '^rpg6\.0/js/engine/(rules|damage|state|effect-ops(?:-[a-z0-9-]+)?|skills|timeline|actions|conditions|summons|traits)\.js$' })
     if ($rules.Count -eq 0) {
         Write-Host 'engine version guard: no engine rule file staged, ok' -ForegroundColor DarkGray
         return $false

@@ -44,13 +44,13 @@
 
 ```
 js/
-├── gui-data.js       数据层：所有数据库读写的唯一出口
+├── gui-data.js       数据层：所有数据库读写的唯一出口（写入与情报在 gui-data-admin.js，先加载）
 ├── gui-gate.js       组织验证：调数据库函数校验答案，拿会话令牌
 ├── gui-upload.js     图片处理：压缩、缩略图、HEIC 转码、上传
 │
 ├── guitu.js          公开图鉴列表
 ├── entry.js          条目详情
-├── add-gui.js        增加条目 + 提供情报（两个页面共用一个脚本）
+├── add-gui.js        增加条目 + 提供情报（两个页面共用一个脚本；上传在 add-gui-upload.js、草稿在 add-gui-draft.js，两片先加载）
 ├── edit-gui.js       编辑图鉴列表
 ├── edit-entry.js     条目编辑器
 ├── old-gui.js        旧图鉴

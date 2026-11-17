@@ -44,7 +44,7 @@
 
 ```
 js/
-├── zone-data.js      数据层：所有数据库读写的唯一出口（由 gui-data.js 改写）
+├── zone-data.js      数据层：所有数据库读写的唯一出口（由 gui-data.js 改写；写入在 zone-data-admin.js、投稿在 zone-data-tips.js，两片先加载）
 ├── relation-utils.js 关联条目：编码、双向查询、删反向关联（含归档对方版本）
 ├── relation-box.js   「关联条目」框（鬼与区域的编辑页共用）
 ├── refs-list.js      「引用情报」折叠列表（鬼与区域共用）

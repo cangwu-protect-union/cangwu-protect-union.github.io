@@ -1,0 +1,629 @@
+/* style-2.css —— style.css 的分片（多图上传、编辑/版本、情报、审核、关联引用）
+   跟在 style.css 之后加载，顺序不能变。 */
+/* =============================================================
+   17. 多图：详情页画廊 + 列表页多图标识
+   ============================================================= */
+
+.entry-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 22px 0 26px;
+}
+.gallery-item {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card);
+  aspect-ratio: 4 / 3;
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+
+/* 列表卡片缩略图上的「N 图」角标 */
+.gui-card-img { position: relative; }
+.gui-card-multi {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  font-size: .66rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .68);
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* 窄屏：画廊改成单列 */
+@media (max-width: 560px) {
+  .entry-gallery { grid-template-columns: 1fr; }
+}
+
+
+/* =============================================================
+   18. 编辑图鉴 / 旧图鉴 / 版本系统
+   ============================================================= */
+
+/* ---- 页面内嵌验证表单 ---- */
+.gate-form .field { margin-bottom: 18px; }
+
+/* ---- 「再次验证身份」模态框 ---- */
+.gate-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .48);
+}
+.gate-modal[hidden] { display: none; }
+
+.gate-modal-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 24px 26px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
+}
+.gate-modal-title { margin: 0 0 .5em; font-size: 1.15rem; border: none; padding: 0; }
+.gate-modal-desc { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+
+/* ---- 旧图鉴方格视图（一行三个） ---- */
+.old-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 4px;
+}
+.old-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  aspect-ratio: 1 / 1;
+  padding: 12px;
+  text-align: center;
+  color: var(--fg);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  transition: border-color .15s, transform .15s;
+}
+.old-tile:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.old-tile-name {
+  font-weight: 600;
+  font-size: .95rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.old-tile-count { font-size: .74rem; color: var(--muted); }
+
+/* 已删除的条目：灰底白字 */
+.old-tile.is-deleted {
+  background: #6d7680;
+  border-color: #5b636b;
+  color: #fff;
+}
+.old-tile.is-deleted .old-tile-count { color: rgba(255, 255, 255, .72); }
+.old-tile.is-deleted:hover { border-color: #2b3138; }
+
+/* 窄屏：两列 */
+@media (max-width: 560px) {
+  .old-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .old-tile-name { font-size: .85rem; }
+}
+
+/* ---- 版本列表 ---- */
+.ver-list { display: grid; gap: 12px; }
+
+.ver-item {
+  display: block;
+  padding: 14px 16px;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color .15s, transform .15s;
+}
+.ver-item:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.ver-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: .76rem;
+}
+.ver-time { color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.ver-tag {
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 8px;
+  background: var(--bg);
+}
+.ver-title { font-weight: 600; font-size: .98rem; margin-bottom: 4px; }
+.ver-preview { color: var(--muted); font-size: .88rem; line-height: 1.6; }
+
+/* ---- 版本查看页顶部提示条 ---- */
+.version-banner {
+  margin: 18px 0 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card);
+}
+.version-banner[hidden] { display: none; }
+.version-banner p { margin: 0 0 10px; font-size: .9rem; color: var(--muted); }
+.version-banner p:last-child { margin-bottom: 0; }
+
+/* ---- 条目编辑器 ---- */
+.editor-title { font-size: 1.6rem; margin-top: 0; }
+
+.para-list { display: grid; gap: 10px; margin-bottom: 12px; }
+
+.para-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.para-row textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: .95rem;
+  line-height: 1.7;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  resize: vertical;
+}
+.para-row textarea:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, .12);
+}
+.para-del {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.para-del:hover { border-color: #b42318; color: #b42318; background: #fdf2f1; }
+
+/* ---- 危险操作区 ---- */
+.editor-sep {
+  margin: 34px 0 20px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.danger-zone p { font-size: .88rem; margin-bottom: 10px; }
+
+.btn-danger {
+  background: transparent;
+  color: #b42318;
+  border: 1px solid #f0b4ae;
+}
+.btn-danger:hover { background: #fdf2f1; opacity: 1; }
+.btn-danger:disabled { opacity: .5; cursor: default; }
+
+
+/* =============================================================
+   19. 搜索框与操作按钮分两行（小屏幕体验）
+   ============================================================= */
+
+/* 工具条改成纵向：搜索框独占一行，按钮在下面一行 */
+.gui-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.gui-toolbar .gui-search { width: 100%; }
+
+/* 按钮行：自动换行，每个按钮等宽伸展 */
+.gui-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gui-actions .btn {
+  flex: 1 1 auto;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 窄屏下按钮占满整行，点起来更舒服 */
+@media (max-width: 560px) {
+  .gui-actions .btn { flex: 1 1 100%; }
+}
+
+/* 编辑列表顶部的小提示 */
+.gui-note { font-size: .84rem; margin: -8px 0 14px; }
+
+
+/* =============================================================
+   20. 情报系统（提供 / 查看 / 引用）
+   ============================================================= */
+
+/* 提供情报页的开放提示 */
+.tip-notice {
+  font-size: .88rem;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  border-radius: 6px;
+  margin-bottom: 18px;
+}
+
+.tip-more { margin-top: 22px; }
+
+/* 情报详情页的「未经核实」角标 */
+.tip-badge {
+  display: inline-block;
+  font-size: .78rem;
+  color: #8a5a00;
+  background: #fff4d6;
+  border: 1px solid #f0d9a0;
+  border-radius: 99px;
+  padding: 2px 10px;
+  margin: 0 0 16px;
+}
+
+/* ---- 引用情报的勾选列表 ---- */
+.pick-list { display: grid; gap: 10px; }
+
+.pick-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pick-item:hover { border-color: var(--accent); }
+.pick-item.is-on { border-color: var(--accent); background: var(--bg); }
+
+.pick-item-img {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eef1f4;
+}
+.pick-item-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.pick-item-body { flex: 1 1 auto; min-width: 0; }
+.pick-item-title {
+  margin: 0 0 4px;
+  font-size: .98rem;
+  font-weight: 600;
+}
+.pick-item-intro {
+  margin: 0 0 4px;
+  font-size: .86rem;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pick-item-meta { margin: 0; font-size: .78rem; color: var(--muted); }
+
+/* 右侧小方格 */
+.pick-item-check { flex: 0 0 auto; }
+.pick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all .15s;
+}
+.pick-box.is-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---- 底部固定的操作栏 ---- */
+.pick-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, .06);
+}
+.pick-bar-count {
+  margin-right: auto;
+  font-size: .86rem;
+  color: var(--muted);
+}
+.pick-bar .btn { min-width: 96px; }
+.pick-bar .btn:disabled {
+  opacity: 1;
+  background: #d6dbe0;
+  color: #8b939b;
+  cursor: not-allowed;
+}
+
+/* 有固定底栏的页面，正文底部留出空间，避免被遮住 */
+body.has-pick-bar { padding-bottom: 76px; }
+
+@media (max-width: 560px) {
+  .pick-item-img { width: 52px; height: 52px; }
+  .pick-bar .btn { min-width: 0; flex: 1 1 0; }
+  .pick-bar { gap: 10px; padding: 10px 14px; }
+  .pick-bar-count { display: none; }
+}
+
+
+/* 恢复草稿后的提示条 */
+.tip-draft-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .88rem;
+  color: #1a5c2a;
+  background: #eef8f0;
+  border: 1px solid #bfe3c7;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 14px;
+}
+.tip-draft-hint .link-btn {
+  color: #1a5c2a;
+  text-decoration: underline;
+  font-size: .88rem;
+}
+
+/* =============================================================
+   17. 投稿审核页
+   ============================================================= */
+
+.review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 6px;
+}
+.review-tabs .btn.is-on {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.review-list { display: grid; gap: 14px; }
+
+.review-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.review-item-img {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.review-item-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.review-item-body { flex: 1 1 auto; min-width: 0; }
+
+.review-item-title { margin: 2px 0 6px; font-size: 1.02rem; line-height: 1.4; }
+.review-item-meta { margin: 0 0 8px; font-size: .84rem; }
+
+.review-details summary {
+  cursor: pointer;
+  font-size: .88rem;
+  color: var(--muted);
+}
+.review-body {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: .92rem;
+  line-height: 1.7;
+}
+.review-body p { margin: 0 0 10px; }
+.review-body p:last-child { margin-bottom: 0; }
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.review-note {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: .9rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+.review-note:focus { border-color: var(--accent); }
+
+.review-meta { margin: 12px 0 0; font-size: .84rem; }
+
+@media (max-width: 560px) {
+  .review-item { flex-direction: column; }
+  .review-item-img { width: 100%; height: 160px; flex: 0 0 auto; }
+  .review-actions .btn { flex: 1 1 0; }
+}
+/* =============================================================
+   21. 关联条目与引用情报（鬼图鉴与异常区域档案共用）
+   ============================================================= */
+
+.rel-box { margin-top: 4px; }
+
+.rel-box__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.rel-box__count { font-size: .85rem; color: var(--muted); }
+
+.rel-box__sub {
+  margin: 10px 0 6px;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+.rel-box__empty { font-size: .9rem; margin: 4px 0; }
+
+.rel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.rel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  font-size: .92rem;
+}
+
+.rel-row a { flex: 1 1 auto; min-width: 0; }
+
+.rel-del {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: .78rem;
+  color: #b42318;
+  background: transparent;
+  border: 1px solid #f0b4ae;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rel-del:hover { background: #fdf2f1; }
+.rel-del:disabled { opacity: .5; cursor: default; }
+
+.refs-box {
+  margin: 24px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.refs-box > summary {
+  cursor: pointer;
+  font-size: .85rem;
+  color: var(--muted);
+  outline: none;
+}
+
+.refs-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: .92rem;
+}
+
+.refs-list li { display: flex; align-items: center; gap: 10px; }
+.refs-list a { flex: 1 1 auto; min-width: 0; }
+
+.refs-del {
+  flex: 0 0 auto;
+  padding: 1px 9px;
+  font: inherit;
+  font-size: .76rem;
+  color: #b42318;
+  background: transparent;
+  border: 1px solid #f0b4ae;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.refs-del:hover { background: #fdf2f1; }
+
+@media (prefers-color-scheme: dark) {
+  .rel-del, .refs-del { color: #ff938a; border-color: #6b2b25; }
+  .rel-del:hover, .refs-del:hover { background: #2a1512; }
+}
