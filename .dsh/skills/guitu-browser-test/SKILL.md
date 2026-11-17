@@ -7,7 +7,7 @@ description: 给 CPU 官网/鬼图鉴做本地端到端验证：起静态服务�
 
 ## 路径
 
-需要时调 `load_workspace_dependencies` 取 `python` / `node` 绝对路径。实测值：
+需要时调 `load_workspace_dependencies` 取绝对路径。实测值：
 
 ```
 python  C:\Users\L\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe
@@ -16,43 +16,23 @@ node    C:\Users\L\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\n
 
 ## 起服务
 
-`Start-Process` 起的 python 会随那条命令结束被杀掉（实测：下一条命令访问 9300 直接
-`ERR_CONNECTION_REFUSED`）。要用后台 job 占住端口：
+`Start-Process` 起的 python 会随那条命令结束被杀掉。要用后台 job 占住端口（`run_in_background`）：
 
 ```
-pwsh: python -m http.server 9300 --bind 127.0.0.1   （run_in_background）
+python -m http.server 9300 --bind 127.0.0.1
 ```
 
 `_local/tests/run-all.mjs` 会自己起服务，跑正式用例时不用手工开。
-
-**收工要按 PID 关**：`job_kill` 只杀掉 pwsh 外壳，python 子进程仍在监听，下次跑 `run-all` 会撞端口或让「服务器是不是我开的」判断失真。实测收尾：
-
-```powershell
-Get-NetTCPConnection -LocalPort 9300 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess
-Stop-Process -Id <PID> -Force
-```
-
-再 `Invoke-WebRequest http://127.0.0.1:9300/...` 确认已拒连，别只看 job 状态。
-
+**收工要按 PID 关**：`job_kill` 只杀 pwsh 外壳，python 子进程仍在监听。按端口找 PID 杀掉，再请求一次确认已拒连，别只看 job 状态。细节见 [判读与细节.md](判读与细节.md)。
 必须用 `http://127.0.0.1:PORT/...`，**不要 `file://`**：Origin 为 `null`，云端 CORS 直接拦掉。
 
 ## 沙箱
 
-Edge / Playwright 靠命名管道启动，在 workspace-write 沙箱里会 `拒绝访问 (0x5)` 或 `spawn EPERM` 退出。**跑浏览器的命令必须带 `sandbox_permissions: danger-full-access`**。
-
-本机 `powershell` 是 5.1，没有 `Invoke-WebRequest -SkipCertificateCheck`，也没有
-`Set-Content -Encoding utf8NoBOM`。要验接口就在浏览器里 `page.evaluate(fetch)`，
-顺带把 CORS 一起验了；测出来的 `400 / 404 / 42501` 比 curl 更接近真实访客。
+Edge / Playwright 靠命名管道启动，在受限沙箱里会 `拒绝访问 (0x5)` 或 `spawn EPERM`。**跑浏览器的命令必须带 `sandbox_permissions: danger-full-access`**（当前会话已默认放开，跨会话要留意）。
 
 ## 首选：Playwright
 
-`_local/pw` 里装了 playwright 1.64.1（pnpm hoisted），连系统 Edge，不下载 Chromium。
-
-```powershell
-& "<node>" check.mjs "http://localhost:9300/index.html" "..\preview\index.png"
-```
-
-打印浏览器版本、地址、标题、JS 异常、控制台报错、HTTP 4xx-5xx、截图路径。写自己的用例：
+`_local/pw` 里装了 playwright（pnpm hoisted），连系统 Edge，不下载 Chromium。
 
 ```js
 import { openBrowser, watchPage } from './browser.mjs';
@@ -82,17 +62,11 @@ await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPo
 await page.setViewportSize({ width: 844, height: 390 });
 ```
 
-`mobile: true` 之后 `(pointer: coarse)` 才为真、`navigator.maxTouchPoints` 才是 5；`maxTouchPoints` 至少给 1（给 0 会报 `Touch points must be between 1 and 16`）。切回桌面要显式 `setTouchEmulationEnabled({enabled:false})`，否则同一页后续断言仍按手机走。
+`mobile: true` 之后 `(pointer: coarse)` 才为真、`navigator.maxTouchPoints` 才是 5；`maxTouchPoints` 至少给 1。切回桌面要显式 `setTouchEmulationEnabled({enabled:false})`，否则同一页后续断言仍按手机走。
 
 ## 退路：CDP 直连
 
-不装依赖时用 `_local/pw/cdp.mjs`（已实测）：
-
-```powershell
-& "<node>" _local\pw\cdp.mjs "http://localhost:9300/index.html" 10600 "..\preview\x.png"
-```
-
-打印标题、JS 异常、控制台错误、网络失败，可选截图。要自己写 CDP 脚本时记住：**先以 `about:blank` 启动，连上 target 再 `Page.navigate`**，直接以目标页启动会连到错误的执行上下文，读到空 DOM。
+不装依赖时用 `_local/pw/cdp.mjs`（已实测）。要自己写 CDP 脚本时记住：**先以 `about:blank` 启动，连上 target 再 `Page.navigate`**，直接以目标页启动会连到错误的执行上下文。命令见 [判读与细节.md](判读与细节.md)。
 
 ## 常用片段
 
@@ -104,26 +78,7 @@ await ev(`(async function(){ try { await window.GuiGate.verifyValues(['<问题�
 await ev(`(async function(){ try { await window.GuiData.insertEntry({ id:"t-"+Date.now(), title:"测试", image:"", images:[], thumbs:[], intro:"x", body:"x", tags:[], date:"2026-01-01", refs:[] }); return "ok"; } catch(e){ return "fail: " + e.message; } })()`);
 ```
 
-## 断言时机
+## 断言时机与判读
 
-不要固定 `sleep` 一段再去读 DOM 下结论：分不清「还在载入」和「已经失败」，而且首次连云端可能要十几秒。
-
-```js
-await page.waitForFunction(() => {
-  const t = document.querySelector('#guiCount');
-  return t && !/载入/.test(t.textContent);
-}, { timeout: 25000 });
-```
-
-同一页面里连续跳转时，切页后要先等目标页的选择器出现再断言。上一个页面的请求还在飞的时候截图或读 DOM，拿到的是空壳，容易被当成渲染回归。
-
-新浏览器 profile 第一次请求 TLS 握手实测 12.3 秒，热连接约 120ms。要测首屏真实体验就保持全新 profile；要测功能就先预热一次，别把冷启动的 12 秒当性能问题报出去。
-
-## 判读
-
-- 页面里既有隐藏的 `.gate-error` 空元素，也有警告：判断「是否显示警告」看 `textContent` 非空，不能只看元素存在。
-- 结果对不上时先做最小差异对照：只改一个变量（换身份、换 profile、换 curl 与应用代码），确认是产品问题还是测量方式问题。
-- 测试后清理自建数据；条目只能软删除，彻底清除要 SQL。`gui_tips` 可以先置 `rejected` 让它从公开面消失，再让用户跑一句 delete。
-- 控制台里的 `favicon.ico 404` 是全站既有噪音（没放 favicon），不当回归；只看自己的资源与 JS 异常。
-- 用真实操作跑完一局对局、提交表单这类流程会**真的写云端数据**；截图脚本要提前想好怎么收拾，别把测试记录留在库里才发现。匿名通常只能插不能删，删要 service_role，届时把 id 交给用户跑 SQL。
-- 临时断言脚本放 `_local/pw`，跑完就删；能留下的用例写进 `_local/tests/cases/`，见 skill `site-e2e-tests`。
+不要固定 `sleep` 再读 DOM：分不清「还在载入」和「已经失败」。用 `waitForFunction` 等目标状态（示例见 [判读与细节.md](判读与细节.md)）。
+常见误判与清理注意事项（`.gate-error` 判空看 textContent、favicon 404 是既有噪音、测试会真的写云端数据）也在 [判读与细节.md](判读与细节.md)。
