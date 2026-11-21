@@ -58,7 +58,21 @@ for (const [index, character] of (plan.characters || []).entries()) {
   if (!inLibrary) newCharacters.push(character.name);
 
   const stats = character.stats || {};
+  const overrides = character.statOverrides || {};
+  for (const key of Object.keys(overrides)) {
+    if (!["atk", "def", "mres", "hp", "mp", "spd"].includes(key)) {
+      fail(character.name + " 的 statOverrides 有不认识的属性：" + key);
+    } else if (!/^-?\d+(\.\d+)?$/.test(String(overrides[key]))) {
+      fail(character.name + " 的 statOverrides." + key + " 必须是数字：" + overrides[key]);
+    }
+  }
   for (const [key, value] of Object.entries(seedStats(seedChar))) {
+    if (Object.hasOwn(overrides, key)) {
+      if (String(stats[key]) !== String(overrides[key])) {
+        fail(character.name + " 的 stats." + key + " 应为覆盖值 " + overrides[key] + "，实际 " + stats[key]);
+      }
+      continue;
+    }
     if (String(stats[key]) !== String(value)) {
       fail(character.name + " 的 stats." + key + " 与 seed 不一致：" + stats[key] + " != " + value);
     }
@@ -386,17 +400,18 @@ function scaffold(input) {
     const seedChar = seedByName.get(character.name);
     const fixture = character.fixture || ("c" + index);
     const fixtureId = character.fixtureId || ("t-" + fixture);
+    const shown = Object.assign({}, seedStats(seedChar), character.statOverrides || {});
     parts.push(JSON.stringify(fixture) + ": { id: " + JSON.stringify(fixtureId) +
       ", name: " + JSON.stringify(character.name) +
       ", gender: " + JSON.stringify(seedChar.gender) +
       ", occupation: " + JSON.stringify(seedChar.occupation) +
       ", side_job: " + JSON.stringify(seedChar.side_job || "") +
-      ", atk: " + JSON.stringify(String(seedChar.atk)) +
-      ", def: " + JSON.stringify(String(seedChar.def)) +
-      ", mres: " + JSON.stringify(String(seedChar.mres)) +
-      ", hp: " + JSON.stringify(String(seedChar.hp)) +
-      ", mp: " + JSON.stringify(String(seedChar.mp)) +
-      ", spd: " + JSON.stringify(String(seedChar.spd)) + " },");
+      ", atk: " + JSON.stringify(shown.atk) +
+      ", def: " + JSON.stringify(shown.def) +
+      ", mres: " + JSON.stringify(shown.mres) +
+      ", hp: " + JSON.stringify(shown.hp) +
+      ", mp: " + JSON.stringify(shown.mp) +
+      ", spd: " + JSON.stringify(shown.spd) + " },");
   }
 
   parts.push("\n// ===== 测试清单 =====");

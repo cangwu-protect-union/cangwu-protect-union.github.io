@@ -45,12 +45,22 @@
     }
     var eff = B.skills && B.skills.effectiveCost
       ? B.skills.effectiveCost(unit, skill)
-      : { mp: (skill.cost && skill.cost.mp) || 0, charge: skill.charge || 0, steps: 0 };
+      : { mp: (skill.cost && skill.cost.mp) || 0, charge: skill.charge || 0, def: (skill.cost && skill.cost.def) || 0, steps: 0 };
     out.effective = eff;
     var mpCost = eff.mp;
     if (B.state.hasStatus(unit, "onlyBasic")) {
       out.ok = false;
       out.reason = "现在只能普攻";
+      out.canCharge = false;
+      out.canRelease = false;
+      return out;
+    }
+    /* 对手的防护层声明「锁死对方技能」（顾文达下潜） */
+    var foeSide = B.state.otherSide(state, B.state.sideOf(state, unit.uid));
+    var foe = B.state.heroOf(state, foeSide);
+    if (foe && B.state.effectHasFlag && B.state.effectHasFlag(foe, "enemyNoSkill")) {
+      out.ok = false;
+      out.reason = "对方封锁了技能";
       out.canCharge = false;
       out.canRelease = false;
       return out;
@@ -75,6 +85,14 @@
     if (mpCost > 0 && unit.mp < mpCost) {
       out.ok = false;
       out.reason = "缺 " + (mpCost - unit.mp) + " 蓝";
+      out.canCharge = false;
+      out.canRelease = false;
+      return out;
+    }
+    var defCost = eff.def || 0;
+    if (defCost > 0 && B.state.statOf(unit, "def") < defCost) {
+      out.ok = false;
+      out.reason = "防御不足 " + defCost + "（现在 " + B.state.statOf(unit, "def") + "）";
       out.canCharge = false;
       out.canRelease = false;
       return out;

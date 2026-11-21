@@ -12,10 +12,12 @@ import liuwenzhe from "./liuwenzhe.js";
 import liyuxuan from "./liyuxuan.js";
 import nimanyun from "./nimanyun.js";
 import songzhiyuan from "./songzhiyuan.js";
+import sunjiaqi from "./sunjiaqi.js";
 import tianyuqing from "./tianyuqing.js";
 import wangluor from "./wangluor.js";
 import wangrongyi from "./wangrongyi.js";
 import xieyuchen from "./xieyuchen.js";
+import yangdongming from "./yangdongming.js";
 import yangshuhan from "./yangshuhan.js";
 import yangshuran from "./yangshuran.js";
 import yuzy from "./yuzy.js";
@@ -28,6 +30,15 @@ import zhuangwenxi from "./zhuangwenxi.js";
 
 const lib = {
   version: 1,
+  /* 面板覆盖：档案里的攻击格是注记（孙嘉怿「受攻击者当前血量的20%」），不是数字。
+     这里给一个可解析的面板值，实际普攻伤害由 basicAtk 表达式算。 */
+  panels: {
+    "孙嘉怿": { atk: 0 }
+  },
+  /* 普攻攻击值表达式：优先级高于面板与 Buff 修正（孙嘉怿） */
+  basicAtk: {
+    "孙嘉怿": { hpPercent: "target.current", percent: 20 }
+  },
   /* 标记：谁身上有哪些计数器。对手可见、可被对手的技能操作（mark / markClear / dispel marks）。 */
   marks: {
     "王荣逸": [{ key: "shuati", name: "刷题", max: 3, init: 0 }],
@@ -47,7 +58,13 @@ const lib = {
     "正盈利": [{ key: "fukui", name: "负亏损", max: 1, init: 0 }],
     /* on:"opponent" 的标记挂到对方英雄身上，双方可见（赵云哲的「卅力」） */
     "赵云哲": [{ key: "shili", name: "卅力", max: 5, init: 0, on: "opponent" }],
-    "倪曼云": [{ key: "juan", name: "卷", max: 4, init: 0 }],
+    /* 倪曼云的「刚长出来」：锁在对方身上，0=未解锁、1=已解锁 */
+    "倪曼云": [
+      { key: "juan", name: "卷", max: 4, init: 0 },
+      { key: "lockAtk", name: "攻击已解锁", max: 1, init: 0, hideMax: true, on: "opponent" },
+      { key: "lockDef", name: "防御已解锁", max: 1, init: 0, hideMax: true, on: "opponent" },
+      { key: "lockMres", name: "法抗已解锁", max: 1, init: 0, hideMax: true, on: "opponent" }
+    ],
     "顾文达": [{ key: "renGao", name: "免疫阈值", max: 9999, init: 60, hideMax: true }]
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
@@ -95,6 +112,20 @@ const lib = {
       attack: [
         { op: "damage", who: "enemyHero", type: "true", value: { stat: "self.atk" }, noBreak: true }
       ]
+    },
+    "yangdongming.voice": {
+      name: "嘚吪呐呃嘶哦",
+      desc: "不占行动、不可选中。每个标准回合末对敌方全体造成 50+5×(场上同名数量−1) 点法伤（不计击溃值）；10 个标准回合后消失，上限 6 个。",
+      ttl: 10,
+      aura: [
+        {
+          op: "damage",
+          who: "allEnemies",
+          type: "magic",
+          noBreak: true,
+          value: { plus: [45, { per: { summonCount: "yangdongming.voice" }, factor: 5 }] }
+        }
+      ]
     }
   },
   characters: {
@@ -120,7 +151,9 @@ const lib = {
     "赵云哲": zhaoyunzhe,
     "李雨轩": liyuxuan,
     "倪曼云": nimanyun,
-    "顾文达": guwenda
+    "顾文达": guwenda,
+    "孙嘉怿": sunjiaqi,
+    "杨冬明": yangdongming
   }
 };
 

@@ -24,7 +24,16 @@ export default [
         cooldown: 0,
         target: "self",
         ops: [],
-        unsupported: "本版未实现：需要「对手消耗蓝」事件与延迟 3 标准回合解锁单个属性的落点；现有引擎没有蓝消耗钩子。"
+        hooks: {
+          battleStart: [
+            { op: "counter", who: "target", key: "atkOrigin", delta: { stat: "target.atk" } },
+            { op: "counter", who: "target", key: "defOrigin", delta: { stat: "target.def" } },
+            { op: "counter", who: "target", key: "mresOrigin", delta: { stat: "target.mres" } },
+            { op: "stat", who: "target", stat: "atk", mode: "set", value: 0 },
+            { op: "stat", who: "target", stat: "def", mode: "set", value: 0 },
+            { op: "stat", who: "target", stat: "mres", mode: "set", value: 0 }
+          ]
+        }
       },
       {
         id: "nimanyun.yuegong",
@@ -34,7 +43,21 @@ export default [
         charge: 1,
         cooldown: 0,
         target: "self",
-        ops: [],
-        unsupported: "本版未实现：需要防护层（免疫一次攻击/击溃后免费触发 2 次「卷」）；引擎没有取消伤害后执行后续 ops 的通用机制。"
+        ops: [
+          { op: "maxHp", who: "self", delta: 60 },
+          {
+            op: "tick",
+            who: "self",
+            permanent: true,
+            key: "yuegong",
+            label: "越共探头",
+            desc: "对方攻击或击溃时完全免疫该次，并免费触发 2 次「卷」。",
+            guard: {
+              remaining: 1,
+              onBreak: true,
+              ops: [{ op: "use", skillId: "nimanyun.juan", times: 2 }]
+            }
+          }
+        ]
       }
 ];

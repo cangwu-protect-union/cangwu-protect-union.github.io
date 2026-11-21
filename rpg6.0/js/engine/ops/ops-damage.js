@@ -36,7 +36,8 @@
               fromBuff: !!(op.fromBuff || dctx.fromBuff),
               healBack: !!op.healBack,
               skillId: dctx.skillId || "",
-              label: dctx.label || ""
+              label: dctx.label || "",
+              actionId: dctx.actionId || ""
             }, events);
           }
         }
@@ -103,10 +104,13 @@
 
         var striker = H.sideUnit(state, ctx, op.who || "self");
         if (!striker || state.phase === "finished") return;
-        var victimUid = op.target === "source"
-          ? ctx.sourceUid
-          : (ctx.ownerUid && ctx.ownerUid !== ctx.sourceUid ? ctx.sourceUid : ctx.targetUid);
-        var victim = H.tryUnit(state, victimUid);
+        /* op.victim 显式指定打谁（送礼物这类「让己方单位普攻」在持续效果里靠它，
+           否则受害者会取 ctx.targetUid 变成打自己） */
+        var victim = op.victim
+          ? H.sideUnit(state, ctx, op.victim)
+          : H.tryUnit(state, op.target === "source"
+            ? ctx.sourceUid
+            : (ctx.ownerUid && ctx.ownerUid !== ctx.sourceUid ? ctx.sourceUid : ctx.targetUid));
         if (!victim) return;
         if (B.actions && B.actions.strike) {
           B.actions.strike(state, striker, victim, events, {

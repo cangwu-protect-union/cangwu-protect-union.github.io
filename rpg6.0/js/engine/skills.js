@@ -11,6 +11,8 @@
   var all = [];
   var markDefs = {};
   var summonDefs = {};
+  var panelDefs = {};
+  var basicAtkDefs = {};
 
   function norm(text) {
     return String(text == null ? "" : text).replace(/\s+/g, "");
@@ -22,6 +24,10 @@
     all = [];
     markDefs = (library && library.marks) || {};
     summonDefs = (library && library.summons) || {};
+    /* 面板覆盖：档案里攻击格写的是注记（孙嘉怿「受攻击者当前血量的20%」），
+       用技能库的 panels 给数字，再用 basicAtk 表达式算实际攻击值。 */
+    panelDefs = (library && library.panels) || {};
+    basicAtkDefs = (library && library.basicAtk) || {};
     var chars = library && library.characters ? library.characters : {};
     Object.keys(chars).forEach(function (owner) {
       chars[owner].forEach(function (skill) {
@@ -46,10 +52,21 @@
     return summonDefs[key] || null;
   }
 
+  function panelOf(name) {
+    return panelDefs[name] || null;
+  }
+
+  /* 动态普攻攻击值：返回数值表达式，没有就返回 null（用面板攻击） */
+  function basicAtkOf(unit) {
+    if (!unit || !unit.name) return null;
+    return basicAtkDefs[unit.name] || null;
+  }
+
   /* 动态费用：按「累计已损失血量」每 per 点降 1 蓝 1 力，最低 0 */
   function effectiveCost(unit, skill) {
     var mp = skill && skill.cost && skill.cost.mp ? Number(skill.cost.mp) : 0;
     var charge = skill && skill.charge ? Number(skill.charge) : 0;
+    var def = skill && skill.cost && skill.cost.def ? Number(skill.cost.def) : 0;
     var steps = 0;
     if (skill && skill.costFromLost) {
       var per = Number(skill.costFromLost.per) || 100;
@@ -57,7 +74,7 @@
       mp = Math.max(0, mp - steps);
       charge = Math.max(0, charge - steps);
     }
-    return { mp: mp, charge: charge, steps: steps };
+    return { mp: mp, charge: charge, def: def, steps: steps };
   }
 
   /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作。
@@ -245,7 +262,7 @@
     return summon ? summon.uid : null;
   }
 
-  function chargeSkill(state, unit, skill, action, events) {
+  function chargeSkill(state, unit, skill, action, events, actionId) {
     if (unit.charge && unit.charge.skillId !== skill.id) {
       unit.charge = null;
     }
@@ -266,7 +283,8 @@
         sourceUid: unit.uid,
         targetUid: tUid,
         skillId: skill.id,
-        label: skill.name
+        label: skill.name,
+        actionId: actionId || ""
       }, prepareOps(skill.chargeOps, unit), events);
     }
     return { kind: "charge", skillId: skill.id, amount: unit.charge.amount };
@@ -285,18 +303,20 @@
     throw new Error("未知的伤害类型：" + key);
   }
 
-  function releaseSkill(state, unit, skill, action, events) {
+  function releaseSkill(state, unit, skill, action, events, actionId) {
     var targetUid = resolveTarget(state, unit, skill, action.target);
     var ctx = {
       sourceUid: unit.uid,
       targetUid: targetUid,
       skillId: skill.id,
       label: skill.name,
+      actionId: actionId || "",
       scope: skill.target === "allEnemies" ? "allEnemies" : (skill.target === "allAllies" ? "allAllies" : ""),
       input: {}
     };
 
     var mpCost = effectiveCost(unit, skill).mp;
+    var defCost = effectiveCost(unit, skill).def;
     var inputValue = 0;
     if (skill.input) {
       var key = skill.input.key || "n";
@@ -332,9 +352,31 @@
         return { kind: "skill", skillId: skill.id, target: targetUid };
       }
     }
+    /* 防御代价（杨冬明竹光法杖「10防」）：释放时扣自身防御，可减到 0 */
+    if (defCost > 0) {
+      B.state.addMod(unit, {
+        stat: "def",
+        mode: "add",
+        value: -defCost,
+        remain: B.state.PERMANENT,
+        source: "cost.def." + skill.id,
+        label: "防御代价"
+      });
+      events.push({
+        type: "stat",
+        round: state.round,
+        uid: unit.uid,
+        stat: "def",
+        mode: "add",
+        value: -defCost,
+        remain: -1,
+        skillId: skill.id
+      });
+    }
 
     unit.charge = null;
     unit.reflect = null;
+    clearGuardsOfSkill(unit, skill.id);
     if (skill.once) unit.flags["used." + skill.id] = true;
     if (skill.cooldown) unit.cooldowns[skill.id] = state.round;
     unit.stats.casts += 1;
@@ -356,7 +398,7 @@
     return done;
   }
 
-  function execute(state, unit, action, events) {
+  function execute(state, unit, action, events, actionId) {
     var skill = find(action.skillId);
     if (!skill) throw new Error("技能不存在：" + action.skillId);
     if (skill.owner !== unit.name) throw new Error("这不是「" + unit.name + "」的技能");
@@ -367,9 +409,21 @@
       throw new Error("现在无法蓄力");
     }
     if (action.kind === "charge" || check.needsCharge) {
-      return chargeSkill(state, unit, skill, action, events);
+      return chargeSkill(state, unit, skill, action, events, actionId);
     }
-    return releaseSkill(state, unit, skill, action, events);
+    return releaseSkill(state, unit, skill, action, events, actionId);
+  }
+
+  /* 释放蓄力型技能时，把蓄力期间挂的防护层一起清掉（顾文达硕哥过肩摔） */
+  function clearGuardsOfSkill(unit, skillId) {
+    if (!unit.effects || !unit.effects.length) return;
+    var kept = [];
+    for (var i = 0; i < unit.effects.length; i++) {
+      var effect = unit.effects[i];
+      if (effect.guard && effect.skillId === skillId) continue;
+      kept.push(effect);
+    }
+    unit.effects = kept;
   }
 
   function runHooks(state, unit, kind, ctx, events) {
@@ -471,6 +525,8 @@
   api.load = load;
   api.find = find;
   api.summonDef = summonDef;
+  api.panelOf = panelOf;
+  api.basicAtkOf = basicAtkOf;
   api.effectiveCost = effectiveCost;
   api.forUnit = forUnit;
   api.has = has;

@@ -38,6 +38,80 @@
 
   var BASIC_CHARGE_ID = "basic.attack";
 
+  /* 倪曼云「刚长出来」：对方每花 1 蓝解锁 1 个属性。
+     锁的信息挂在对方身上（marks 里 on:"opponent"），解锁动作不消耗行动。 */
+  var UNLOCK_STATS = ["atk", "def", "mres"];
+  var UNLOCK_MARK = { atk: "lockAtk", def: "lockDef", mres: "lockMres" };
+  var UNLOCK_ORIGIN = { atk: "atkOrigin", def: "defOrigin", mres: "mresOrigin" };
+  var UNLOCK_LABEL = { atk: "攻击", def: "防御", mres: "法抗" };
+
+  function lockedStats(unit) {
+    var out = [];
+    if (!unit || !unit.marks) return out;
+    for (var i = 0; i < UNLOCK_STATS.length; i++) {
+      var mark = unit.marks[UNLOCK_MARK[UNLOCK_STATS[i]]];
+      if (mark && Number(mark.value) === 0) out.push(UNLOCK_STATS[i]);
+    }
+    return out;
+  }
+
+  function unlockAction(state, unit) {
+    var stats = lockedStats(unit);
+    if (!stats.length) return null;
+    var enough = unit.mp >= 1;
+    return {
+      kind: "unlock",
+      label: "解锁属性（1 蓝）",
+      enabled: enough,
+      reason: enough ? "" : "蓝不足",
+      stats: stats.map(function (key) { return { key: key, label: UNLOCK_LABEL[key] }; }),
+      targets: []
+    };
+  }
+
+  /* 解锁：支付 1 蓝、标记该属性已解锁、3 个标准回合后把原值写回。
+     原值在开局由倪曼云被动记进对方的 counter。 */
+  function executeUnlock(state, unit, action, events) {
+    var stat = String(action.stat || "");
+    if (UNLOCK_STATS.indexOf(stat) < 0) throw new Error("解锁目标非法：" + stat);
+    var mark = unit.marks ? unit.marks[UNLOCK_MARK[stat]] : null;
+    if (!mark || Number(mark.value) !== 0) throw new Error("这个属性已经解锁了");
+    if (unit.mp < 1) throw new Error("蓝不足，不能解锁");
+    unit.mp -= 1;
+    events.push({ type: "mp", round: state.round, uid: unit.uid, delta: -1, mp: unit.mp, reason: "unlock" });
+    mark.value = 1;
+    events.push({
+      type: "mark",
+      round: state.round,
+      uid: unit.uid,
+      key: UNLOCK_MARK[stat],
+      name: mark.name,
+      value: 1,
+      max: mark.max,
+      hideMax: !!mark.hideMax,
+      skillId: "passive.unlock"
+    });
+    state.effectSeq = (state.effectSeq || 0) + 1;
+    unit.scheduled.push({
+      id: "sc" + state.effectSeq,
+      atRound: state.round + 3,
+      ops: [{ op: "stat", who: "self", stat: stat, mode: "set", value: { counter: UNLOCK_ORIGIN[stat] } }],
+      sourceUid: unit.uid,
+      targetUid: unit.uid,
+      skillId: "passive.unlock",
+      label: "解锁" + UNLOCK_LABEL[stat]
+    });
+    events.push({
+      type: "unlock",
+      round: state.round,
+      uid: unit.uid,
+      stat: stat,
+      label: UNLOCK_LABEL[stat],
+      remain: 3
+    });
+    return { kind: "unlock", stat: stat };
+  }
+
   function basicAttack(state, unit, target, events, opts) {
     opts = opts || {};
     var healUid = !opts.forced && B.skills && B.skills.basicHealTarget
@@ -77,7 +151,19 @@
       unit.charge = null;
     }
     var type = B.traits.basicType(unit);
-    var amount = B.state.statOf(unit, "atk");
+    var amount;
+    /* 动态普攻面板（孙嘉怿）：攻击值按表达式算，优先级高于面板与 Buff 修正 */
+    var atkExpr = B.skills && B.skills.basicAtkOf ? B.skills.basicAtkOf(unit) : null;
+    if (atkExpr && B.effectOps && B.effectOps.valueOf) {
+      amount = B.effectOps.valueOf(state, {
+        sourceUid: unit.uid,
+        targetUid: target.uid,
+        skillId: "basic.attack",
+        label: "普攻"
+      }, atkExpr);
+    } else {
+      amount = B.state.statOf(unit, "atk");
+    }
     var selfHit = target.uid === unit.uid;
     var mod = {};
     if (selfHit) {
@@ -121,7 +207,8 @@
           noReaction: !!opts.noReaction,
           healBack: selfHit,
           skillId: opts.skillId || "basic.attack",
-          label: opts.label || "普攻"
+          label: opts.label || "普攻",
+          actionId: opts.actionId || ""
         };
         B.damage.hit(state, hitSpec, events);
         if (hitSpec.dodged) dodged += 1;
@@ -144,12 +231,21 @@
       forced: true,
       noReaction: true,
       noBreak: !!(opts && opts.noBreak),
-      label: (opts && opts.label) || "普攻"
+      label: (opts && opts.label) || "普攻",
+      actionId: (opts && opts.actionId) || ""
     });
   }
 
   function basicBreak(state, unit, target, events) {
-    if (target.breakImmune) throw new Error("这个单位无法被击溃");
+    if (target.breakImmune || (B.state.effectHasFlag && B.state.effectHasFlag(target, "breakImmune"))) {
+      throw new Error("这个单位无法被击溃");
+    }
+    /* 防护层对击溃也生效（硕哥过肩摔、越共探头）：免疫该次并消耗一次 */
+    var guardEffect = B.state.guardEffectOf ? B.state.guardEffectOf(target) : null;
+    if (guardEffect && guardEffect.guard && guardEffect.guard.onBreak && B.damage && B.damage.consumeGuard) {
+      B.damage.consumeGuard(state, target, { sourceUid: unit.uid, skillId: "basic.break" }, events);
+      return { kind: "basic", type: "break", target: target.uid, guarded: true };
+    }
     var threshold = B.rules.CONFIG.breakThreshold;
     if (target.breakValue < threshold) {
       throw new Error("击溃值不足 " + threshold + "（现在 " + target.breakValue + "）");
@@ -191,25 +287,33 @@
   function execute(state, action, events) {
     if (!action || typeof action !== "object") throw new Error("动作格式错误");
     var unit = currentUnit(state);
+    /* 解锁属性是额外动作：不消耗行动，也不吃「行动前掷骰跳过」 */
+    if (action.kind === "unlock") return executeUnlock(state, unit, action, events);
     /* 行动前的持续效果判定（高猿长啸）：跳过时行动照样消耗，committed 仍是原动作，
        因为掷骰由种子决定，回放会得到同一次判定。 */
     if (B.effectOps && B.effectOps.actionGate && !B.effectOps.actionGate(state, unit, events)) {
       return action;
     }
+    /* 一次动作一个 id：防护层「免疫一次攻击」按它去重，多段伤害只算一次 */
+    state.actionSeq = (state.actionSeq || 0) + 1;
+    var actionId = "act" + state.actionSeq;
     var result;
     if (action.kind === "basic") {
+      /* 跳过本回合：只在没有其他可选动作时由 list 提供，不受「只能普攻」等封锁影响 */
+      if (action.type === "pass") return { kind: "basic", type: "pass", target: "" };
       var onlyBasic = B.state.hasStatus(unit, "onlyBasic");
       if (onlyBasic && action.type !== "attack") {
         throw new Error("现在只能普攻");
       }
       if (action.type === "attack") {
         if (B.state.hasStatus(unit, "noBasic")) throw new Error("无法普攻");
+        if (B.state.effectHasFlag && B.state.effectHasFlag(unit, "selfNoBasic")) throw new Error("无法普攻");
         var targetUnit = requireTarget(state, unit, action.target);
         var gate = B.skills && B.skills.basicGate
           ? B.skills.basicGate(state, unit, targetUnit.uid, events)
           : { allow: true, reason: "" };
         if (!gate.allow) throw new Error(gate.reason || "无法普攻");
-        result = basicAttack(state, unit, targetUnit, events);
+        result = basicAttack(state, unit, targetUnit, events, { actionId: actionId });
       } else if (action.type === "break") {
         result = basicBreak(state, unit, requireTarget(state, unit, action.target), events);
       } else if (action.type === "chargeMp") {
@@ -219,7 +323,7 @@
       }
     } else if (action.kind === "skill" || action.kind === "charge") {
       if (!B.skills || !B.skills.execute) throw new Error("技能系统尚未接入");
-      result = B.skills.execute(state, unit, action, events);
+      result = B.skills.execute(state, unit, action, events, actionId);
     } else {
       throw new Error("未知的动作类型：" + action.kind);
     }
@@ -254,13 +358,17 @@
       ? unit.charge.amount
       : 0;
     var onlyBasic = B.state.hasStatus(unit, "onlyBasic");
-    var noBasic = B.state.hasStatus(unit, "noBasic");
+    var noBasic = B.state.hasStatus(unit, "noBasic") ||
+      !!(B.state.effectHasFlag && B.state.effectHasFlag(unit, "selfNoBasic"));
     var gate = B.skills && B.skills.basicGate
       ? B.skills.basicGate(state, unit, targets[0] || "", [])
       : { allow: true, reason: "" };
     var breakable = targets.filter(function (uid) {
       var t = B.state.unitOf(state, uid);
-      return !t.breakImmune && t.breakValue >= B.rules.CONFIG.breakThreshold;
+      if (t.breakImmune) return false;
+      /* 防护层的免击溃也要在可行动作里排除，否则界面与 AI 会选到必失败的动作 */
+      if (B.state.effectHasFlag && B.state.effectHasFlag(t, "breakImmune")) return false;
+      return t.breakValue >= B.rules.CONFIG.breakThreshold;
     });
     out.push({
       kind: "basic",
@@ -298,6 +406,21 @@
           : (unit.mp < B.state.maxMpOf(unit) ? "" : "蓝已满")),
       targets: []
     });
+    var unlock = unlockAction(state, unit);
+    if (unlock) out.push(unlock);
+    /* 兜底：被锁到无任何动作可做时（下潜 + 旋转同时锁普攻与蓄力、蓝已满），
+       允许跳过本回合，避免对局卡死。只在没有可选动作时出现。 */
+    var anyEnabled = out.some(function (item) { return item.enabled; });
+    if (!anyEnabled && hasAction) {
+      out.push({
+        kind: "basic",
+        type: "pass",
+        label: "跳过本回合",
+        enabled: true,
+        reason: "",
+        targets: []
+      });
+    }
     return out;
   }
 
@@ -305,6 +428,7 @@
   api.list = list;
   api.currentUnit = currentUnit;
   api.strike = strike;
+  api.lockedStats = lockedStats;
 
   if (typeof module === "object" && module.exports) module.exports = B;
 })(typeof globalThis !== "undefined" ? globalThis : this);

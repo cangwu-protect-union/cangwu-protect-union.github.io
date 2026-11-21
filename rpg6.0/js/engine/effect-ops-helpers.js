@@ -111,6 +111,11 @@
       if (!holder) return 0;
       return holder.flags[H.counterKey(ctx, expr.counter, expr.perTarget !== false)] || 0;
     }
+    if (expr.summonCount != null) {
+      var countOwner = H.sideUnit(state, ctx, expr.who || "self");
+      if (!countOwner || !B.summons || !B.summons.countKey) return 0;
+      return B.summons.countKey(state, B.state.sideOf(state, countOwner.uid), String(expr.summonCount));
+    }
     if (expr.mark) {
       var markParts = String(expr.mark).split(".");
       var markWho = markParts.length > 1 ? markParts[0] : "self";
@@ -172,7 +177,8 @@
         label: tctx.label || "",
         /* 归零后逐标准回合恢复原值：记住改动前的面板，标准回合末按 restore 补回 */
         restore: op.restore == null ? 0 : Number(op.restore),
-        origin: op.restore == null ? null : before
+        origin: op.restore == null ? null : before,
+        targetUid: target.uid
       });
       H.pushEvent(state, events, {
         type: "stat",
@@ -216,6 +222,18 @@
         });
         continue;
       }
+      var guardImmune = op.kind && B.state.immuneToBuff ? B.state.immuneToBuff(target, op.kind) : "";
+      if (guardImmune) {
+        H.pushEvent(state, events, {
+          type: "buffImmune",
+          uid: target.uid,
+          kind: op.kind,
+          percent: H.evalValue(state, tctx, op.percent),
+          label: guardImmune,
+          blocked: true
+        });
+        continue;
+      }
       if (op.kind && H.DEBUFF_KINDS[op.kind] && target.reflect) {
         target = H.sideUnit(state, tctx, "self");
         if (!target) continue;
@@ -229,7 +247,8 @@
         unit: spec ? spec.unit : "standard",
         source: H.sourceTag(tctx),
         label: tctx.label || "",
-        stacking: op.stacking !== false
+        stacking: op.stacking !== false,
+        targetUid: target.uid
       });
       H.pushEvent(state, events, {
         type: "buffAdd",
@@ -251,6 +270,18 @@
         target = H.sideUnit(state, tctx, "self");
         if (!target) continue;
         H.pushEvent(state, events, { type: "reflect", uid: target.uid, kind: "status", detail: op.kind });
+      }
+      var guardImmune = B.state.immuneToStatus ? B.state.immuneToStatus(target, op.kind) : "";
+      if (guardImmune) {
+        H.pushEvent(state, events, {
+          type: "statusImmune",
+          uid: target.uid,
+          kind: op.kind,
+          label: guardImmune,
+          blocked: true,
+          skillId: tctx.skillId || ""
+        });
+        continue;
       }
       var spec = H.durationOf(op.duration || op.rounds);
       var label = op.label || tctx.label || "";
@@ -285,15 +316,22 @@
       state.effectSeq = (state.effectSeq || 0) + 1;
       var effect = {
         id: "ef" + state.effectSeq,
-        remain: op.permanent ? B.state.PERMANENT : (spec ? spec.count : 1),
+        remain: op.permanent || op.guard ? B.state.PERMANENT : (spec ? spec.count : 1),
         unit: spec ? spec.unit : "standard",
         unstoppable: !!op.unstoppable,
         label: op.label || tctx.label || "",
         desc: op.desc || "",
+        tag: op.tag || "",
+        key: op.key || "",
         gate: op.gate || null,
         period: Number(op.period) || 0,
         breakOnSourceStatus: op.breakOnSourceStatus || null,
         breakOnHolderStatus: op.breakOnHolderStatus || null,
+        /* 防护层：取消 N 次伤害 + 用完后执行的 ops；免疫异常/击溃/蓄力打断 */
+        guard: op.guard ? { remaining: Math.max(1, Number(op.guard.remaining) || 1), ops: op.guard.ops || [], blockedActionId: "" } : null,
+        immune: op.immune || null,
+        breakImmune: !!op.breakImmune,
+        chargeGuard: !!op.chargeGuard,
         ops: op.ops || [],
         sourceUid: tctx.sourceUid,
         targetUid: target.uid,
@@ -384,6 +422,11 @@
     } else if (cond.status) {
       var owner = H.sideUnit(state, ctx, cond.who || "self");
       ok = !!owner && B.state.hasStatus(owner, cond.status);
+      if (cond.ne) ok = !ok;
+    } else if (cond.effect) {
+      /* 按持续效果的 key 判断（下潜期间：人高马大阈值与回血翻倍） */
+      var effectOwner = H.sideUnit(state, cond.who || "self");
+      ok = !!effectOwner && B.state.hasEffectKey(effectOwner, cond.effect);
       if (cond.ne) ok = !ok;
     } else if (cond.summon) {
       var summonOwner = H.sideUnit(state, ctx, cond.who || "self");

@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->23 人 81 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.9<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->25 人 88 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.10<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -60,7 +60,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`（可带 `restore`）、`buff`、`status`、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`）、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
-- 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`。
+- 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`、`{summonCount:"key"}`（己方该召唤物存活数量）。
 - 技能字段：`cost.mp`、`charge`、`cooldown`、`once`、`costFromLost:{per}`、`requires`、`chargeOps`（蓄力时生效，如肥肥反弹）、`hooks.basicMod`（普攻前改判）、`hooks.basicMode`（把普攻改成给召唤物回血）、`hooks.basicHit`/`breakAction`（被动）、`hooks.afterAction`（每个动作结束后）、`unsupported`（本版不做，界面置灰并显示原因）。
 - 召唤物定义字段：`name`、`stats:{atk,def,mres,hp,mp,spd}`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`（每标准回合末）、`attack`（按速度攒行动条，满 100 出手一次，所以 `stats.spd` 必须为正数）、`onExpire`（到期）；无 `stats.hp`/`hp:0` 就是无血计时物。
 
@@ -103,6 +103,12 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 受击掷骰免疫 | `rollDodge:{sides,values}` 在 `damage.hit` 最前面、每段伤害各掷一次；命中就整体不结算（不掉血、不加击溃/眩晕值、不清蓄力、不触发命中后被动）；对 Buff 持续伤害、反弹、被动强制普攻同样生效；强扣不是伤害，不掷 |
 | Buff 免疫 | `buffImmune:[kind]` 由 `skills.immuneBuffs` 汇总，`addBuff` 拦截并推 `buffImmune` 事件；标准回合开始再兜底清一次。与召唤物的 `breakImmune` 不是一回事 |
 | 标准回合开始钩子 | `roundStart`，在速度条结算之前跑（宋知远血 ≤600 回 25） |
+| 防护层 `guard` | 挂在 `tick` 上：`{remaining,onBreak,ops}`，每次伤害取消一次（同一动作多段只算一次，靠 `actionId` 去重）；`onBreak` 让击溃也触发；用完移除并执行 `ops`（目标取敌方英雄）；配 `immune.buffs/statuses`、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic`；进 hash |
+| 护盾 | `shield` op → `unit.shield`：独立血量池，`damage.hit` 全额吸收、不扣血，破盾多余伤害消失；强扣穿透；标准回合末计时，到期执行 `onExpire`（坚若磐石 +5 防），提前破盾不加防；进 hash |
+| 动态普攻面板 | 技能库 `panels:{角色:{atk}}` 覆盖面板，`basicAtk:{角色:表达式}` 算实际攻击值，优先级高于面板与 Buff 修正（孙嘉怿：面板 0、普攻按目标当前血 20%）；界面攻击栏显示 `−` 加注记 |
+| 解锁动作 | `kind:"unlock"`：`actions.list` 在单位身上有 `lockAtk/lockDef/lockMres`（0=未解锁）时列出，支付 1 蓝解锁一个，不消耗行动、可重复、全部解锁后隐藏；解锁后 3 标准回合用 `schedule` 写回原值（原值开局存 counter） |
+| 防御代价 | `cost.def`：`conditions` 判防御是否足够（不足置灰），`releaseSkill` 扣永久防御，可到 0 |
+| 无动作兜底 | 被锁到没有任何可选动作时（下潜 + 旋转同时锁普攻与蓄力、蓝已满），`actions.list` 追加 `basic/pass`「跳过本回合」 |
 
 ## 手机横屏与折叠（对局页）
 

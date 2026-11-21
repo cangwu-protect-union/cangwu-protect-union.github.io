@@ -60,7 +60,7 @@ js/
 │   ├── traits.js      8 主业 + 6 副业
 │   ├── state.js       建局、面板结算、深拷贝、状态指纹
 │   ├── damage.js      伤害/回血/强扣/死亡
-│   ├── effect-ops.js  效果解释器框架、注册表与出口（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op；opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
+│   ├── effect-ops.js  效果解释器框架、注册表与出口（<!-- RPG6-STATS:START ops -->35<!-- RPG6-STATS:END ops --> 个 op；opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
 │   ├── skills.js      技能执行与档案校验

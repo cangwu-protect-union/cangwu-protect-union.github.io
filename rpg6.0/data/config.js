@@ -7,6 +7,6 @@ window.RPG_APP = {
     labRuns: "rpg_lab_runs",
     labPairs: "rpg_lab_pairs"
   },
-  engineVersion: "6.0-engine.9",
+  engineVersion: "6.0-engine.10",
   pageSize: 12
 };

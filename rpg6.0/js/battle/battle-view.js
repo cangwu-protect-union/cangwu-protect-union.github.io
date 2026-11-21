@@ -42,6 +42,15 @@
 
 
   P.statCell = function (unit, key) {
+    var atkExpr = key === "atk" && B.skills && B.skills.basicAtkOf ? B.skills.basicAtkOf(unit) : null;
+    if (atkExpr) {
+      /* 动态普攻面板（孙嘉怿）：没有固定攻击值，显示 − 并在下方标注规则 */
+      var note = atkExpr.hpPercent
+        ? "受攻击者当前血量的" + (Number(atkExpr.percent) || 0) + "%"
+        : "按公式计算";
+      return '<span class="stat is-dynamic"><i>' + P.STAT_LABEL[key] + '</i><b>−</b><em>' +
+        P.esc(note) + "</em></span>";
+    }
     var base = unit.base[key];
     var now = key === "maxHp" ? B.state.maxHpOf(unit) : key === "maxMp" ? B.state.maxMpOf(unit) : B.state.statOf(unit, key);
     var changed = Math.abs(now - base) > 0.001;
@@ -209,9 +218,15 @@
     });
     (unit.effects || []).forEach(function (effect, i) {
       var left = effect.remain === B.state.PERMANENT ? "永久" : effect.remain + " 回合";
+      /* 防护层显示剩余可取消次数，而不是标准回合 */
+      if (effect.guard) left = "剩 " + effect.guard.remaining + " 次";
       chips += '<span class="chip is-effect" data-detail="effect:' + unit.uid + ":" + i + '">' +
         P.esc(effect.label || "持续效果") + " " + left + "</span>";
     });
+    if (unit.shield) {
+      chips += '<span class="chip is-shield">护盾 ' + Math.max(0, unit.shield.hp) +
+        "（剩 " + unit.shield.remain + " 回合）</span>";
+    }
     unit.statuses.forEach(function (status) {
       chips += '<span class="chip is-status">' + P.esc(status.label || P.STATUS_TEXT[status.kind] || status.kind) + " " + status.remain + "</span>";
     });
@@ -259,7 +274,17 @@
       "<i>（" + P.esc(unit.job || "无主业") + (unit.subJob ? "/" + P.esc(unit.subJob) : "") + "）</i></header>";
 
     html += '<div class="bq-stats">';
+    var atkExpr = B.skills && B.skills.basicAtkOf ? B.skills.basicAtkOf(unit) : null;
     ["atk", "def", "mres", "maxHp", "maxMp", "spd"].forEach(function (key) {
+      if (key === "atk" && atkExpr) {
+        /* 动态普攻面板（孙嘉怿）：攻击格没有固定值，显示 − 并在下方标注实际规则 */
+        var note = atkExpr.hpPercent
+          ? "受攻击者当前血量的" + (Number(atkExpr.percent) || 0) + "%"
+          : "按公式计算";
+        html += '<span class="bq-stat is-dynamic">' + P.STAT_LABEL[key] + " −" +
+          '<em class="bq-stat-note">' + P.esc(note) + "</em></span>";
+        return;
+      }
       html += "<span>" + P.STAT_LABEL[key] + " " + unit.base[key] + "</span>";
     });
     html += "</div>";

@@ -197,7 +197,8 @@
         var holder = H.sideUnit(state, ctx, op.who || "self");
         if (!holder) return;
         var ckey = H.counterKey(ctx, op.key, op.perTarget !== false);
-        holder.flags[ckey] = (holder.flags[ckey] || 0) + (op.delta == null ? 1 : Number(op.delta));
+        var delta = op.delta == null ? 1 : H.evalValue(state, ctx, op.delta);
+        holder.flags[ckey] = (holder.flags[ckey] || 0) + delta;
         H.pushEvent(state, events, { type: "counter", uid: holder.uid, key: op.key, value: holder.flags[ckey], skillId: ctx.skillId || "" });
         return;
       
@@ -206,6 +207,39 @@
   api.registerOp("dispel", function (state, ctx, op, events) {
 
         H.runDispel(state, ctx, op, events);
+        return;
+      
+  });
+
+  /* 护盾：独立血量池，伤害全额吸收（damage.hit 里处理），标准回合末计时，
+     到期时移除并执行 onExpire（杨冬明「坚若磐石」加防）。 */
+  api.registerOp("shield", function (state, ctx, op, events) {
+
+        var targets = H.sideUnits(state, ctx, op.who || "self");
+        for (var si = 0; si < targets.length; si++) {
+          var target = targets[si];
+          var tctx = H.ctxFor(ctx, target);
+          var hp = H.evalValue(state, tctx, op.hp == null ? 0 : op.hp);
+          if (hp <= 0) continue;
+          target.shield = {
+            hp: hp,
+            max: hp,
+            remain: Math.max(1, Number(op.duration) || 1),
+            ops: op.onExpire || [],
+            source: H.sourceTag(tctx),
+            label: op.label || tctx.label || "护盾",
+            skillId: tctx.skillId || "",
+            bornRound: Math.max(1, state.round)
+          };
+          H.pushEvent(state, events, {
+            type: "shieldAdd",
+            uid: target.uid,
+            hp: hp,
+            remain: target.shield.remain,
+            label: target.shield.label,
+            skillId: tctx.skillId || ""
+          });
+        }
         return;
       
   });

@@ -31,6 +31,76 @@
     if (!unit.charge) return false;
     if (unit.charge.indestructible) return false;
     if (B.traits.chargeUnbreakable(unit)) return false;
+    if (B.state.effectHasFlag && B.state.effectHasFlag(unit, "chargeGuard")) return false;
+    return true;
+  }
+
+  /* 防护层取消一次伤害：一次动作的多段伤害只算一次免疫（actionId 相同）。
+     次数用完后移除该效果并执行 onCancel。 */
+  function consumeGuard(state, target, spec, events) {
+    if (!B.state.guardEffectOf) return false;
+    var effect = B.state.guardEffectOf(target);
+    if (!effect) return false;
+    var guard = effect.guard;
+    var actionId = spec.actionId || "";
+    if (actionId && guard.blockedActionId === actionId) return true;
+    if (actionId) guard.blockedActionId = actionId;
+    guard.remaining -= 1;
+    pushEvent(events, {
+      type: "guardBlock",
+      round: state.round,
+      uid: target.uid,
+      sourceUid: spec.sourceUid || "",
+      label: effect.label || "防护",
+      remain: Math.max(0, guard.remaining),
+      skillId: spec.skillId || ""
+    });
+    if (guard.remaining <= 0) {
+      var kept = [];
+      for (var i = 0; i < target.effects.length; i++) {
+        if (target.effects[i] !== effect) kept.push(target.effects[i]);
+      }
+      target.effects = kept;
+      pushEvent(events, {
+        type: "effectExpire",
+        round: state.round,
+        uid: target.uid,
+        kind: "effect",
+        label: effect.label || ""
+      });
+      if (guard.ops && guard.ops.length && B.effectOps && B.effectOps.runOps) {
+        /* 触发/反击类后续 ops 的目标固定取敌方英雄：召唤物攻击不算「对方本人」，
+           也避免把无血计时物当目标后因 hp=0 被立即移除而找不到单位。 */
+        var foeHero = B.state.heroOf(state, B.state.otherSide(state, target.side));
+        B.effectOps.runOps(state, {
+          sourceUid: effect.sourceUid || target.uid,
+          targetUid: foeHero ? foeHero.uid : "",
+          skillId: effect.skillId || "",
+          label: effect.label || ""
+        }, guard.ops, events);
+      }
+    }
+    return true;
+  }
+
+  /* 护盾全额吸收：护盾在时这一段伤害全部吃掉、不扣血；破盾后的多余伤害也消失 */
+  function shieldAbsorb(state, target, amount, events) {
+    if (!target.shield || target.shield.hp <= 0) return false;
+    var label = target.shield.label || "";
+    target.shield.hp -= amount;
+    var broke = target.shield.hp <= 0;
+    pushEvent(events, {
+      type: "shieldHit",
+      round: state.round,
+      uid: target.uid,
+      absorbed: amount,
+      remain: Math.max(0, target.shield.hp),
+      label: label
+    });
+    if (broke) {
+      target.shield = null;
+      pushEvent(events, { type: "shieldBreak", round: state.round, uid: target.uid, label: label });
+    }
     return true;
   }
 
@@ -118,6 +188,10 @@
     }
     if (source && B.state.hasStatus(source, "noBreakOut")) noBreak = true;
 
+    /* 防护层：完全免疫该次（不掉血、不加击溃/眩晕值、不清蓄力、不触发受击后被动） */
+    if (dmg > 0 && consumeGuard(state, target, spec, events)) return 0;
+    if (state.phase === "finished") return 0;
+
     /* 受击掷骰免疫：任何伤害（含 Buff 持续伤害、反弹与被动强制普攻）都先掷骰 */
     if (dmg > 0 && B.skills && B.skills.rollDodge) {
       var dodgeLabel = B.skills.rollDodge(state, target, events);
@@ -203,6 +277,11 @@
     }
 
     var beforeHp = target.hp;
+    /* 护盾：全吸收这一段，不扣血也不触发伤害后被动 */
+    if (dmg > 0 && shieldAbsorb(state, target, dmg, events)) {
+      target.lastDamageType = type;
+      return 0;
+    }
     if (dmg > 0 && type === "magic") consumeMagicVuln(state, target, events);
     target.hp = Math.max(0, target.hp - dmg);
     B.state.markHpLoss(target, beforeHp);
@@ -314,6 +393,8 @@
   api.heal = heal;
   api.healFull = healFull;
   api.clearCharge = clearCharge;
+  api.consumeGuard = consumeGuard;
+  api.shieldAbsorb = shieldAbsorb;
 
   if (typeof module === "object" && module.exports) module.exports = B;
 })(typeof globalThis !== "undefined" ? globalThis : this);

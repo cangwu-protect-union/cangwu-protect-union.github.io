@@ -46,6 +46,7 @@ node .dsh/skills/rpg6-character-batch/scripts/triage.mjs --remaining
 ### 3. 实现方案（plan.json）
 
 用 `assets/plan.template.json` 写，一个角色一块，**覆盖该角色档案里的全部技能**（不做的也留 `unsupported`，界面能解释）。字段：`status` ∈ implemented/unsupported/engine-gap；`unsupported` 只在后两种填可核对理由；`tests` 至少一条。
+面板与 seed 不一致时（档案攻击格写成注记、不是数字），plan 里加 `statOverrides:{atk:"0"}` 声明覆盖值：`--check` 会要求 `stats.atk` 等于覆盖值、放开与 seed 的比对，`--scaffold` 生成的 CHAR fixture 也用覆盖值。实际覆盖要在技能库 `index.js` 的 `panels` 里登记，否则 `makeUnit` 仍会读到 seed 的注记而抛错。
 
 ```powershell
 node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json

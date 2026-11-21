@@ -135,6 +135,28 @@
     unit.mods = kept;
   }
 
+  /* 护盾按标准回合计时：到期移除并执行 onExpire（杨冬明「坚若磐石」加防） */
+  function expireShields(state, events) {
+    for (var i = 0; i < state.units.length; i++) {
+      var unit = state.units[i];
+      if (!unit.shield) continue;
+      unit.shield.remain -= 1;
+      if (unit.shield.remain > 0) continue;
+      var ops = unit.shield.ops;
+      var label = unit.shield.label;
+      unit.shield = null;
+      H.pushEvent(state, events, { type: "shieldExpire", uid: unit.uid, label: label });
+      if (ops && ops.length) {
+        H.runOps(state, {
+          sourceUid: unit.uid,
+          targetUid: B.state.otherUid(state, unit.uid),
+          skillId: "shield.expire",
+          label: label
+        }, ops, events);
+      }
+    }
+  }
+
   function standardRoundEnd(state, events) {
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
@@ -158,6 +180,7 @@
       }
     }
     if (B.summons && B.summons.tick) B.summons.tick(state, events);
+    expireShields(state, events);
     var summonList = (state.summons || []).slice();
     for (var si = 0; si < summonList.length; si++) {
       var summon = null;
@@ -343,7 +366,7 @@
   H.runOps = runOps;;
   api.runOp = runOp;
   api.actionGate = function () { return H.actionGate.apply(null, arguments); };
-  api.valueOf = valueOf;
+  api.valueOf = function (state, ctx, expr) { return H.evalValue(state, ctx, expr); };
   api.statValue = function () { return H.statValue.apply(null, arguments); };
   api.roundStart = roundStart;
   api.roundEnd = roundEnd;

@@ -18,13 +18,18 @@
 
   function makeUnit(character, uid) {
     if (!character) throw new Error("缺少角色：" + uid);
+    /* 面板覆盖：技能库里 panels[角色] 覆盖档案面板（孙嘉怿的攻击格是注记，不是数字） */
+    var panel = B.skills && B.skills.panelOf ? B.skills.panelOf(character.name) : null;
+    function statOf(key) {
+      return panel && panel[key] != null ? panel[key] : character[key === "maxHp" ? "hp" : (key === "maxMp" ? "mp" : key)];
+    }
     var base = {
-      atk: parseStat(character.atk, "攻击"),
-      def: parseStat(character.def, "防御"),
-      mres: parseStat(character.mres, "法抗"),
-      maxHp: parseStat(character.hp, "血量上限"),
-      maxMp: parseStat(character.mp, "蓝上限"),
-      spd: parseStat(character.spd, "速度")
+      atk: parseStat(statOf("atk"), "攻击"),
+      def: parseStat(statOf("def"), "防御"),
+      mres: parseStat(statOf("mres"), "法抗"),
+      maxHp: parseStat(statOf("maxHp"), "血量上限"),
+      maxMp: parseStat(statOf("maxMp"), "蓝上限"),
+      spd: parseStat(statOf("spd"), "速度")
     };
     var unit = {
       uid: uid,
@@ -48,6 +53,7 @@
       mods: [],
       scheduled: [],
       effects: [],
+      shield: null,
       taunt: 0,
       trait: null,
       flags: {},
@@ -203,6 +209,50 @@
     return false;
   }
 
+  /* 防护层：挂在持续效果上的 guard / immune / breakImmune / chargeGuard 声明。
+     顾文达「下潜」、倪曼云「越共探头」、顾文达「硕哥过肩摔」共用。 */
+  function guardEffectOf(unit) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].guard && (list[i].guard.remaining == null || list[i].guard.remaining > 0)) return list[i];
+    }
+    return null;
+  }
+
+  function effectHasFlag(unit, flag) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i][flag]) return true;
+    }
+    return false;
+  }
+
+  function hasEffectKey(unit, key) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].key === key) return true;
+    }
+    return false;
+  }
+
+  function immuneToBuff(unit, kind) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      var kinds = list[i].immune && list[i].immune.buffs;
+      if (kinds && kinds.indexOf(kind) >= 0) return list[i].label || "防护";
+    }
+    return "";
+  }
+
+  function immuneToStatus(unit, kind) {
+    var list = unit && unit.effects ? unit.effects : [];
+    for (var i = 0; i < list.length; i++) {
+      var kinds = list[i].immune && list[i].immune.statuses;
+      if (kinds && kinds.indexOf(kind) >= 0) return list[i].label || "防护";
+    }
+    return "";
+  }
+
   function markOf(unit, key) {
     var mark = unit.marks && unit.marks[key];
     return mark ? mark.value : 0;
@@ -228,7 +278,9 @@
       label: mod.label || "",
       progress: Number(mod.progress) || 0,
       origin: mod.origin == null ? null : Number(mod.origin),
-      restore: Number(mod.restore) || 0
+      restore: Number(mod.restore) || 0,
+      /* 「按目标回合」计时用；老数据没有这个字段，按标准回合计时 */
+      targetUid: mod.targetUid || unit.uid
     };
     unit.mods.push(entry);
     return entry;
@@ -253,7 +305,9 @@
       unit: buff.unit || "standard",
       source: buff.source || "",
       label: buff.label || "",
-      stacking: buff.stacking !== false
+      stacking: buff.stacking !== false,
+      /* 「按目标回合」计时用；王泺然认大哥、江雨轩泰山压顶曾经因为没有这个字段而永不结束 */
+      targetUid: buff.targetUid || unit.uid
     };
     if (!entry.stacking) {
       for (var i = 0; i < unit.buffs.length; i++) {
@@ -291,7 +345,7 @@
 
   /* 进入击溃：击溃值固定为 0，击溃状态期间也不会再增加 */
   function enterBreak(unit, remain, source, label) {
-    if (unit.breakImmune) {
+    if (unit.breakImmune || effectHasFlag(unit, "breakImmune")) {
       return { kind: "break", remain: 0, unit: "standard", source: source || "", skillId: "", label: (label || "击溃") + "（免疫）" };
     }
     unit.breakValue = 0;
@@ -384,7 +438,10 @@
       var st = [];
       for (var s = 0; s < u.statuses.length; s++) st.push(u.statuses[s].kind + u.statuses[s].remain);
       var eff = [];
-      for (var e = 0; e < u.effects.length; e++) eff.push(u.effects[e].id + u.effects[e].remain);
+      for (var e = 0; e < u.effects.length; e++) {
+        eff.push(u.effects[e].id + u.effects[e].remain +
+          (u.effects[e].guard ? ":g" + u.effects[e].guard.remaining : ""));
+      }
       var marks = [];
       var markKeys = Object.keys(u.marks || {});
       for (var mk = 0; mk < markKeys.length; mk++) marks.push(markKeys[mk] + u.marks[markKeys[mk]].value);
@@ -392,7 +449,8 @@
         u.uid, u.hp, u.mp, u.gauge, u.actionsLeft, u.breakValue, u.stunValue,
         u.charge ? u.charge.skillId + ":" + u.charge.amount : "-",
         buffs.join(","), mods.join(","), st.join(","), eff.join(","),
-        u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0
+        u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0,
+        u.shield ? u.shield.hp + ":" + u.shield.remain : "-"
       ].join("|"));
     }
     var summonParts = [];
@@ -439,6 +497,11 @@
   api.mresOf = mresOf;
   api.spdOf = spdOf;
   api.hasStatus = hasStatus;
+  api.guardEffectOf = guardEffectOf;
+  api.effectHasFlag = effectHasFlag;
+  api.hasEffectKey = hasEffectKey;
+  api.immuneToBuff = immuneToBuff;
+  api.immuneToStatus = immuneToStatus;
   api.markOf = markOf;
   api.markName = markName;
   api.canAct = canAct;
