@@ -89,6 +89,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 ## 硬规则
 
+- **`plan.mjs --check` 有验收态**：实现完成后再跑 `--check` 会报「已在技能库里」，要改成 `allowExisting:true`；同时 `docs.expectedSkills` 会把已入库技能重复计数（libSkills + plan 技能），验收时把 `docs` 块清空，文档计数交给 `rpg6-stats.js --check` 与 `audit-docs.mjs`。第六批是在实现前跑的 `--check`，所以没遇到；`verify.ps1 -Plan` 在实现后跑，plan 必须是验收态。
+- **`tools/check.ps1` 有 20480 字节单文件上限**（md/js/css，vendor 豁免）：改大文件前先量余量，超了就拆函数到分片文件或压缩注释；拆法示例见 `rpg6-battle` 的踩坑 45。
 - 逻辑未确认不写代码；用户确认的是逐技能表，不是「大概懂了」。
 - 数据库是唯一数据源；`data/seeds/characters*.js` 只用于离线盘点，不一致先修再继续。
 - 技能库是 ESM 分文件（`data/skills/*.js` + `index.js`），不是当年的 `data/battle-skills.js`；脚本按 ESM 直接 import，别改回 vm 读 window 全局。
