@@ -140,8 +140,15 @@
       (s.buffs || []).forEach(function (b) {
         chips += '<span class="bu-sum-buff">' + P.esc(({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[b.kind] || b.kind) + "%</span>";
       });
+      var def = B.skills && B.skills.summonDef ? B.skills.summonDef(s.summonKey) : null;
+      var pace = "";
+      if (def && def.attack && s.base && s.base.spd > 0) {
+        var spd = B.state.spdOf(s);
+        if (spd > 0) pace = " · 速度 " + spd + "（每 " + Math.ceil(B.rules.CONFIG.gaugeMax / spd) + " 回合攻击）";
+      }
       var title = s.name + (s.targetable ? " · 血 " + s.hp + "/" + s.base.maxHp : "") +
-        (s.ttl ? " · 剩 " + s.ttl.remain + " 回合" : "") + (s.targetable ? "" : " · 不可选中");
+        (s.ttl ? " · 剩 " + s.ttl.remain + " 回合" : "") + pace +
+        (s.targetable ? "" : " · 不可选中");
       html += '<button type="button" class="' + cls + '" data-summon="' + P.esc(s.uid) + '" title="' + P.esc(title) + '">' +
         "<b>" + P.esc(s.name) + "</b>" +
         (s.targetable ? '<span class="bu-sum-hp">' + s.hp + "/" + s.base.maxHp + "</span>" : "") +

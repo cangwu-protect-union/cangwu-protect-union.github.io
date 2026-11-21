@@ -395,7 +395,7 @@
       var smKeys = Object.keys(su.marks || {});
       for (var smk = 0; smk < smKeys.length; smk++) smark.push(smKeys[smk] + su.marks[smKeys[smk]].value);
       summonParts.push([
-        su.uid, su.side, su.summonKey, su.hp, su.breakValue, su.stunValue,
+        su.uid, su.side, su.summonKey, su.hp, su.gauge || 0, su.breakValue, su.stunValue,
         su.ttl ? su.ttl.remain : "-",
         sb.join(","), sm.join(","), ss.join(","), se.join(","), smark.join(","), su.hpLost || 0
       ].join("|"));

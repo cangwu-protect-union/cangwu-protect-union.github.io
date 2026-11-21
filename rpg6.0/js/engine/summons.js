@@ -151,6 +151,18 @@
     }, ops, events);
   }
 
+  /* 自动攻击按速度攒行动条：每个标准回合末 +速度，满 100 出手一次，
+     所以速度 10 就是每 10 个标准回合末打一次。攒满那一拍无法行动（眩晕/击溃/不能行动）则作废。 */
+  function stepAttack(state, unit, def, events) {
+    var step = B.rules.gaugeStep(unit.gauge, B.state.spdOf(unit), false);
+    unit.gauge = step.gauge;
+    for (var a = 0; a < step.actions; a++) {
+      if (state.phase === "finished") return;
+      if (!B.state.canAct(unit)) return;
+      runScript(state, unit, def.attack, events);
+    }
+  }
+
   /* 标准回合末：先光环/自动攻击，再到期自爆/收尾，最后扣计时。 */
   function tick(state, events) {
     var list = (state.summons || []).slice();
@@ -165,7 +177,7 @@
       if (!def) continue;
       if (def.aura) runScript(state, unit, def.aura, events);
       if (state.phase === "finished") return;
-      if (def.attack && B.state.canAct(unit)) runScript(state, unit, def.attack, events);
+      if (def.attack) stepAttack(state, unit, def, events);
       if (state.phase === "finished") return;
       if (unit.ttl) {
         if (unit.ttl.remain <= 1) {

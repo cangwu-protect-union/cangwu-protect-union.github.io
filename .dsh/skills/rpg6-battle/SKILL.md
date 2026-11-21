@@ -26,7 +26,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../timeline.js` | 标准回合、速度条、行动队列、跳过无法行动者；空回合会连续推进 |
 | `.../conditions.js` | 技能条件（蓝/力/冷却/封锁/一次性/标记门槛、`costFromLost` 动态费用） |
 | `.../skills.js` | 技能执行、蓄力、校验、动态费用、嘲讽、被动钩子、标记初始化 |
-| `.../summons.js` | 召唤物创建/移除/上限/计时/光环/到期自爆/自动攻击 |
+| `.../summons.js` | 召唤物创建/移除/上限/计时/光环/到期自爆/按速度攒条的自动攻击 |
 | `.../actions.js` | 普攻/击溃/蓄蓝、普攻前改判、`afterAction` 行动后钩子 |
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
 | `rpg6.0/data/skills/` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；一个角色一个文件，`index.js` 聚合） |
@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.8<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -62,7 +62,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`。
 - 技能字段：`cost.mp`、`charge`、`cooldown`、`once`、`costFromLost:{per}`、`requires`、`chargeOps`（蓄力时生效，如肥肥反弹）、`hooks.basicMod`（普攻前改判）、`hooks.basicMode`（把普攻改成给召唤物回血）、`hooks.basicHit`/`breakAction`（被动）、`hooks.afterAction`（每个动作结束后）、`unsupported`（本版不做，界面置灰并显示原因）。
-- 召唤物定义字段：`name`、`stats:{atk,def,mres,hp,mp,spd}`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`（每标准回合末）、`attack`（每标准回合末自动攻击）、`onExpire`（到期）；无 `stats.hp`/`hp:0` 就是无血计时物。
+- 召唤物定义字段：`name`、`stats:{atk,def,mres,hp,mp,spd}`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`（每标准回合末）、`attack`（按速度攒行动条，满 100 出手一次，所以 `stats.spd` 必须为正数）、`onExpire`（到期）；无 `stats.hp`/`hp:0` 就是无血计时物。
 
 ## 召唤物与目标（第四批）
 
@@ -71,10 +71,10 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 单体选目标先在该侧 `combatantsOf` 里取最高嘲讽，只有最高者可选；`射手` 的 `ignoreTaunt` 例外。召唤物默认嘲讽 0。
 - 普攻可指定有血召唤物；羊书含的普攻是「给墓回血」这个特例，`basicHealTarget` 要同时接进 `requireTarget`、`onBasic`、`basicAttack`。
 - 召唤物造成的伤害**一律**不造成击溃/眩晕（`damage.hit` 里按 `source.isSummon` 强制），不要只依赖数据里的 `noBreak`；也不触发召唤者的「造成伤害」类被动。
-- 标准回合末顺序：`aura → attack → 到期 onExpire → ttl-1`；眩晕跳过 `attack`，`breakImmune` 免疫击溃。`period` 按 `bornRound` 计算，`bornRound` 至少为 1（`battleStart` 时 `state.round` 是 0）。
+- 标准回合末顺序：`aura → attack 行动条 → 到期 onExpire → ttl-1`；`attack` 按自身速度攒条（每标准回合末 +速度，满 100 打一次；速度 10 = 每 10 个标准回合一次），攒满那一拍无法行动则作废；`breakImmune` 免疫击溃。`period` 按 `bornRound` 计算，`bornRound` 至少为 1（`battleStart` 时 `state.round` 是 0）。
 - 速度条会跨过没有单位可行动的空标准回合；`beginTurn` 会连续调 `roundEnd`。所以召唤物/持续效果会按**每个**标准回合结算，UI 下一次渲染时 ttl 可能已经从 4 跳到 1；浏览器用例断言日志/召唤事件，别断言「刚召唤时一定看到剩 4」。
 - 累计失血 `hpLost` 在 `damage`、`directLoss`、血上限被压低导致当前血下降时增加；治疗不回退。羊书含墓的 `costFromLost` 按它实时算。
-- 召唤物进 `state.hash`（uid/side/key/hp/ttl/状态/效果/标记/hpLost），回放和旧战报按版本区分。
+- 召唤物进 `state.hash`（uid/side/key/hp/gauge/ttl/状态/效果/标记/hpLost），回放和旧战报按版本区分。
 - UI：角色卡底部召唤物带；`[data-summon]` 点击要先于 `[data-unit]` 处理；目标选择时在 `targetsOf`/`onBasic` 用 `combatantsOf` + 最高嘲讽，不要再用 `otherUid` 只给英雄。
 
 ## 已经定死的口径（不要再改）
@@ -90,7 +90,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 先手 | 速度低者先，同速开局用种子随机 |
 | 混伤 | 同时造成等量普伤与真伤两段 |
 | 标记 | 对手可见、可被对手技能削减或清空 |
-| 召唤物 | 独立单位、不进速度条；无血计时物不可选；伤害无击溃/眩晕；死亡不判负，英雄死亡清场 |
+| 召唤物 | 独立单位、不进英雄速度条；无血计时物不可选；伤害无击溃/眩晕；`attack` 按自身速度攒条（每 100/速度 个标准回合一次，速度 10 = 每 10 回合；攒满那一拍无法行动则作废）；死亡不判负，英雄死亡清场 |
 | 嘲讽 | 单体选目标取该侧最高；召唤物默认 0；射手 `ignoreTaunt` 例外 |
 | 动态费用 | `costFromLost:{per}` 按累计失血每 per 点降 1 蓝 1 力，最低 0；费用在每次蓄力/释放时重算 |
 | 标准回合 | 持续效果施加当回合就扣一层；空标准回合也会推进（一次 `apply` 可能跨多个 `roundEnd`） |
@@ -126,7 +126,7 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 & powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 143 条（含 `lint.test.mjs` 14 条）、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
+压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 158 条（含 `lint.test.mjs` 14 条）、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
 
 `rpg6-lint.js` 与 `rpg6-stats.js --check` 已经挂在 `check.ps1` 里，单跑是为了看细项。`--warn` 只提醒不阻断，`--json` 给机器读；`rpg6-stats.js --write` 改数字，手改会被 `--check` 抓。
 

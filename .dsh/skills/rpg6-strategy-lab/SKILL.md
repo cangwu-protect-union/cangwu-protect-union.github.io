@@ -1,16 +1,15 @@
 ---
 name: rpg6-strategy-lab
-description: 回合制 6.0 的策略实验室：本地跑对局、练打法、算胜率矩阵、判定每对角色是静止/封闭/开放。跑或改 rpg6.0/strategy-lab、lab.html、判定口径、技能标定表，或要发布新一期实验室结果时加载。
+description: 已终止的项目，仅作存档：回合制 6.0 的策略实验室（rpg6.0/strategy-lab、lab.html、标定表、快照）。不再跑、不再维护，也不作为任何改动的验收项。
 ---
 
-# 策略实验室
+# 策略实验室（已终止）
+
+> **已终止，不再维护。** 改引擎、角色、召唤物时不要跑 `selftest.mjs` / `lab.mjs`，不要 `--stage=calibrate` 重建标定表，也不要 `--stage=export` 重导快照。`strategy-lab/data/calibration.json` 与 `data/lab-snapshot*.js` 冻结在 `6.0-engine.7`，与 `ENGINE_VERSION` 不一致是预期状态。下面的内容只作为存档记录，不再执行。
 
 ## 什么时候加载
 
-- 要跑一次实验室（`lab.mjs`），或改训练 / 判定 / 标定逻辑
-- 改站点页 `rpg6.0/lab.html`、`js/lab/*`、`data/lab-snapshot.js`
-- 要上传结果到数据库，或修 `rpg_lab_runs` / `rpg_lab_pairs`
-- 引擎升版后要重跑标定与快照
+- 只在有人明确要求翻档案、恢复实验室时看；日常改动一律忽略本 skill
 
 ## 一条命令能跑通
 

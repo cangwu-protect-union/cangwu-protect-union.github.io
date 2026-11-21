@@ -43,7 +43,8 @@ const lib = {
     "正盈利": [{ key: "fukui", name: "负亏损", max: 1, init: 0 }]
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
-     aura 每标准回合末，onExpire 到期时，attack 每标准回合末自动攻击（被眩晕则跳过）。 */
+     aura 每标准回合末，onExpire 到期时，attack 按自身速度攒行动条（每 100/速度 个标准回合末攻击一次；
+     攒满那一拍被眩晕/击溃则作废，速度必须为正，否则永远不会出手）。 */
   summons: {
     "liubinlu.xiaoliu": {
       name: "小刘亦萱",
@@ -74,7 +75,7 @@ const lib = {
     },
     "yangshuhan.tomb": {
       name: "杨舒然之墓",
-      stats: { atk: 200, def: 0, mres: 0, hp: 1200, mp: 0, spd: 0 },
+      stats: { atk: 200, def: 0, mres: 0, hp: 1200, mp: 0, spd: 10 },
       targetable: true,
       breakImmune: true,
       taunt: 0,

@@ -39,7 +39,7 @@
 | 改样式或调整视觉 | `guitu-design` |
 | 改 rpg6.0 战斗引擎、技能库、召唤物或对局页 | `rpg6-battle` |
 | 批量加角色/技能、评估剩余角色、做角色批次方案 | `rpg6-character-batch` |
-| 跑/改策略实验室、判定口径、`lab.html`、实验室数据表 | `rpg6-strategy-lab` |
+| ~~策略实验室~~ | 已终止，不再维护也不作为改动依据（见「回合制 6.0」） |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |
 
@@ -76,14 +76,7 @@ node _local/tests/run-all.mjs --group=回合制
 
 改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；同步 `test.html` 提示、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`。文档里的角色数/技能数/op 数不要手写，跑 `node _local/tools/rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`，用它的盘点/分诊/plan/验收流程；本节命令是它的验收子集。
 
-策略实验室（`rpg6.0/strategy-lab`，独立工具，不走引擎单测）的验收：
-
-```
-node rpg6.0/strategy-lab/selftest.mjs
-node rpg6.0/strategy-lab/lab.mjs --chars=5
-```
-
-引擎升版后必须先 `node rpg6.0/strategy-lab/lab.mjs --stage=calibrate` 重建标定表，再重跑并 `--stage=export` 更新 `data/lab-snapshot.js`，否则站点显示的是旧引擎结论。改实验室相关代码加载 `rpg6-strategy-lab`。
+策略实验室（`rpg6.0/strategy-lab`）**已终止，不再维护**：改引擎/角色/召唤物时不跑 `selftest.mjs`、`lab.mjs`，也不 `--stage=calibrate` 重建标定表或 `--stage=export` 重导快照。`strategy-lab/data/calibration.json`、`data/lab-snapshot*.js` 冻结在 `6.0-engine.7`，与引擎版本不一致是预期状态，不要为了让它们对齐而改数据；`lab.html` 与 `rpg6_lab_*` 表原样保留，不再作为任何改动的验收项或依据。
 
 ## 文档与配图
 
