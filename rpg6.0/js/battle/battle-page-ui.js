@@ -45,6 +45,20 @@
     panel.style.minHeight = Math.min(avail, Math.max(96, need)) + "px";
   }
 
+  P.matchLogHeight = function () {
+    if (P.isCompact()) return;
+    var speedEl = P.dom.grid.querySelector("[data-speed]");
+    var logBox = P.dom.grid.querySelector("[data-log]");
+    if (!speedEl || !logBox) return;
+    if (logBox.open) {
+      logBox.style.height = speedEl.getBoundingClientRect().height + "px";
+      logBox.style.maxHeight = "none";
+    } else {
+      logBox.style.height = "";
+      logBox.style.maxHeight = "";
+    }
+  }
+
   P.turnText = function () {
     if (!P.state) return "";
     if (P.mode === "replay") {

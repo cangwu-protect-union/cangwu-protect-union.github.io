@@ -106,10 +106,10 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - **一屏布局**：`html.is-battle` 隐藏站点 header/footer；`.battle-page` 锁 `100dvh`；grid 两列（`speed` / `unitA unitB` / `queryA queryB` / `log`），各格自己滚，页面不滚。角色卡底部的召唤物带在紧凑断点下 `flex-wrap:nowrap + overflow-x:auto`，只占一行；844×390 带墓的用例已断言 `docH <= vh`。
 - **四处折叠**（状态都在 JS 变量里，`render()` 重建 DOM 后按它恢复，不要直接读 DOM）：
   - 速度条、战斗日志：原生 `<details>`；`speedOpen` / `battleLogOpen`。
-  - 展开态统一 `position: fixed; inset: 0` 铺满视口，`<summary>` 用 `position: sticky` 顶住当关闭入口；这套规则**只写在紧凑断点里**。桌面战斗日志保持常显 `<section>`，由 `renderBattleLog(state, open, collapsible)` 决定输出哪种标签。
+  - 展开态统一 `position: fixed; inset: 0` 铺满视口，`<summary>` 用 `position: sticky` 顶住当关闭入口；这套规则**只写在紧凑断点里**。战斗日志桌面与手机都输出 `<details>`（`renderBattleLog(state, open, preview)`），桌面传 `preview`（`!compact`）在 `<summary>` 里预览上一个有效回合（`renderLogPreview` 找最近一个有非 `is-round` 展示事件的标准回合，不含「第 N 标准回合」分隔行），展开时高度用 `matchLogHeight()` 对齐速度条面板实测高度；手机传 `preview=false`、只留标题行。
   - 伤害记录（手机独有）：绝对定位浮层，靠 `.battle-unit { overflow: visible }` 才盖得出去；高度由 `applyLogPanel()` 现算——`max-height` 取「卡片底边 → 底栏顶边」，`min-height` 至少盖到整张技能卡，少了会露出半行技能文字；`.bu-status` 要 `position: relative; z-index: 4`，否则浮层可能盖住自己的「收起」按钮。
   - Buff 详情：手机没有 hover，点 chip 弹气泡（`data-detail` + `BattleView.chipDetail`），点别处或滚动关闭。
-- **改完必看两个视口**：844×390（不滚、双方并排、操作栏可见；有召唤物时召唤物带只占一行）与 1280×900（战斗日志仍是 `SECTION` / `static`）。
+- **改完必看两个视口**：844×390（不滚、双方并排、操作栏可见；有召唤物时召唤物带只占一行）与 1280×900（战斗日志是 `DETAILS`、`position: static`、默认 `open`，展开高度与速度条面板对齐）。
 
 ## 测试
 

@@ -116,15 +116,16 @@
       readOnly: P.mode !== "play",
       speedOpen: P.speedOpen === null ? !compact : P.speedOpen,
       battleLogOpen: P.battleLogOpen === null ? !compact : P.battleLogOpen,
-      battleLogCollapsible: compact,
+      battleLogPreview: !compact,
       logUid: P.logUid
     });
     P.dom.grid.classList.toggle("is-picking", root.BattlePick.isActive(P.pick));
     P.dom.grid.classList.toggle("is-replay", P.mode !== "play");
     P.restoreOpenSkills();
     P.applyLogPanel();
+    P.matchLogHeight();
     var logBox = P.dom.grid.querySelector("[data-log]");
-    if (logBox) logBox.scrollTop = logBox.scrollHeight;
+    if (logBox && logBox.open) logBox.scrollTop = logBox.scrollHeight;
     if (P.dom.turnEl) P.dom.turnEl.textContent = P.turnText();
     if (P.dom.hintEl) P.dom.hintEl.textContent = P.hint;
     if (P.dom.replayBox) {
@@ -437,7 +438,10 @@
       var speed = event.target.closest("[data-speed]");
       if (speed) P.speedOpen = speed.open;
       var battleLog = event.target.closest("[data-log]");
-      if (battleLog) P.battleLogOpen = battleLog.open;
+      if (battleLog) {
+        P.battleLogOpen = battleLog.open;
+        P.matchLogHeight();
+      }
     }, true);
 
     P.dom.stage.addEventListener("mouseover", function (event) {

@@ -104,16 +104,37 @@
 
   /* 返回 { text, cls }；返回 null 的事件不进日志 */
 
-  /* 桌面是常显的普通区块；紧凑布局才折成一行、点开成覆盖层 */
-  P.renderBattleLog = function (state, open, collapsible) {
+  /* 桌面与手机都折成可点标题的 <details>（触发方式同手机端）。
+     桌面折叠态在标题下预览上一个有效回合，展开态铺出完整日志；
+     手机折叠态只留标题行、展开铺满视口，由 CSS 紧凑断点处理。 */
+  P.renderLogPreview = function (state) {
+    var list = state.log || [];
+    var lastRound = null;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var probe = P.eventLine(state, list[i]);
+      if (!probe || probe.cls === "is-round") continue;
+      lastRound = list[i].round;
+      break;
+    }
+    var html = "";
+    if (lastRound != null) {
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].round !== lastRound) continue;
+        var line = P.eventLine(state, list[j]);
+        if (!line || line.cls === "is-round") continue;
+        html += '<li class="bl-row ' + line.cls + '">' + P.esc(line.text) + "</li>";
+      }
+    }
+    if (!html) html = '<li class="bl-row is-empty">还没有事件</li>';
+    return '<ol class="bl-items bl-preview">' + html + "</ol>";
+  }
+
+  P.renderBattleLog = function (state, open, preview) {
     var list = state.log || [];
     var start = Math.max(0, list.length - 160);
-    var head = collapsible
-      ? '<summary><span class="bl-title">战斗日志</span></summary>'
-      : '<h2 class="bl-title">战斗日志</h2>';
-    var html = collapsible
-      ? '<details class="battle-log" data-log' + (open ? " open" : "") + ">" + head + '<ol class="bl-items">'
-      : '<section class="battle-log" data-log>' + head + '<ol class="bl-items">';
+    var head = '<summary><span class="bl-title">战斗日志</span>' +
+      (preview ? P.renderLogPreview(state) : "") + "</summary>";
+    var html = '<details class="battle-log" data-log' + (open ? " open" : "") + ">" + head + '<ol class="bl-items">';
     var rows = 0;
     for (var i = start; i < list.length; i++) {
       var line = P.eventLine(state, list[i]);
@@ -122,7 +143,7 @@
       html += '<li class="bl-row ' + line.cls + '">' + P.esc(line.text) + "</li>";
     }
     if (!rows) html += '<li class="bl-row is-empty">还没有事件</li>';
-    html += collapsible ? "</ol></details>" : "</ol></section>";
+    html += "</ol></details>";
     return html;
   }
 
@@ -352,7 +373,7 @@
     parts.push(P.renderQuery(state, state.units[0], meta, pick, readOnly));
     parts.push(P.renderQuery(state, state.units[1], meta, pick, readOnly));
     parts.push(P.renderBattleLog(state, !!(options && options.battleLogOpen),
-      !!(options && options.battleLogCollapsible)));
+      !!(options && options.battleLogPreview)));
     return parts.join("");
   }
 

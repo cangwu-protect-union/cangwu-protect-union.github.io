@@ -100,13 +100,11 @@
 }
 
 .battle-log > summary {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+  display: block;
   margin-bottom: 4px;
   cursor: pointer;
   list-style: none;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .battle-log > summary::-webkit-details-marker {
@@ -117,10 +115,20 @@
   content: "▸";
   font-size: 11px;
   color: var(--muted);
+  margin-right: 6px;
 }
 
 .battle-log[open] > summary::before {
   content: "▾";
+}
+
+/* 桌面折叠态：标题下预览上一个有效回合；展开态收起预览避免重复 */
+.battle-log .bl-preview {
+  margin-top: 2px;
+}
+
+.battle-log[open] > summary .bl-preview {
+  display: none;
 }
 
 .bl-items {
