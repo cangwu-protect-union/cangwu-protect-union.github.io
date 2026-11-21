@@ -566,11 +566,13 @@
 
 .bq-stat.is-dynamic {
   display: inline-flex;
-  flex-direction: column;
-  line-height: 1.22;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 4px;
 }
 
 .bq-stat-note {
+  flex-basis: 100%;
   font-style: normal;
   font-size: 10px;
   opacity: 0.72;
@@ -578,11 +580,13 @@
 
 .stat.is-dynamic {
   display: inline-flex;
-  flex-direction: column;
-  line-height: 1.15;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 4px;
 }
 
 .stat.is-dynamic em {
+  flex-basis: 100%;
   font-style: normal;
   font-size: 9px;
   color: var(--muted);
