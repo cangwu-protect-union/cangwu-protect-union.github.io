@@ -1,5 +1,6 @@
 /* 回合制正传 6.0 · 对局页单入口（test.html 只引这一个模块）
-   装配顺序：引擎 → 技能库挂到 window（battle-page 仍在读，阶段 3 转显式） → 渲染层。 */
+   装配顺序：数据访问层 → 引擎 → 技能库挂到 window（battle-page 仍在读，阶段 3 转显式） → 渲染层。 */
+import "../rpg-data.js";
 import "../engine/index.js";
 import skillsLib from "../../data/skills/index.js";
 

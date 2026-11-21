@@ -1,6 +1,8 @@
 /* 回合制正传 6.0 · 战报列表
    读 rpg_battles，按时间倒序；点一行进 test.html?record=id 回放。
    列表对所有人共享，可按参与角色筛选；进页面顺手清掉 30 天前的记录。 */
+import "../rpg-data.js";
+
 (function (root) {
   "use strict";
 
