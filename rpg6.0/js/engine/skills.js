@@ -1,6 +1,6 @@
 /* 回合制正传 6.0 · 战斗引擎 · 技能库
    执行技能、处理蓄力、校验技能库与角色档案是否一致。
-   技能数据在 data/battle-skills.js，这里不写任何具体技能。 */
+   技能数据在 data/skills/，这里不写任何具体技能。 */
 (function (root) {
   "use strict";
   var B = root.RPG6B || (root.RPG6B = {});

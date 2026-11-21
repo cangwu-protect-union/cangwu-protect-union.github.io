@@ -88,7 +88,7 @@ Institution of Role-Play-Games），简称 CPU，于 2022 年建立。目前包�
 │   ├── 访客流程图.md        界面上点哪里能到哪里
 │   ├── *.html              13 个页面（公开 6 个 + 编辑流程 6 个 + 战报 1 个）
 │   ├── css/                archive.css 角色档案样式、battle.css 对局样式
-│   ├── data/               表名配置、33 条兜底角色、battle-skills.js 技能库
+│   ├── data/               表名配置、seeds/ 33 条兜底角色、skills/ 技能库（一个角色一个文件）
 │   ├── js/                 数据层、表单组件、各页面逻辑
 │   ├── js/engine/          战斗引擎（纯函数，可在 node 里跑）
 │   ├── js/battle/          对局界面：渲染、选中、战报、页面装配

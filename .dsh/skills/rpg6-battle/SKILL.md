@@ -22,7 +22,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../traits.js` | 8 主业 + 6 副业；主业/副业写反也能查（两张表都找）；`ignoreTaunt` |
 | `.../state.js` | 建单位、面板结算（set→add→mul）、标记、`summons/side/hpLost`、深拷贝、指纹 |
 | `.../damage.js` | 伤害/回血/强扣、击溃值、蓄力打断、不会死亡、英雄/召唤物死亡判定 |
-| `.../effect-ops.js` | 效果解释器框架与出口（34 个 op；helpers 与 op 实现拆在 `effect-ops-helpers.js`、`effect-ops-2.js`，按顺序加载）、群体目标 `sideUnits`、持续效果/周期计时、反射、打断、标记 |
+| `.../effect-ops.js` | 效果解释器框架、注册表与出口（opNames 从注册表推导）、群体目标 `sideUnits`、持续效果/周期计时、反射、打断、标记；op 实现按伤害/状态/流程拆在 `ops/`，helpers 在 `effect-ops-helpers.js` |
 | `.../timeline.js` | 标准回合、速度条、行动队列、跳过无法行动者；空回合会连续推进 |
 | `.../conditions.js` | 技能条件（蓝/力/冷却/封锁/一次性/标记门槛、`costFromLost` 动态费用） |
 | `.../skills.js` | 技能执行、蓄力、校验、动态费用、嘲讽、被动钩子、标记初始化 |
@@ -57,7 +57,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 
 ## 技能 DSL 速查
 
-- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 `effect-ops.js` 的 `opNames`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`noStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`、`buff`、`status`、`breakValue`、`forceBreak`、`tick`、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
+- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`noStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`、`buff`、`status`、`breakValue`、`forceBreak`、`tick`、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`。

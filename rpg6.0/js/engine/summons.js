@@ -1,6 +1,6 @@
 /* 回合制正传 6.0 · 战斗引擎 · 召唤物
    召唤物是独立战斗单位：有自己的血量、状态、计时，不进速度条与行动队列。
-   定义在 data/battle-skills.js 的 summons 块；这里只负责创建、移除与标准回合末的脚本。 */
+   定义在 data/skills/index.js 的 summons 块；这里只负责创建、移除与标准回合末的脚本。 */
 (function (root) {
   "use strict";
   var B = root.RPG6B || (root.RPG6B = {});

@@ -60,7 +60,7 @@ js/
 │   ├── traits.js      8 主业 + 6 副业
 │   ├── state.js       建局、面板结算、深拷贝、状态指纹
 │   ├── damage.js      伤害/回血/强扣/死亡
-│   ├── effect-ops.js  效果解释器框架与出口（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op；helpers 与各 op 在 effect-ops-helpers.js、effect-ops-2.js，紧随其后加载）
+│   ├── effect-ops.js  效果解释器框架、注册表与出口（<!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个 op；opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
 │   ├── skills.js      技能执行与档案校验
@@ -92,9 +92,9 @@ js/
 两个只读函数：`rpg_search`（筛选 + 分页 + 总数）、`rpg_facets`（筛选下拉的选项）。
 迁移脚本在 `_local/sql/rpg-setup.sql`，旧档案导入在 `_local/sql/rpg-seed-characters.sql`。
 
-`data/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。副本拆成 4 个文件（characters-2/3/4.js 只做 push，按顺序加载）。
+`data/seeds/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。副本由 `_local/tools/gen-rpg-seed.js` 生成，拆成 4 个文件（characters-2/3/4.js 只做 push）。
 
-`data/battle-skills.js` 是技能库（角色技能 + marks + summons），拆成 3 个文件按顺序加载。`data/lab-snapshot.js` 是策略实验室的兜底快照，拆成多个文件按顺序加载，重新导出：`node rpg6.0/strategy-lab/lab.mjs --stage=export`。
+`data/skills/` 是技能库（角色技能 + marks + summons）：一个角色一个文件，`index.js` 聚合并导出。`data/lab-snapshot.js` 是策略实验室的兜底快照，拆成多个文件按顺序加载，重新导出：`node rpg6.0/strategy-lab/lab.mjs --stage=export`。
 
 `data/rule-docs.js` 是规则条目的标题与 HTML 正文，也是规则唯一的来源。改它等于改规则，刷新页面就生效，不写数据库、没有后台界面。
 
@@ -114,7 +114,7 @@ js/
 
 ```
 页面 → rpg-data.js → POST /v1/rdb/rest/rpc/rpg_search → 渲染
-                   ↘ 云端不可用 → data/characters.js
+                   ↘ 云端不可用 → data/seeds/characters.js
 ```
 
 写（必须带令牌）：
@@ -170,4 +170,4 @@ test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步�
 ## 原始资料
 
 `archive/6.0doc/回合制角色/*.txt` 是 44 份原始角色档案（技能原文，编号与出处见 `0 清单.txt`），导入数据库后不再参与渲染，保留作核对依据。
-`archive/picture/5–19.jpeg` 被 `data/characters.js` 直接引用；角色与图片按人物对应，同一张合影可对应多名角色。
+`archive/picture/5–19.jpeg` 被 `data/seeds/characters.js` 直接引用；角色与图片按人物对应，同一张合影可对应多名角色。

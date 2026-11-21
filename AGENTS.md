@@ -64,7 +64,7 @@ node _local/tests/run-all.mjs --group=导航
 
 ### 回合制 6.0
 
-改 `rpg6.0/js/engine`、`data/battle-skills.js`、召唤物、对局页或战报时，加载 `rpg6-battle`，并在 `check.ps1` 之外跑：
+改 `rpg6.0/js/engine`、`data/skills/`、召唤物、对局页或战报时，加载 `rpg6-battle`，并在 `check.ps1` 之外跑：
 
 ```
 node _local/tests/engine/run.mjs
