@@ -23,9 +23,9 @@ export function loadEngine() {
   if (cache) return cache;
   globalThis.window = globalThis;
   for (const name of LOAD_ORDER) require(path.join(ENGINE_DIR, name + ".js"));
-  require(path.join(ROOT, "rpg6.0", "data", "battle-skills.js"));
-  require(path.join(ROOT, "rpg6.0", "data", "battle-skills-2.js"));
-  require(path.join(ROOT, "rpg6.0", "data", "battle-skills-3.js"));
+  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills.js"));
+  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills-2.js"));
+  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills-3.js"));
   const B = globalThis.RPG6B;
   const LIB = globalThis.RPG6_SKILLS;
   B.skills.load(LIB);
@@ -46,7 +46,7 @@ function readCharacters() {
   const sandbox = { window: {} };
   vm.createContext(sandbox);
   for (const name of ["characters.js", "characters-2.js", "characters-3.js", "characters-4.js"]) {
-    const file = path.join(ROOT, "rpg6.0", "data", name);
+    const file = path.join(ROOT, "rpg6.0", "data", "seeds", name);
     vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: file });
   }
   return sandbox.window.RPG_SEED_CHARACTERS || [];

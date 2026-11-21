@@ -46,7 +46,7 @@ const AREAS = [
   { skill: "—", label: "生成物", generated: true, match: /(^rpg6\.0\/preview\/|^guitu\/.*\.png$|^quyu\/.*\.png$|\.png$)/ },
   { skill: "—", label: "skill 本体", generated: true, match: /^\.dsh\/skills\// },
   { skill: "rpg6-strategy-lab", match: /^rpg6\.0\/(strategy-lab\/|lab\.html|css\/lab\.css|js\/lab\/|data\/lab-snapshot)/, label: "策略实验室" },
-  { skill: "rpg6-battle", match: /^rpg6\.0\/(js\/engine\/|js\/battle\/|data\/battle-skills|test\.html)/, label: "战斗引擎" },
+  { skill: "rpg6-battle", match: /^rpg6\.0\/(js\/engine\/|js\/battle\/|data\/skills|test\.html)/, label: "战斗引擎" },
   { skill: "rpg6-character-batch", match: /^rpg6\.0\/data\/characters\.js|^_local\/docs\/回合制6\.0/, label: "角色批次" },
   { skill: "cloudbase-pg", match: /^_local\/sql\//, label: "数据库" },
   { skill: "site-e2e-tests", match: /^_local\/tests\//, label: "端到端测试" },

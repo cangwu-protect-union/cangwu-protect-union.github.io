@@ -1,5 +1,5 @@
 /* 回合制正传 6.0 · 角色档案的数据访问层
-   数据库是唯一数据源；云端不可用时退回 data/characters.js 的内置副本。
+   数据库是唯一数据源；云端不可用时退回 data/seeds/characters.js 的内置副本。
    拆成 3 个文件按顺序加载：rpg-data-write.js → rpg-data-battles.js → rpg-data.js，函数都挂在 window.RpgData 上。 */
 (function () {
   "use strict";
