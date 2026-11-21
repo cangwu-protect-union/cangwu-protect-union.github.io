@@ -217,7 +217,8 @@
         label: "受击判定",
         damageType: type,
         amount: dmg,
-        dodge: false
+        dodge: false,
+        convert: ""
       };
       B.skills.runHooks(state, target, "beforeDamage", pre, events);
       if (pre.dodge) {
@@ -229,6 +230,28 @@
           sourceUid: spec.sourceUid || "",
           label: pre.label || "闪避",
           skillId: spec.skillId || ""
+        });
+        return 0;
+      }
+      /* 伤害转血上限（学富五车 E3）：不扣血、等量加血上限；强扣不是伤害、不转换；
+         转换后不触发击溃/眩晕/蓄力打断与伤害后被动，事件单独一条，避免被当成闪避。 */
+      if (pre.convert === "maxHp") {
+        B.state.addMod(target, {
+          stat: "maxHp",
+          mode: "add",
+          value: dmg,
+          remain: B.state.PERMANENT,
+          source: "convert.maxHp",
+          label: "伤害转血上限"
+        });
+        pushEvent(events, {
+          type: "convertMaxHp",
+          round: state.round,
+          sourceUid: spec.sourceUid || "",
+          uid: target.uid,
+          amount: dmg,
+          skillId: spec.skillId || "",
+          label: spec.label || ""
         });
         return 0;
       }

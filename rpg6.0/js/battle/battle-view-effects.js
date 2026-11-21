@@ -10,6 +10,32 @@
     return type === "magic" ? "法伤" : type === "true" ? "真伤" : "普伤";
   }
 
+  /* 额外动作按钮：unlock（解锁属性）与 item（吃碎苹果/功德回血），接在三个基础按钮后面 */
+  P.renderExtraActions = function (state, unit, pick, active) {
+    var html = "";
+    var extras = active && B.battle && B.battle.available ? B.battle.available(state) : [];
+    for (var x = 0; x < extras.length; x++) {
+      var ex = extras[x];
+      if (ex.kind === "unlock") {
+        var pickedUnlock = pick && pick.mode === "unlock";
+        html += '<button type="button" class="btn btn-ghost bq-btn' + (pickedUnlock ? " is-picked" : "") +
+          '" data-unlock' + (ex.enabled ? "" : " disabled") + ' title="' + P.esc(ex.reason) + '">' + P.esc(ex.label) + "</button>";
+      } else if (ex.kind === "item") {
+        html += '<button type="button" class="btn btn-ghost bq-btn" data-item="' + P.esc(ex.key) + '"' +
+          (ex.enabled ? "" : " disabled") + ' title="' + P.esc(ex.reason) + '">' + P.esc(ex.label) + "</button>";
+      }
+    }
+    if (active && pick && pick.mode === "unlock" && pick.stats && pick.stats.length) {
+      html += '<div class="bq-choice"><span class="bq-choice-label">选择要解锁的属性</span>';
+      pick.stats.forEach(function (st) {
+        html += '<button type="button" class="btn btn-ghost bq-btn" data-unlock-stat="' + P.esc(st.key) + '">' +
+          P.esc(st.label) + "</button>";
+      });
+      html += "</div>";
+    }
+    return html;
+  }
+
   P.esc = function (text) {
     return String(text == null ? "" : text)
       .replace(/&/g, "&amp;")
@@ -27,7 +53,20 @@
         line = { text: "— 第 " + e.round + " 标准回合 —", cls: "is-round" };
         break;
       case "action":
-        line = { text: round + who + " 施放「" + (e.name || e.skillId) + "」", cls: "is-action" };
+        if (e.kind === "item") {
+          line = { text: round + who + " 使用「" + (e.name || e.itemId) + "」", cls: "is-action" };
+        } else {
+          line = { text: round + who + " 施放「" + (e.name || e.skillId) + "」", cls: "is-action" };
+        }
+        break;
+      case "unlock":
+        line = { text: round + who + " 解锁" + (e.label || e.stat), cls: "is-mute" };
+        break;
+      case "convertMaxHp":
+        line = { text: round + who + " 把 " + e.amount + " 伤害转成血上限", cls: "is-status" };
+        break;
+      case "buffDecay":
+        line = { text: round + who + " 的「" + ({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[e.kind] + "」衰减到 " + e.percent + "%", cls: "is-mute" };
         break;
       case "turnSkip":
         line = { text: round + who + " 无法行动，跳过", cls: "is-cancel" };

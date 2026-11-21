@@ -4,7 +4,7 @@
   "use strict";
 
   function create() {
-    return { mode: "", type: "", id: "", targets: [] };
+    return { mode: "", type: "", id: "", targets: [], stats: [] };
   }
 
   function begin(pick, spec) {
@@ -12,6 +12,7 @@
     pick.type = spec.type || "";
     pick.id = spec.id || "";
     pick.targets = (spec.targets || []).slice();
+    pick.stats = (spec.stats || []).slice();
     return pick;
   }
 
@@ -20,6 +21,7 @@
     pick.type = "";
     pick.id = "";
     pick.targets = [];
+    pick.stats = [];
     return pick;
   }
 

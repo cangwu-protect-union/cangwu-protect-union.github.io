@@ -280,7 +280,13 @@
       origin: mod.origin == null ? null : Number(mod.origin),
       restore: Number(mod.restore) || 0,
       /* 「按目标回合」计时用；老数据没有这个字段，按标准回合计时 */
-      targetUid: mod.targetUid || unit.uid
+      targetUid: mod.targetUid || unit.uid,
+      /* 「按己方回合」计时用（selfRound） */
+      sourceUid: mod.sourceUid || "",
+      /* 可复原态（E2）：removeEffect 按 key 一并回滚 */
+      untilRecast: mod.untilRecast || "",
+      /* 负面修正数据标记（E11）：dispel scope:"marked" 按它清除 */
+      debuff: !!mod.debuff
     };
     unit.mods.push(entry);
     return entry;
@@ -307,7 +313,9 @@
       label: buff.label || "",
       stacking: buff.stacking !== false,
       /* 「按目标回合」计时用；王泺然认大哥、江雨轩泰山压顶曾经因为没有这个字段而永不结束 */
-      targetUid: buff.targetUid || unit.uid
+      targetUid: buff.targetUid || unit.uid,
+      /* 「按己方回合」计时用（selfRound） */
+      sourceUid: buff.sourceUid || ""
     };
     if (!entry.stacking) {
       for (var i = 0; i < unit.buffs.length; i++) {
@@ -330,7 +338,11 @@
       source: status.source || "",
       skillId: status.skillId || "",
       label: status.label || "",
-      targetUid: status.targetUid || unit.uid
+      targetUid: status.targetUid || unit.uid,
+      /* 「按己方回合」计时用（selfRound） */
+      sourceUid: status.sourceUid || "",
+      /* noSkill 下仍可蓄力（泼水节 Q2）：只禁释放，不禁蓄力 */
+      chargeOk: !!status.chargeOk
     };
     for (var i = 0; i < unit.statuses.length; i++) {
       if (unit.statuses[i].kind === entry.kind &&

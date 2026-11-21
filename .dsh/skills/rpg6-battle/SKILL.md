@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->25 人 88 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.10<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->29 人 104 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -57,7 +57,13 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 
 ## 技能 DSL 速查
 
-- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`（可带 `restore`）、`buff`、`status`、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`）、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
+- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`（可带 `untilRecast`/`debuff`）、`stat`（可带 `restore`、`untilRecast`、`debuff`）、`buff`、`status`（可带 `chargeOk`：noSkill 下仍可蓄力，Q2）、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`、`debuff`）、`schedule`、`reflect`、`interrupt`、`dispel`（scope 含 `status`/`marked`）、`dice`（`times` 连续独立掷）、`if`（`cond.effect` 按持续效果 key 判断）、`counter`、`mark`（`delta` 支持数值表达式）、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`、`removeEffect`（移除并回滚 `untilRecast`）、`decay`（Buff 逐回合衰减）、`convert`（beforeDamage 转血上限）。
+- `who` 可以是对象 `{of:"allEnemies",limit:N}`：群体目标截断到前 N 个（土豆地雷最多打 3 个）。
+- 时长单位 `enemyRound`：按持有者对手英雄的回合计时（学富五车），被跳过的回合也算；selfRound 需要 `sourceUid`（已存）。
+- 技能字段 `items` + 动作 `kind:"item"`：额外动作（吃碎苹果/功德回血），不消耗行动、不吃掷骰跳过；`requires` 卡库存、`oncePerRound` 每回合限 1 次、`noEffect` 效果在身时不列入口；眩晕/击溃不可用，onlyBasic/noSkill 不拦（Q14）；入口 conditions.itemsOf/itemAvailable 与 actions.list/execute。
+- 技能字段 `forbidEffect:"key"`：自身有该 key 的持续效果时置灰。
+- 费用 `cost.maxMp`：判蓝上限 ≥ 值，释放后永久扣蓝上限、当前蓝钳到新上限（机枪射手）。
+- 负面数据标记 `debuff:true`（`stat`/`maxHp`/`maxMp`/`tick`）：`dispel scope:"marked"` 清除；不加标记的不清。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`、`{summonCount:"key"}`（己方该召唤物存活数量）。

@@ -67,6 +67,7 @@
     var mp = skill && skill.cost && skill.cost.mp ? Number(skill.cost.mp) : 0;
     var charge = skill && skill.charge ? Number(skill.charge) : 0;
     var def = skill && skill.cost && skill.cost.def ? Number(skill.cost.def) : 0;
+    var maxMp = skill && skill.cost && skill.cost.maxMp ? Number(skill.cost.maxMp) : 0;
     var steps = 0;
     if (skill && skill.costFromLost) {
       var per = Number(skill.costFromLost.per) || 100;
@@ -74,7 +75,7 @@
       mp = Math.max(0, mp - steps);
       charge = Math.max(0, charge - steps);
     }
-    return { mp: mp, charge: charge, def: def, steps: steps };
+    return { mp: mp, charge: charge, def: def, maxMp: maxMp, steps: steps };
   }
 
   /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作。
@@ -242,6 +243,9 @@
     return requested;
   }
 
+  /* 额外动作（E5）的库存与可用性在 actions.js（itemsOf/itemAvailable）：
+     技能库只负责按单位给技能清单，items 字段由动作层展开。 */
+
   function basicMode(state, unit, target, events) {
     var ctx = {
       sourceUid: unit.uid,
@@ -317,6 +321,7 @@
 
     var mpCost = effectiveCost(unit, skill).mp;
     var defCost = effectiveCost(unit, skill).def;
+    var maxMpCost = effectiveCost(unit, skill).maxMp;
     var inputValue = 0;
     if (skill.input) {
       var key = skill.input.key || "n";
@@ -372,6 +377,32 @@
         remain: -1,
         skillId: skill.id
       });
+    }
+    /* 蓝上限代价（E10：机枪射手「5蓝上限」）：永久 −5 蓝上限，当前蓝钳到新上限 */
+    if (maxMpCost > 0) {
+      B.state.addMod(unit, {
+        stat: "maxMp",
+        mode: "add",
+        value: -maxMpCost,
+        remain: B.state.PERMANENT,
+        source: "cost.maxMp." + skill.id,
+        label: "蓝上限代价"
+      });
+      var mpBeforeCap = unit.mp;
+      unit.mp = Math.min(unit.mp, B.state.maxMpOf(unit));
+      events.push({
+        type: "stat",
+        round: state.round,
+        uid: unit.uid,
+        stat: "maxMp",
+        mode: "add",
+        value: -maxMpCost,
+        remain: -1,
+        skillId: skill.id
+      });
+      if (unit.mp !== mpBeforeCap) {
+        events.push({ type: "mp", round: state.round, uid: unit.uid, delta: unit.mp - mpBeforeCap, mp: unit.mp, reason: "maxMpCost" });
+      }
     }
 
     unit.charge = null;

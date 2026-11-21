@@ -284,11 +284,48 @@
     return { kind: "basic", type: "chargeMp" };
   }
 
+  /* 额外动作（E5）：吃碎苹果、功德回血。不消耗行动，不吃「行动前掷骰跳过」。
+     入口展开与可用性在 conditions.itemsOf/itemAvailable。 */
+  function executeItem(state, unit, action, events) {
+    var items = B.conditions.itemsOf(unit);
+    var item = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].id === action.key) {
+        item = items[i];
+        break;
+      }
+    }
+    if (!item) throw new Error("没有这个额外动作：" + action.key);
+    var check = B.conditions.itemAvailable(state, unit, item);
+    if (!check.ok) throw new Error(check.reason);
+    if (item.oncePerRound) unit.flags["itemUsed." + item.id] = state.round;
+    events.push({
+      type: "action",
+      round: state.round,
+      uid: unit.uid,
+      kind: "item",
+      itemId: item.id,
+      name: item.label,
+      target: unit.uid
+    });
+    if (B.effectOps && B.effectOps.runOps) {
+      B.effectOps.runOps(state, {
+        sourceUid: unit.uid,
+        targetUid: unit.uid,
+        skillId: item.skillId,
+        label: item.label
+      }, B.skills.prepareOps(item.ops, unit), events);
+    }
+    return { kind: "item", key: item.id };
+  }
+
   function execute(state, action, events) {
     if (!action || typeof action !== "object") throw new Error("动作格式错误");
     var unit = currentUnit(state);
     /* 解锁属性是额外动作：不消耗行动，也不吃「行动前掷骰跳过」 */
     if (action.kind === "unlock") return executeUnlock(state, unit, action, events);
+    /* 吃苹果/功德回血同为额外动作 */
+    if (action.kind === "item") return executeItem(state, unit, action, events);
     /* 行动前的持续效果判定（高猿长啸）：跳过时行动照样消耗，committed 仍是原动作，
        因为掷骰由种子决定，回放会得到同一次判定。 */
     if (B.effectOps && B.effectOps.actionGate && !B.effectOps.actionGate(state, unit, events)) {
@@ -408,6 +445,22 @@
     });
     var unlock = unlockAction(state, unit);
     if (unlock) out.push(unlock);
+    /* 额外动作（E5）：不消耗行动；眩晕/击溃不可用，onlyBasic/noSkill 不拦。
+       库存不足或 forbid 效果在身时不列入口；每回合限 1 次的用过之后列出来置灰。 */
+    var items = B.conditions.itemsOf(unit);
+    for (var it = 0; it < items.length; it++) {
+      var item = items[it];
+      var avail = B.conditions.itemAvailable(state, unit, item);
+      if (avail.noStock || avail.forbidden) continue;
+      out.push({
+        kind: "item",
+        key: item.id,
+        label: item.label,
+        enabled: avail.ok,
+        reason: avail.reason,
+        targets: []
+      });
+    }
     /* 兜底：被锁到无任何动作可做时（下潜 + 旋转同时锁普攻与蓄力、蓝已满），
        允许跳过本回合，避免对局卡死。只在没有可选动作时出现。 */
     var anyEnabled = out.some(function (item) { return item.enabled; });

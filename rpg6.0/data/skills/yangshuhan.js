@@ -12,14 +12,15 @@ export default [
         ops: [],
         hooks: {
           battleStart: [
-            { op: "stat", stat: "atk", who: "allEnemies", mode: "add", value: -20, duration: 15 },
-            { op: "stat", stat: "def", who: "allEnemies", mode: "add", value: -20, duration: 15 },
-            { op: "stat", stat: "mres", who: "allEnemies", mode: "add", value: -20, duration: 15 },
+            { op: "stat", stat: "atk", who: "allEnemies", mode: "add", value: -20, duration: 15, debuff: true },
+            { op: "stat", stat: "def", who: "allEnemies", mode: "add", value: -20, duration: 15, debuff: true },
+            { op: "stat", stat: "mres", who: "allEnemies", mode: "add", value: -20, duration: 15, debuff: true },
             {
               op: "tick",
               who: "allEnemies",
               duration: { unit: "standard", count: 15 },
               period: 3,
+              debuff: true,
               label: "王霸之气",
               ops: [{ op: "damage", type: "true", value: 25 }]
             }

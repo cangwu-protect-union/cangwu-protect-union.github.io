@@ -38,7 +38,9 @@
             value: value,
             remain: B.state.PERMANENT,
             source: H.sourceTag(cctx),
-            label: cctx.label || ""
+            label: cctx.label || "",
+            untilRecast: op.untilRecast || "",
+            debuff: !!op.debuff
           });
           if (stat === "maxHp") B.state.clampHpToMax(ct);
           if (stat === "maxMp") ct.mp = Math.min(ct.mp, B.state.maxMpOf(ct));
@@ -75,7 +77,9 @@
             value: value,
             remain: B.state.PERMANENT,
             source: H.sourceTag(cctx),
-            label: cctx.label || ""
+            label: cctx.label || "",
+            untilRecast: op.untilRecast || "",
+            debuff: !!op.debuff
           });
           if (stat === "maxHp") B.state.clampHpToMax(ct);
           if (stat === "maxMp") ct.mp = Math.min(ct.mp, B.state.maxMpOf(ct));
@@ -152,7 +156,7 @@
         if (!target || !target.marks || !target.marks[op.key]) return;
         var markDef = target.marks[op.key];
         if (op.mode === "set" && op.value != null) markDef.value = H.evalValue(state, ctx, op.value);
-        else markDef.value = markDef.value + (op.delta == null ? 1 : Number(op.delta));
+        else markDef.value = markDef.value + (op.delta == null ? 1 : H.evalValue(state, ctx, op.delta));
         markDef.value = B.rules.clamp(markDef.value, 0, markDef.max);
         H.pushEvent(state, events, {
           type: "mark",
@@ -204,9 +208,86 @@
       
   });
 
+  /* 驱散（scope：debuff/all/status/marked/breakValue/marks）。
+     status 清异常状态（E7），marked 清带 debuff 标记的修正与效果（E11）。 */
+  function runDispel(state, ctx, op, events) {
+    var targets = H.sideUnits(state, ctx, op.who || "target");
+    for (var ti = 0; ti < targets.length; ti++) {
+      var target = targets[ti];
+      var tctx = H.ctxFor(ctx, target);
+      var removed = [];
+      if (op.scope === "debuff" || op.scope === "all") {
+        target.buffs = target.buffs.filter(function (b) {
+          if (H.DEBUFF_KINDS[b.kind]) {
+            removed.push(b.kind);
+            return false;
+          }
+          return true;
+        });
+        target.statuses = target.statuses.filter(function (s) {
+          if (H.STATUS_DEBUFF[s.kind]) {
+            removed.push(s.kind);
+            return false;
+          }
+          return true;
+        });
+        target.mods = target.mods.filter(function (m) {
+          if (m.mode === "add" && m.value < 0) {
+            removed.push("mod:" + m.stat);
+            return false;
+          }
+          return true;
+        });
+      }
+      if (op.scope === "status") {
+        target.statuses = target.statuses.filter(function (s) {
+          if (H.STATUS_CLEAR[s.kind]) {
+            removed.push(s.kind);
+            return false;
+          }
+          return true;
+        });
+      }
+      if (op.scope === "marked") {
+        target.mods = target.mods.filter(function (m) {
+          if (m.debuff) {
+            removed.push("mod:" + m.stat);
+            return false;
+          }
+          return true;
+        });
+        target.effects = target.effects.filter(function (e) {
+          if (e.debuff) {
+            removed.push(e.label || e.key || "effect");
+            H.pushEvent(state, events, {
+              type: "effectExpire",
+              uid: target.uid,
+              kind: "effect",
+              label: e.label || ""
+            });
+            return false;
+          }
+          return true;
+        });
+      }
+      if (op.scope === "breakValue") {
+        target.breakValue = 0;
+        removed.push("breakValue");
+      }
+      if (op.scope === "marks") {
+        var markKeys = Object.keys(target.marks || {});
+        for (var mk = 0; mk < markKeys.length; mk++) {
+          target.marks[markKeys[mk]].value = 0;
+          removed.push(markKeys[mk]);
+        }
+      }
+      H.pushEvent(state, events, { type: "dispel", uid: target.uid, scope: op.scope || "debuff", removed: removed, skillId: tctx.skillId || "" });
+    }
+  }
+
   api.registerOp("dispel", function (state, ctx, op, events) {
 
-        H.runDispel(state, ctx, op, events);
+        runDispel(state, ctx, op, events);
         return;
       
   });
@@ -240,6 +321,105 @@
             skillId: tctx.skillId || ""
           });
         }
+        return;
+      
+  });
+
+  /* 可复原态（E2）：按 key 移除持续效果，并把 untilRecast 标记为该 key 的属性修正一并回滚。
+     再次释放「剃发为僧」走这里：防/血上限/速回到基础值、普攻类型复原，功德保留。 */
+  api.registerOp("removeEffect", function (state, ctx, op, events) {
+
+        var rmTargets = H.sideUnits(state, ctx, op.who || "self");
+        for (var ri = 0; ri < rmTargets.length; ri++) {
+          var rt = rmTargets[ri];
+          var kept = [];
+          var removedCount = 0;
+          for (var e = 0; e < rt.effects.length; e++) {
+            if (rt.effects[e].key === op.key) {
+              H.pushEvent(state, events, {
+                type: "effectExpire",
+                uid: rt.uid,
+                kind: "effect",
+                label: rt.effects[e].label || op.key,
+                skillId: rt.effects[e].skillId || ""
+              });
+              removedCount += 1;
+            } else {
+              kept.push(rt.effects[e]);
+            }
+          }
+          rt.effects = kept;
+          var keptMods = [];
+          for (var m = 0; m < rt.mods.length; m++) {
+            if (rt.mods[m].untilRecast === op.key) {
+              H.pushEvent(state, events, {
+                type: "modExpire",
+                uid: rt.uid,
+                kind: rt.mods[m].stat,
+                label: rt.mods[m].label || op.key
+              });
+            } else {
+              keptMods.push(rt.mods[m]);
+            }
+          }
+          rt.mods = keptMods;
+          B.state.clampHpToMax(rt);
+          H.pushEvent(state, events, {
+            type: "dispel",
+            uid: rt.uid,
+            scope: "effect:" + op.key,
+            removed: removedCount ? [op.key] : [],
+            skillId: ctx.skillId || ""
+          });
+        }
+        return;
+      
+  });
+
+  /* 衰减（E4）：把目标身上指定 kind 的 Buff 百分比减 delta，减到 0 移除（我是天才的勇猛逐回合 −20%） */
+  api.registerOp("decay", function (state, ctx, op, events) {
+
+        var decayTargets = H.sideUnits(state, ctx, op.who || "target");
+        for (var di = 0; di < decayTargets.length; di++) {
+          var dt = decayTargets[di];
+          var dctx = H.ctxFor(ctx, dt);
+          var delta = H.evalValue(state, dctx, op.delta);
+          var kept = [];
+          for (var b = 0; b < dt.buffs.length; b++) {
+            var buff = dt.buffs[b];
+            if (buff.kind !== op.kind) {
+              kept.push(buff);
+              continue;
+            }
+            buff.percent = buff.percent - delta;
+            if (buff.percent <= 0) {
+              H.pushEvent(state, events, {
+                type: "buffExpire",
+                uid: dt.uid,
+                kind: buff.kind,
+                label: buff.label || ""
+              });
+            } else {
+              kept.push(buff);
+              H.pushEvent(state, events, {
+                type: "buffDecay",
+                uid: dt.uid,
+                kind: buff.kind,
+                percent: buff.percent,
+                label: buff.label || ""
+              });
+            }
+          }
+          dt.buffs = kept;
+        }
+        return;
+      
+  });
+
+  /* 伤害转血上限（E3）：配合 beforeDamage 钩子使用，把这次受击标记为「不扣血、等量加血上限」 */
+  api.registerOp("convert", function (state, ctx, op, events) {
+
+        if (ctx) ctx.convert = op.to || "";
         return;
       
   });

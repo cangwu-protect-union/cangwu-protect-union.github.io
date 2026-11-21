@@ -26,6 +26,13 @@
 
   H.sideUnits = function (state, ctx, which) {
     var w = which || "target";
+    /* E1 群体上限：who 写成 {of:"allEnemies",limit:N}，截断到前 N 个 */
+    if (w && typeof w === "object") {
+      var baseList = H.sideUnits(state, ctx, w.of || "allEnemies");
+      var cap = Number(w.limit);
+      if (isFinite(cap) && cap > 0 && baseList.length > cap) return baseList.slice(0, cap);
+      return baseList;
+    }
     var owner = H.ownerUnit(state, ctx);
     var mySide = owner ? (owner.side || (owner.uid === "a" ? "a" : "b")) : "a";
     var enemySide = mySide === "a" ? "b" : "a";
@@ -178,7 +185,12 @@
         /* 归零后逐标准回合恢复原值：记住改动前的面板，标准回合末按 restore 补回 */
         restore: op.restore == null ? 0 : Number(op.restore),
         origin: op.restore == null ? null : before,
-        targetUid: target.uid
+        targetUid: target.uid,
+        sourceUid: tctx.sourceUid,
+        /* E2 removeEffect 按 key 回滚 */
+        untilRecast: op.untilRecast || "",
+        /* E11 dispel scope:"marked" 清除 */
+        debuff: !!op.debuff
       });
       H.pushEvent(state, events, {
         type: "stat",
@@ -248,7 +260,8 @@
         source: H.sourceTag(tctx),
         label: tctx.label || "",
         stacking: op.stacking !== false,
-        targetUid: target.uid
+        targetUid: target.uid,
+        sourceUid: tctx.sourceUid
       });
       H.pushEvent(state, events, {
         type: "buffAdd",
@@ -294,7 +307,9 @@
           source: H.sourceTag(tctx),
           skillId: op.skillId || "",
           label: label,
-          targetUid: target.uid
+          targetUid: target.uid,
+          sourceUid: tctx.sourceUid,
+          chargeOk: !!op.chargeOk
         });
       H.pushEvent(state, events, {
         type: "statusAdd",
@@ -337,6 +352,8 @@
         targetUid: target.uid,
         skillId: tctx.skillId || "",
         fromBuff: !!op.fromBuff,
+        /* E11 dispel scope:"marked" 清除 */
+        debuff: !!op.debuff,
         bornRound: Math.max(1, state.round)
       };
       target.effects.push(effect);
@@ -425,7 +442,7 @@
       if (cond.ne) ok = !ok;
     } else if (cond.effect) {
       /* 按持续效果的 key 判断（下潜期间：人高马大阈值与回血翻倍） */
-      var effectOwner = H.sideUnit(state, cond.who || "self");
+      var effectOwner = H.sideUnit(state, ctx, cond.who || "self");
       ok = !!effectOwner && B.state.hasEffectKey(effectOwner, cond.effect);
       if (cond.ne) ok = !ok;
     } else if (cond.summon) {
@@ -459,50 +476,6 @@
     }
     if (ok) H.runOps(state, ctx, op.then || [], events);
     else H.runOps(state, ctx, op.else || [], events);
-  }
-
-  H.runDispel = function (state, ctx, op, events) {
-    var targets = H.sideUnits(state, ctx, op.who || "target");
-    for (var ti = 0; ti < targets.length; ti++) {
-      var target = targets[ti];
-      var tctx = H.ctxFor(ctx, target);
-      var removed = [];
-      if (op.scope === "debuff" || op.scope === "all") {
-        target.buffs = target.buffs.filter(function (b) {
-          if (H.DEBUFF_KINDS[b.kind]) {
-            removed.push(b.kind);
-            return false;
-          }
-          return true;
-        });
-        target.statuses = target.statuses.filter(function (s) {
-          if (H.STATUS_DEBUFF[s.kind]) {
-            removed.push(s.kind);
-            return false;
-          }
-          return true;
-        });
-        target.mods = target.mods.filter(function (m) {
-          if (m.mode === "add" && m.value < 0) {
-            removed.push("mod:" + m.stat);
-            return false;
-          }
-          return true;
-        });
-      }
-      if (op.scope === "breakValue") {
-        target.breakValue = 0;
-        removed.push("breakValue");
-      }
-      if (op.scope === "marks") {
-        var markKeys = Object.keys(target.marks || {});
-        for (var mk = 0; mk < markKeys.length; mk++) {
-          target.marks[markKeys[mk]].value = 0;
-          removed.push(markKeys[mk]);
-        }
-      }
-      H.pushEvent(state, events, { type: "dispel", uid: target.uid, scope: op.scope || "debuff", removed: removed, skillId: tctx.skillId || "" });
-    }
   }
 
   H.runInterrupt = function (state, ctx, op, events) {

@@ -1,19 +1,23 @@
 /* 回合制正传 6.0 · 技能库聚合入口
-   一个角色一个文件（见本目录 *.js），本文件把 23 人合并成 { version, marks, summons, characters }。
+   一个角色一个文件（见本目录 *.js），本文件把 29 人合并成 { version, marks, summons, characters }。
    浏览器（js/battle/entry.js）与 Node 测试（run.mjs / batch.mjs / strategy-lab）都从这里 import。
    唯一数据源；加角色就新建一个角色文件并在这里登记。 */
 import baobiran from "./baobiran.js";
 import guwenda from "./guwenda.js";
+import handongxiao from "./handongxiao.js";
 import jiangyuxuan from "./jiangyuxuan.js";
 import jinshengjie from "./jinshengjie.js";
 import lishuo from "./lishuo.js";
 import liubinlu from "./liubinlu.js";
 import liuwenzhe from "./liuwenzhe.js";
+import liuyixuan from "./liuyixuan.js";
 import liyuxuan from "./liyuxuan.js";
+import lvchangling from "./lvchangling.js";
 import nimanyun from "./nimanyun.js";
 import songzhiyuan from "./songzhiyuan.js";
 import sunjiaqi from "./sunjiaqi.js";
 import tianyuqing from "./tianyuqing.js";
+import wangchunyu from "./wangchunyu.js";
 import wangluor from "./wangluor.js";
 import wangrongyi from "./wangrongyi.js";
 import xieyuchen from "./xieyuchen.js";
@@ -65,7 +69,13 @@ const lib = {
       { key: "lockDef", name: "防御已解锁", max: 1, init: 0, hideMax: true, on: "opponent" },
       { key: "lockMres", name: "法抗已解锁", max: 1, init: 0, hideMax: true, on: "opponent" }
     ],
-    "顾文达": [{ key: "renGao", name: "免疫阈值", max: 9999, init: 60, hideMax: true }]
+    "顾文达": [{ key: "renGao", name: "免疫阈值", max: 9999, init: 60, hideMax: true }],
+    /* 第七批：受击计数/碎苹果（刘亦萱）、功德（吕场龄） */
+    "刘亦萱": [
+      { key: "taken", name: "受击次数", max: 5, init: 0 },
+      { key: "apple", name: "碎苹果", max: 36, init: 0 }
+    ],
+    "吕场龄": [{ key: "gongde", name: "功德", max: 99, init: 0 }]
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
      desc 是详情栏里的行为说明（手写），缺省时按 aura / attack / onExpire 自动拼；
@@ -126,6 +136,18 @@ const lib = {
           value: { plus: [45, { per: { summonCount: "yangdongming.voice" }, factor: 5 }] }
         }
       ]
+    },
+    "lvchangling.dilei": {
+      name: "土豆地雷",
+      desc: "300 血、可被单体选中。10 个标准回合后消失，消失时对最多 3 个敌人造成 100 真伤并各挂 50% 脆弱 5 标准回合（可叠加）。",
+      stats: { atk: 0, def: 0, mres: 0, hp: 300, mp: 0, spd: 0 },
+      ttl: 10,
+      targetable: true,
+      taunt: 0,
+      onExpire: [
+        { op: "damage", who: { of: "allEnemies", limit: 3 }, type: "true", value: 100 },
+        { op: "buff", who: { of: "allEnemies", limit: 3 }, kind: "fragile", percent: 50, duration: 5 }
+      ]
     }
   },
   characters: {
@@ -153,7 +175,11 @@ const lib = {
     "倪曼云": nimanyun,
     "顾文达": guwenda,
     "孙嘉怿": sunjiaqi,
-    "杨冬明": yangdongming
+    "杨冬明": yangdongming,
+    "刘亦萱": liuyixuan,
+    "吕场龄": lvchangling,
+    "王春雨": wangchunyu,
+    "韩东晓": handongxiao
   }
 };
 

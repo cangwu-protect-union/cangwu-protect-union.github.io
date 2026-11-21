@@ -9,6 +9,8 @@
   api._helpers = H;
   H.DEBUFF_KINDS = { fragile: true, panic: true };
   H.STATUS_DEBUFF = { break: true, stun: true, noSkill: true, noBasic: true, noCharge: true, cannotAct: true };
+  /* 文学巨作「清除异常状态」的范围：眩晕/击溃/眩晕余波 + 封锁类（Q18） */
+  H.STATUS_CLEAR = { break: true, stun: true, daze: true, noSkill: true, noBasic: true, noCharge: true, onlyBasic: true, cannotAct: true };
 
   var OP_REGISTRY = {};
   function registerOp(name, fn) {
@@ -241,7 +243,7 @@
       var owner = state.units[u];
       var active = owner.effects.slice();
       for (var i = 0; i < active.length; i++) {
-        if (!isDueForTurn(active[i], unit)) continue;
+        if (!isDueForTurn(state, active[i], unit)) continue;
         if (state.phase === "finished") break;
         H.runOps(state, ctxOfEffect(active[i]), active[i].ops, events);
       }
@@ -255,18 +257,24 @@
     }
   }
 
-  function isDueForTurn(item, unit) {
+  function isDueForTurn(state, item, unit) {
     if (item.unit === "selfRound") return item.sourceUid === unit.uid;
     if (item.unit === "targetRound") return item.targetUid === unit.uid;
+    /* 按持有者对手英雄的回合计时（王春雨「学富五车」） */
+    if (item.unit === "enemyRound") return B.state.otherUid(state, item.targetUid) === unit.uid;
     return false;
   }
 
-  /* 一个单位的回合被跳过（眩晕/击溃/无法行动）时，按「它的回合」计时的状态照常走一格 */
+  /* 一个单位的回合被跳过（眩晕/击溃/无法行动）时，按「它的回合」计时的状态照常走一格。
+     跳过的是谁就按谁的回合结算，所以所有单位身上 due 于该单位的计时都走一格（含 enemyRound）。 */
   function skippedTurn(state, unit, events) {
-    unit.effects = tickTurnList(unit.effects, state, unit, events, "effect");
-    unit.buffs = tickTurnList(unit.buffs, state, unit, events, "buff");
-    unit.statuses = tickTurnList(unit.statuses, state, unit, events, "status");
-    unit.mods = tickTurnList(unit.mods, state, unit, events, "mod");
+    for (var u = 0; u < state.units.length; u++) {
+      var holder = state.units[u];
+      holder.effects = tickTurnList(holder.effects, state, unit, events, "effect");
+      holder.buffs = tickTurnList(holder.buffs, state, unit, events, "buff");
+      holder.statuses = tickTurnList(holder.statuses, state, unit, events, "status");
+      holder.mods = tickTurnList(holder.mods, state, unit, events, "mod");
+    }
   }
 
   /* 按「持有者回合开始」计时的状态：在该单位回合开始时先走一格（彻底疯狂的眩晕余波） */
@@ -293,7 +301,7 @@
     var kept = [];
     for (var i = 0; i < list.length; i++) {
       var item = list[i];
-      if (!isDueForTurn(item, unit)) {
+      if (!isDueForTurn(state, item, unit)) {
         kept.push(item);
         continue;
       }

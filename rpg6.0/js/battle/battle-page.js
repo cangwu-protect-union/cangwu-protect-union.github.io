@@ -2,9 +2,6 @@
    三种模式：play（对局）、replay（回放战报）、以及开局前的选人。
    所有规则都在引擎里，这里只调度、存档与提示。
    拆成 3 个文件按顺序加载：battle-page-record.js → battle-page-ui.js → battle-page.js，函数都挂在 RPG6BattlePage 上。 */
-/* 回合制正传 6.0 · 战斗界面 · 页面装配
-   三种模式：play（对局）、replay（回放战报）、以及开局前的选人。
-   所有规则都在引擎里，这里只调度、存档与提示。 */
 (function (root) {
   "use strict";
 
@@ -184,10 +181,6 @@
     P.render();
     return true;
   }
-
-  var BUFF_NAME = { strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" };
-
-
 
   P.currentUnit = function () {
     if (!P.state || P.mode !== "play" || P.state.phase === "finished" || !P.state.turnUid) return null;
@@ -420,6 +413,24 @@
         return;
       }
       if (event.target.closest(".bq-input")) return;
+      var unlockBtn = event.target.closest("[data-unlock]");
+      if (unlockBtn) {
+        event.preventDefault();
+        P.onUnlock();
+        return;
+      }
+      var unlockStat = event.target.closest("[data-unlock-stat]");
+      if (unlockStat) {
+        event.preventDefault();
+        P.applyAction({ kind: "unlock", stat: unlockStat.getAttribute("data-unlock-stat") });
+        return;
+      }
+      var itemBtn = event.target.closest("[data-item]");
+      if (itemBtn) {
+        event.preventDefault();
+        P.onItem(itemBtn.getAttribute("data-item"));
+        return;
+      }
       var unit = event.target.closest("[data-unit]");
       if (unit) {
         event.preventDefault();

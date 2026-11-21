@@ -329,6 +329,8 @@
       html += '<button type="button" class="btn btn-ghost bq-btn' + (pickedBasic ? " is-picked" : "") +
         '" data-basic="' + kind + '"' + (active ? "" : " disabled") + ">" + P.esc(label) + "</button>";
     }
+    /* 额外动作（unlock/item）在 battle-view-effects.js 的 renderExtraActions 里渲染 */
+    html += P.renderExtraActions(state, unit, pick, active);
     html += "</div>";
 
     if (active && pick && pick.mode === "choice") {

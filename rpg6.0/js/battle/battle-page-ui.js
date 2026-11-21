@@ -4,6 +4,8 @@
   "use strict";
   var P = root.RPG6BattlePage || (root.RPG6BattlePage = {});
   var B = root.RPG6B;
+  /* Buff 显示名：P.describe 的事件行与提示共用（battle-page.js 里不再另存一份） */
+  var BUFF_NAME = { strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" };
 
 
   P.isCompact = function () {
@@ -378,6 +380,42 @@
       return;
     }
     P.setHint("请在技能行里完成选择");
+  }
+
+  /* 额外动作入口：解锁属性（倪曼云）与 items（吃碎苹果/功德回血） */
+  P.onUnlock = function () {
+    var unit = P.currentUnit();
+    if (!unit) return;
+    var extras = B.battle.available(P.state);
+    for (var i = 0; i < extras.length; i++) {
+      if (extras[i].kind !== "unlock") continue;
+      if (!extras[i].enabled) {
+        P.setHint(extras[i].reason || "现在不能解锁");
+        return;
+      }
+      root.BattlePick.begin(P.pick, { mode: "unlock", stats: extras[i].stats || [] });
+      P.setHint("选择要解锁的属性");
+      P.render();
+      return;
+    }
+    P.setHint("没有可以解锁的属性");
+  }
+
+  P.onItem = function (key) {
+    var unit = P.currentUnit();
+    if (!unit) return;
+    var extras = B.battle.available(P.state);
+    for (var i = 0; i < extras.length; i++) {
+      if (extras[i].kind === "item" && extras[i].key === key) {
+        if (!extras[i].enabled) {
+          P.setHint(extras[i].reason || "现在不能用");
+          return;
+        }
+        P.applyAction({ kind: "item", key: key });
+        return;
+      }
+    }
+    P.setHint("这个额外动作现在不可用");
   }
 
   P.charOf = function (id) {
