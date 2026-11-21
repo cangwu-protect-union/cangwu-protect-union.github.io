@@ -34,7 +34,7 @@ const GAPS = [
 
 const argv = process.argv.slice(2);
 const root = findRoot(argv);
-const { rows } = coverage(loadSeed(root), loadLibrary(root));
+const { rows } = coverage(loadSeed(root), await loadLibrary(root));
 
 const only = argValue(argv, "--character");
 const all = hasFlag(argv, "--all");

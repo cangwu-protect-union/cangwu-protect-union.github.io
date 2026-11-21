@@ -150,7 +150,11 @@
     if (stat === "maxMp") base = unit.base.maxMp;
     var m = modValue(unit, stat);
     var value = base;
-    if (m.sets.length) value = Number(m.sets[m.sets.length - 1].value);
+    if (m.sets.length) {
+      var set = m.sets[m.sets.length - 1];
+      /* set 模式的归零/覆盖可以带 progress（逐标准回合恢复原值的进度） */
+      value = Number(set.value) + (Number(set.progress) || 0);
+    }
     value = value + m.adds;
     value = value * m.mul;
     if (unit.trait && unit.trait.lowHpBoost && (stat === "atk" || stat === "def" || stat === "spd")) {
@@ -172,13 +176,19 @@
   }
 
   function defOf(unit) {
-    if (hasStatus(unit, "stun")) return 0;
+    if (dazeActive(unit)) return 0;
     return statOf(unit, "def");
   }
 
   function mresOf(unit) {
-    if (hasStatus(unit, "stun")) return 0;
+    if (dazeActive(unit)) return 0;
     return statOf(unit, "mres");
+  }
+
+  /* 眩晕与「眩晕余波」（daze）都让防御、法抗视为 0；daze 不阻止行动，
+     用来把「1 个敌方回合」的防抗归零窗口延长到下一次行动开始之前。 */
+  function dazeActive(unit) {
+    return hasStatus(unit, "stun") || hasStatus(unit, "daze");
   }
 
   function spdOf(unit) {
@@ -215,7 +225,10 @@
       remain: mod.remain == null ? PERMANENT : mod.remain,
       unit: mod.unit || "standard",
       source: mod.source || "",
-      label: mod.label || ""
+      label: mod.label || "",
+      progress: Number(mod.progress) || 0,
+      origin: mod.origin == null ? null : Number(mod.origin),
+      restore: Number(mod.restore) || 0
     };
     unit.mods.push(entry);
     return entry;
@@ -262,7 +275,8 @@
       unit: status.unit || "standard",
       source: status.source || "",
       skillId: status.skillId || "",
-      label: status.label || ""
+      label: status.label || "",
+      targetUid: status.targetUid || unit.uid
     };
     for (var i = 0; i < unit.statuses.length; i++) {
       if (unit.statuses[i].kind === entry.kind &&
@@ -332,6 +346,8 @@
     };
     state.units[0].side = "a";
     state.units[1].side = "b";
+    /* 对手标记（如赵云哲的「卅力」）在两名英雄都建好之后挂，挂到对方身上 */
+    if (B.skills && B.skills.initOpponentMarks) B.skills.initOpponentMarks(state);
     decideOrder(state);
     return state;
   }
@@ -364,7 +380,7 @@
       var buffs = [];
       for (var b = 0; b < u.buffs.length; b++) buffs.push(u.buffs[b].kind + u.buffs[b].percent + u.buffs[b].remain);
       var mods = [];
-      for (var m = 0; m < u.mods.length; m++) mods.push(u.mods[m].stat + u.mods[m].mode + u.mods[m].value + u.mods[m].remain);
+      for (var m = 0; m < u.mods.length; m++) mods.push(u.mods[m].stat + u.mods[m].mode + u.mods[m].value + u.mods[m].remain + ":" + (u.mods[m].progress || 0) + ":" + (u.mods[m].origin == null ? "" : u.mods[m].origin));
       var st = [];
       for (var s = 0; s < u.statuses.length; s++) st.push(u.statuses[s].kind + u.statuses[s].remain);
       var eff = [];
@@ -386,7 +402,7 @@
       var sb = [];
       for (var sb1 = 0; sb1 < su.buffs.length; sb1++) sb.push(su.buffs[sb1].kind + su.buffs[sb1].percent + su.buffs[sb1].remain);
       var sm = [];
-      for (var sm1 = 0; sm1 < su.mods.length; sm1++) sm.push(su.mods[sm1].stat + su.mods[sm1].mode + su.mods[sm1].value + su.mods[sm1].remain);
+      for (var sm1 = 0; sm1 < su.mods.length; sm1++) sm.push(su.mods[sm1].stat + su.mods[sm1].mode + su.mods[sm1].value + su.mods[sm1].remain + ":" + (su.mods[sm1].progress || 0) + ":" + (su.mods[sm1].origin == null ? "" : su.mods[sm1].origin));
       var ss = [];
       for (var ss1 = 0; ss1 < su.statuses.length; ss1++) ss.push(su.statuses[ss1].kind + su.statuses[ss1].remain);
       var se = [];

@@ -188,13 +188,15 @@
     return parts.length ? parts.join("；") : "每标准回合结算一次";
   }
 
-  var BUFF_NAME = { strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" };
+  var BUFF_NAME = { strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌", magicVuln: "法伤易伤" };
 
   var STATUS_DESC = {
     break: "无法行动，直到击溃结束",
     stun: "无法行动，防御与法抗视为 0",
     noSkill: "不能释放技能",
     noBasic: "不能普攻",
+    noCharge: "不能蓄力",
+    daze: "防御与法抗视为 0，但仍可行动",
     cannotAct: "无法行动",
     onlyBasic: "只能普攻",
     noDeath: "血量不会被降到 0 以下",

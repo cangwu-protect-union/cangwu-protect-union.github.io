@@ -1,13 +1,16 @@
 /* 回合制正传 6.0 · 技能库聚合入口
-   一个角色一个文件（见本目录 *.js），本文件把 19 人合并成 { version, marks, summons, characters }。
+   一个角色一个文件（见本目录 *.js），本文件把 23 人合并成 { version, marks, summons, characters }。
    浏览器（js/battle/entry.js）与 Node 测试（run.mjs / batch.mjs / strategy-lab）都从这里 import。
    唯一数据源；加角色就新建一个角色文件并在这里登记。 */
 import baobiran from "./baobiran.js";
+import guwenda from "./guwenda.js";
 import jiangyuxuan from "./jiangyuxuan.js";
 import jinshengjie from "./jinshengjie.js";
 import lishuo from "./lishuo.js";
 import liubinlu from "./liubinlu.js";
 import liuwenzhe from "./liuwenzhe.js";
+import liyuxuan from "./liyuxuan.js";
+import nimanyun from "./nimanyun.js";
 import songzhiyuan from "./songzhiyuan.js";
 import tianyuqing from "./tianyuqing.js";
 import wangluor from "./wangluor.js";
@@ -18,6 +21,7 @@ import yangshuran from "./yangshuran.js";
 import yuzy from "./yuzy.js";
 import zhangjiaming from "./zhangjiaming.js";
 import zhangketa from "./zhangketa.js";
+import zhaoyunzhe from "./zhaoyunzhe.js";
 import zhengwanwan from "./zhengwanwan.js";
 import zhengyingli from "./zhengyingli.js";
 import zhuangwenxi from "./zhuangwenxi.js";
@@ -40,7 +44,11 @@ const lib = {
     ],
     "田誉清": [{ key: "naijiu", name: "耐久", max: 9999, init: 3, hideMax: true }],
     "刘滨路": [{ key: "dongneng", name: "动能", max: 7, init: 0 }],
-    "正盈利": [{ key: "fukui", name: "负亏损", max: 1, init: 0 }]
+    "正盈利": [{ key: "fukui", name: "负亏损", max: 1, init: 0 }],
+    /* on:"opponent" 的标记挂到对方英雄身上，双方可见（赵云哲的「卅力」） */
+    "赵云哲": [{ key: "shili", name: "卅力", max: 5, init: 0, on: "opponent" }],
+    "倪曼云": [{ key: "juan", name: "卷", max: 4, init: 0 }],
+    "顾文达": [{ key: "renGao", name: "免疫阈值", max: 9999, init: 60, hideMax: true }]
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
      desc 是详情栏里的行为说明（手写），缺省时按 aura / attack / onExpire 自动拼；
@@ -108,7 +116,11 @@ const lib = {
     "田誉清": tianyuqing,
     "刘滨路": liubinlu,
     "正盈利": zhengyingli,
-    "羊书含": yangshuhan
+    "羊书含": yangshuhan,
+    "赵云哲": zhaoyunzhe,
+    "李雨轩": liyuxuan,
+    "倪曼云": nimanyun,
+    "顾文达": guwenda
   }
 };
 

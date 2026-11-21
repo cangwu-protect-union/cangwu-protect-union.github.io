@@ -32,7 +32,7 @@
               type: type,
               amount: H.evalValue(state, dctx, op.value) * factor,
               noBreak: !!op.noBreak,
-              noStun: !!op.noStun,
+              addStun: !!op.addStun,
               fromBuff: !!(op.fromBuff || dctx.fromBuff),
               healBack: !!op.healBack,
               skillId: dctx.skillId || "",

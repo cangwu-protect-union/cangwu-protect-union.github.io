@@ -121,6 +121,11 @@
       out.needsCharge = true;
       out.canRelease = false;
       out.reason = "需要蓄力 " + have + "/" + need;
+      if (B.state.hasStatus(unit, "noCharge")) {
+        out.ok = false;
+        out.canCharge = false;
+        out.reason = "现在无法蓄力";
+      }
     }
     return out;
   }

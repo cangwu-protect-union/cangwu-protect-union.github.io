@@ -76,6 +76,8 @@ node _local/tests/run-all.mjs --group=回合制
 
 改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；同步 `test.html` 提示、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`。文档里的角色数/技能数/op 数不要手写，跑 `node _local/tools/rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`，用它的盘点/分诊/plan/验收流程；本节命令是它的验收子集。
 
+**眩晕值口径（6.0-engine.9 起）**：一般伤害**默认不加眩晕值**，只有伤害 op 标 `addStun: true` 才加（技能文本必须明确写「造成/算眩晕值」）；击溃值仍按默认 +1。新增或改技能时别按「造成伤害就涨眩晕值」的旧模型写。
+
 策略实验室（`rpg6.0/strategy-lab`）**已终止，不再维护**：改引擎/角色/召唤物时不跑 `selftest.mjs`、`lab.mjs`，也不 `--stage=calibrate` 重建标定表或 `--stage=export` 重导快照。`strategy-lab/data/calibration.json`、`data/lab-snapshot*.js` 冻结在 `6.0-engine.7`，与引擎版本不一致是预期状态，不要为了让它们对齐而改数据；`lab.html` 与 `rpg6_lab_*` 表原样保留，不再作为任何改动的验收项或依据。
 
 ## 文档与配图

@@ -2,7 +2,7 @@
   "batch": "示例：赵云哲（真实候选，未写入游戏；只演示 plan 格式与脚手架）",
   "allowExisting": false,
   "engine": {
-    "version": "6.0-engine.6",
+    "version": "6.0-engine.8",
     "changes": []
   },
   "docs": {

@@ -8,7 +8,7 @@
   var H = {};
   api._helpers = H;
   H.DEBUFF_KINDS = { fragile: true, panic: true };
-  H.STATUS_DEBUFF = { break: true, stun: true, noSkill: true, noBasic: true, cannotAct: true };
+  H.STATUS_DEBUFF = { break: true, stun: true, noSkill: true, noBasic: true, noCharge: true, cannotAct: true };
 
   var OP_REGISTRY = {};
   function registerOp(name, fn) {
@@ -69,9 +69,9 @@
     var kept = [];
     for (var i = 0; i < unit.effects.length; i++) {
       var effect = unit.effects[i];
+      var broken = false;
       if (effect.breakOnSourceStatus && effect.sourceUid) {
         var src = H.tryUnit(state, effect.sourceUid);
-        var broken = false;
         if (src) {
           for (var j = 0; j < effect.breakOnSourceStatus.length; j++) {
             if (B.state.hasStatus(src, effect.breakOnSourceStatus[j])) {
@@ -80,15 +80,24 @@
             }
           }
         }
-        if (broken) {
-          H.pushEvent(state, events, {
-            type: "effectExpire",
-            uid: unit.uid,
-            kind: "effect",
-            label: effect.label || ""
-          });
-          continue;
+      }
+      /* 持有者自己进入指定状态（如旋转：目标被击溃）时，效果立即结束 */
+      if (!broken && effect.breakOnHolderStatus) {
+        for (var k = 0; k < effect.breakOnHolderStatus.length; k++) {
+          if (B.state.hasStatus(unit, effect.breakOnHolderStatus[k])) {
+            broken = true;
+            break;
+          }
         }
+      }
+      if (broken) {
+        H.pushEvent(state, events, {
+          type: "effectExpire",
+          uid: unit.uid,
+          kind: "effect",
+          label: effect.label || ""
+        });
+        continue;
       }
       kept.push(effect);
     }
@@ -99,6 +108,31 @@
     if (!effect.period) return true;
     var diff = state.round - (effect.bornRound || 0) + 1;
     return diff > 0 && diff % effect.period === 0;
+  }
+
+  /* 属性归零后逐标准回合恢复原值（李雨轩「小学生人大代表」）：
+     每次 +restore，最后一跳补足到 origin，之后移除整条 set 修正。 */
+  function advanceRestores(state, unit, events) {
+    var mods = unit.mods || [];
+    if (!mods.length) return;
+    var kept = [];
+    for (var i = 0; i < mods.length; i++) {
+      var mod = mods[i];
+      if (!mod.restore || mod.mode !== "set") {
+        kept.push(mod);
+        continue;
+      }
+      var origin = Number(mod.origin) || 0;
+      var current = B.state.statOf(unit, mod.stat);
+      if (current >= origin) {
+        H.pushEvent(state, events, { type: "modExpire", uid: unit.uid, kind: mod.stat, label: mod.label || "" });
+        continue;
+      }
+      var step = Math.min(Number(mod.restore) || 0, origin - current);
+      if (step > 0) mod.progress = (Number(mod.progress) || 0) + step;
+      kept.push(mod);
+    }
+    unit.mods = kept;
   }
 
   function standardRoundEnd(state, events) {
@@ -156,6 +190,7 @@
       target.buffs = tickDown(target.buffs, events, state, target.uid, "buff", "standard");
       target.statuses = tickDown(target.statuses, events, state, target.uid, "status", "standard");
       target.mods = tickDown(target.mods, events, state, target.uid, "mod", "standard");
+      advanceRestores(state, target, events);
     }
     var tickSummons = (state.summons || []).slice();
     for (var ti = 0; ti < tickSummons.length; ti++) {
@@ -169,6 +204,7 @@
       live.buffs = tickDown(live.buffs, events, state, live.uid, "buff", "standard");
       live.statuses = tickDown(live.statuses, events, state, live.uid, "status", "standard");
       live.mods = tickDown(live.mods, events, state, live.uid, "mod", "standard");
+      advanceRestores(state, live, events);
     }
   }
 
@@ -200,6 +236,34 @@
     if (item.unit === "selfRound") return item.sourceUid === unit.uid;
     if (item.unit === "targetRound") return item.targetUid === unit.uid;
     return false;
+  }
+
+  /* 一个单位的回合被跳过（眩晕/击溃/无法行动）时，按「它的回合」计时的状态照常走一格 */
+  function skippedTurn(state, unit, events) {
+    unit.effects = tickTurnList(unit.effects, state, unit, events, "effect");
+    unit.buffs = tickTurnList(unit.buffs, state, unit, events, "buff");
+    unit.statuses = tickTurnList(unit.statuses, state, unit, events, "status");
+    unit.mods = tickTurnList(unit.mods, state, unit, events, "mod");
+  }
+
+  /* 按「持有者回合开始」计时的状态：在该单位回合开始时先走一格（彻底疯狂的眩晕余波） */
+  function turnStart(state, unit, events) {
+    var statuses = unit.statuses || [];
+    var kept = [];
+    for (var i = 0; i < statuses.length; i++) {
+      var st = statuses[i];
+      if (st.unit !== "turnStart") {
+        kept.push(st);
+        continue;
+      }
+      st.remain -= 1;
+      if (st.remain > 0) {
+        kept.push(st);
+        continue;
+      }
+      H.pushEvent(state, events, { type: "statusExpire", uid: unit.uid, kind: st.kind, label: st.label || "" });
+    }
+    unit.statuses = kept;
   }
 
   function tickTurnList(list, state, unit, events, kind) {
@@ -284,6 +348,8 @@
   api.roundStart = roundStart;
   api.roundEnd = roundEnd;
   api.turnEnd = turnEnd;
+  api.skippedTurn = skippedTurn;
+  api.turnStart = turnStart;
   api.ctxOfEffect = ctxOfEffect;
 
   if (typeof module === "object" && module.exports) module.exports = B;

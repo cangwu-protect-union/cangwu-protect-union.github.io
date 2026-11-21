@@ -77,9 +77,11 @@
     return sum;
   }
 
-  function multiplier(source, target) {
+  function multiplier(source, target, type) {
     var out = 1 + buffTotal(source, "brave", "sum") / 100 - buffTotal(source, "panic", "max") / 100;
     var take = 1 + buffTotal(target, "fragile", "sum") / 100 - buffTotal(target, "strong", "max") / 100;
+    /* magicVuln 只作用于法伤，由 damage.hit 在一次命中后消耗 */
+    if (type === "magic") take *= 1 + buffTotal(target, "magicVuln", "max") / 100;
     return Math.max(0, out) * Math.max(0, take);
   }
 

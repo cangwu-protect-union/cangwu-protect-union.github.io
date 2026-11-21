@@ -203,6 +203,7 @@
         throw new Error("现在只能普攻");
       }
       if (action.type === "attack") {
+        if (B.state.hasStatus(unit, "noBasic")) throw new Error("无法普攻");
         var targetUnit = requireTarget(state, unit, action.target);
         var gate = B.skills && B.skills.basicGate
           ? B.skills.basicGate(state, unit, targetUnit.uid, events)
@@ -253,6 +254,7 @@
       ? unit.charge.amount
       : 0;
     var onlyBasic = B.state.hasStatus(unit, "onlyBasic");
+    var noBasic = B.state.hasStatus(unit, "noBasic");
     var gate = B.skills && B.skills.basicGate
       ? B.skills.basicGate(state, unit, targets[0] || "", [])
       : { allow: true, reason: "" };
@@ -264,8 +266,10 @@
       kind: "basic",
       type: "attack",
       label: "普攻",
-      enabled: hasAction && gate.allow,
-      reason: !hasAction ? "本回合行动已用完" : (gate.allow ? "" : (gate.reason || "无法普攻")),
+      enabled: hasAction && !noBasic && gate.allow,
+      reason: !hasAction
+        ? "本回合行动已用完"
+        : (noBasic ? "无法普攻" : (gate.allow ? "" : (gate.reason || "无法普攻"))),
       targets: targets,
       chargeNeed: basicNeed,
       chargeHave: basicHave

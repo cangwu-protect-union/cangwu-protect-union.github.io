@@ -11,7 +11,7 @@ import {
 
 const argv = process.argv.slice(2);
 const root = findRoot(argv);
-const { rows, counts, extraLibrary } = coverage(loadSeed(root), loadLibrary(root));
+const { rows, counts, extraLibrary } = coverage(loadSeed(root), await loadLibrary(root));
 
 if (hasFlag(argv, "--json")) {
   console.log(JSON.stringify({ counts, characters: rows, extraLibrary }, null, 2));

@@ -122,6 +122,9 @@
     if (expr.minus) {
       return H.evalValue(state, ctx, expr.minus[0]) - H.evalValue(state, ctx, expr.minus[1]);
     }
+    if (expr.ctx) {
+      return Number(ctx && ctx[expr.ctx]) || 0;
+    }
     throw new Error("无法解析的数值表达式：" + JSON.stringify(expr));
   }
 
@@ -166,7 +169,10 @@
         remain: spec ? spec.count : B.state.PERMANENT,
         unit: spec ? spec.unit : "standard",
         source: H.sourceTag(tctx),
-        label: tctx.label || ""
+        label: tctx.label || "",
+        /* 归零后逐标准回合恢复原值：记住改动前的面板，标准回合末按 restore 补回 */
+        restore: op.restore == null ? 0 : Number(op.restore),
+        origin: op.restore == null ? null : before
       });
       H.pushEvent(state, events, {
         type: "stat",
@@ -256,7 +262,8 @@
           unit: spec ? spec.unit : "standard",
           source: H.sourceTag(tctx),
           skillId: op.skillId || "",
-          label: label
+          label: label,
+          targetUid: target.uid
         });
       H.pushEvent(state, events, {
         type: "statusAdd",
@@ -286,6 +293,7 @@
         gate: op.gate || null,
         period: Number(op.period) || 0,
         breakOnSourceStatus: op.breakOnSourceStatus || null,
+        breakOnHolderStatus: op.breakOnHolderStatus || null,
         ops: op.ops || [],
         sourceUid: tctx.sourceUid,
         targetUid: target.uid,

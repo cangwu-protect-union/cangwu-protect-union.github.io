@@ -35,7 +35,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.8<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->23 人 81 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.9<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -57,7 +57,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 
 ## 技能 DSL 速查
 
-- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`noStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`、`buff`、`status`、`breakValue`、`forceBreak`、`tick`、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
+- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`、`stat`（可带 `restore`）、`buff`、`status`、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`）、`schedule`、`reflect`、`interrupt`、`dispel`、`dice`（`times` 连续独立掷）、`if`、`counter`、`mark`、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`。
@@ -86,6 +86,11 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 强扣 | 不减免、不加击溃值 |
 | 击溃 | 是一次行动，需击溃值 ≥3；击溃状态 `(击溃值−1)×2` 标准回合 |
 | 眩晕 | 只由技能给，防御与法抗视为 0 |
+| 眩晕值 | **默认伤害不加**；伤害 op 标 `addStun` 才 +1，上限 5。只有技能文本明确写「造成/算眩晕值」才标 |
+| 眩晕余波 | `daze` 状态不阻止行动，但防御、法抗视为 0；`duration:{unit:"turnStart",count:N}` 在该单位回合开始时计时 |
+| 击溃值 | 常规伤害默认 +1（`noBreak` 或 Buff 持续伤害除外）；`tick.breakOnHolderStatus` 让持续效果在持有者进入击溃时立即结束 |
+| 对手标记 | `marks[角色][]` 里写 `on:"opponent"` 的标记不挂自己，建单位后挂到对方英雄 |
+| 归零恢复 | `stat` 用 `mode:"set"` + `restore:N`：记住改动前原值，每标准回合 +N，最后一跳补足后移除 |
 | 蓄蓝/蓄力 | 各消耗 1 行动；力绑定单个技能 |
 | 先手 | 速度低者先，同速开局用种子随机 |
 | 混伤 | 同时造成等量普伤与真伤两段 |

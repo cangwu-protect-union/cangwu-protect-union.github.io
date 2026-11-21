@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   argValue,
+  eachOp,
   findRoot,
   flattenLibrary,
   hasFlag,
@@ -23,17 +24,14 @@ if (!file) {
 
 const plan = JSON.parse(fs.readFileSync(path.resolve(file), "utf8"));
 const seed = loadSeed(root);
-const lib = loadLibrary(root);
+const lib = await loadLibrary(root);
 const { all: libSkills, byId: libById } = flattenLibrary(lib);
 const seedByName = new Map(seed.map((c) => [c.name, c]));
 const errors = [];
 const warnings = [];
 const engineVersion = readEngineVersion(root);
 const opNames = readOpNames(root);
-const hookNames = new Set([
-  "battleStart", "basicGate", "basicMod", "basicMode", "basicHit",
-  "beforeDamage", "damageDealt", "damageTaken", "statDrained", "afterAction"
-]);
+const hookNames = readHookNames(root);
 
 if (!plan || typeof plan !== "object") fail("plan 不是对象");
 if (!Array.isArray(plan.characters)) fail("plan.characters 必须是数组");
@@ -233,7 +231,7 @@ function validateSkill(owner, skill, source) {
 function validateSummonKeys(where, skill) {
   const lists = [skill.ops, skill.chargeOps, ...Object.values(skill.hooks || {})];
   for (const choice of skill.choices || []) lists.push(choice.ops);
-  for (const ops of lists) walkOps(ops, (op) => {
+  for (const ops of lists) eachOp(ops, (op) => {
     if (op.op !== "summon" || !op.key) return;
     const known = (plan.summons && plan.summons[op.key]) || (lib.summons && lib.summons[op.key]);
     if (!known) fail(where + " 的 summon.key 没有定义：" + op.key);
@@ -269,11 +267,41 @@ function readEngineVersion(repo) {
 }
 
 function readOpNames(repo) {
-  const file = path.join(repo, "rpg6.0/js/engine/effect-ops.js");
-  const text = fs.readFileSync(file, "utf8");
+  const dir = path.join(repo, "rpg6.0/js/engine/ops");
   const set = new Set();
-  for (const m of text.matchAll(/^\s*case\s+"([^"]+)"/gm)) set.add(m[1]);
-  if (!set.size) throw new Error("无法从 effect-ops.js 读到 op 名");
+  if (fs.existsSync(dir)) {
+    for (const name of fs.readdirSync(dir).filter((f) => f.endsWith(".js"))) {
+      const text = fs.readFileSync(path.join(dir, name), "utf8");
+      for (const m of text.matchAll(/registerOp\(\s*"([^"]+)"/g)) set.add(m[1]);
+    }
+  }
+  if (!set.size) {
+    const file = path.join(repo, "rpg6.0/js/engine/effect-ops.js");
+    const text = fs.readFileSync(file, "utf8");
+    for (const m of text.matchAll(/^\s*case\s+"([^"]+)"/gm)) set.add(m[1]);
+  }
+  if (!set.size) throw new Error("无法从 js/engine/ops 读到 op 名");
+  return set;
+}
+
+/* hook 名单同样从引擎现扫，避免 plan.mjs 里再抄一份会过期的表。 */
+function readHookNames(repo) {
+  const dir = path.join(repo, "rpg6.0/js/engine");
+  const set = new Set();
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.name.endsWith(".js")) continue;
+      const text = fs.readFileSync(full, "utf8");
+      for (const m of text.matchAll(/runHooks\([^;\n]*?"([A-Za-z]+)"/g)) if (m[1] !== "kind") set.add(m[1]);
+    }
+  };
+  walk(dir);
+  if (!set.size) throw new Error("无法从 js/engine 读到 hook 名");
   return set;
 }
 
@@ -287,55 +315,73 @@ function fail(message) {
 
 function scaffold(input) {
   const parts = [];
-  parts.push("// ===== battle-skills.js · characters 追加 =====");
+  const imports = [];
+  const registry = [];
+
   for (const [index, character] of input.characters.entries()) {
-    parts.push(JSON.stringify(character.name) + ": [");
+    const file = character.fixture || ("char" + index);
+    imports.push('import ' + file + ' from "./' + file + '.js";');
+    registry.push('    ' + JSON.stringify(character.name) + ": " + file + ",");
+
+    parts.push("// ===== rpg6.0/data/skills/" + file + ".js =====");
+    parts.push("/* 回合制正传 6.0 · 技能库 · " + character.name + " */");
+    parts.push("export default [");
     const list = [];
     for (const skill of character.skills) {
       const data = {
         id: skill.id,
         name: skill.name,
-        conditionText: skill.condition,
-        passive: !!skill.passive,
-        cost: skill.cost || { mp: 0 },
-        charge: Number(skill.charge) || 0,
-        cooldown: Number(skill.cooldown) || 0,
-        target: skill.target || "enemy",
-        ops: skill.ops || []
+        conditionText: skill.condition
       };
+      if (skill.passive) data.passive = true;
+      data.cost = skill.cost || { mp: 0 };
+      data.charge = Number(skill.charge) || 0;
+      data.cooldown = Number(skill.cooldown) || 0;
+      data.target = skill.target || "enemy";
       if (skill.once) data.once = true;
       if (skill.costFromLost) data.costFromLost = skill.costFromLost;
-      if (skill.hooks && Object.keys(skill.hooks).length) data.hooks = skill.hooks;
-      if (skill.chargeOps && skill.chargeOps.length) data.chargeOps = skill.chargeOps;
-      if (skill.choices && skill.choices.length) data.choices = skill.choices;
-      if (skill.input) data.input = skill.input;
       if (skill.requires && skill.requires.length) data.requires = skill.requires;
+      if (skill.input) data.input = skill.input;
+      data.ops = skill.ops || [];
+      if (skill.chargeOps && skill.chargeOps.length) data.chargeOps = skill.chargeOps;
+      if (skill.hooks && Object.keys(skill.hooks).length) data.hooks = skill.hooks;
+      if (skill.choices && skill.choices.length) data.choices = skill.choices;
       if (skill.unsupported) data.unsupported = skill.unsupported;
       list.push(JSON.stringify(data, null, 2));
     }
     const indented = list.map((item) => item.split("\n").map((line) => "    " + line).join("\n"));
-    parts.push("  " + indented.join(",\n"));
-    parts.push("]");
-    if (index < input.characters.length - 1) parts[parts.length - 1] += ",";
+    parts.push(indented.join(",\n"));
+    parts.push("];");
   }
+
+  parts.push("\n// ===== rpg6.0/data/skills/index.js · import 追加 =====");
+  parts.push(imports.join("\n"));
+  parts.push("\n// ===== rpg6.0/data/skills/index.js · characters 追加 =====");
+  parts.push(registry.join("\n"));
 
   if (input.marks && Object.keys(input.marks).length) {
-    parts.push("\n// ===== battle-skills.js · marks 追加 =====");
-    parts.push(JSON.stringify(input.marks, null, 2));
+    parts.push("\n// ===== rpg6.0/data/skills/index.js · marks 追加 =====");
+    const lines = [];
+    for (const [owner, marks] of Object.entries(input.marks)) {
+      lines.push("    " + JSON.stringify(owner) + ": " + JSON.stringify(marks));
+    }
+    parts.push(lines.join(",\n"));
   }
   if (input.summons && Object.keys(input.summons).length) {
-    parts.push("\n// ===== battle-skills.js · summons 追加 =====");
-    parts.push(JSON.stringify(input.summons, null, 2));
+    parts.push("\n// ===== rpg6.0/data/skills/index.js · summons 追加 =====");
+    parts.push(Object.entries(input.summons)
+      .map(([key, summon]) => "    " + JSON.stringify(key) + ": " + JSON.stringify(summon))
+      .join(",\n"));
   }
 
-  parts.push("\n// ===== skills.test.mjs · SHEET 追加 =====");
+  parts.push("\n// ===== _local/tests/engine/skills.test.mjs · SHEET 追加 =====");
   const sheet = {};
   for (const character of input.characters) {
     sheet[character.name] = character.skills.map((s) => [s.name, s.condition]);
   }
   parts.push(JSON.stringify(sheet, null, 2));
 
-  parts.push("\n// ===== skills.test.mjs · CHAR fixture =====");
+  parts.push("\n// ===== _local/tests/engine/skills.test.mjs · CHAR fixture =====");
   for (const [index, character] of input.characters.entries()) {
     const seedChar = seedByName.get(character.name);
     const fixture = character.fixture || ("c" + index);
@@ -366,7 +412,7 @@ function scaffold(input) {
   parts.push("\n// ===== 文档计数（预计） =====");
   parts.push("// 角色 " + (libCharactersCount() + newCharacters.length) +
     " / 技能 " + (libSkills.length + input.characters.reduce((n, c) => n + c.skills.length, 0)));
-  parts.push("// 跑 audit-docs.mjs 确认 test.html / 游戏说明 / 架构 / rpg6-battle 全部同步");
+  parts.push("// 跑 node _local/tools/rpg6-stats.js --write 写回，再跑 audit-docs.mjs 与 check.ps1");
 
   return parts.join("\n");
 }

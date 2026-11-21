@@ -85,7 +85,11 @@
         var uid = state.queue.shift();
         var unit = B.state.unitOf(state, uid);
         if (unit.hp <= 0) continue;
+        /* 按「回合开始」计时的状态先走一格（如彻底疯狂的眩晕余波） */
+        if (B.effectOps && B.effectOps.turnStart) B.effectOps.turnStart(state, unit, events);
         if (!B.state.canAct(unit)) {
+          /* 回合被跳过也算这个单位过了一个回合：按「它的回合」计时的状态走一格（如眩晕 1 个敌方回合） */
+          if (B.effectOps && B.effectOps.skippedTurn) B.effectOps.skippedTurn(state, unit, events);
           pushEvent(events, { type: "turnSkip", round: state.round, uid: uid });
           continue;
         }

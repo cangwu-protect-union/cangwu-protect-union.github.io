@@ -22,7 +22,8 @@
     strong: "受到伤害减少",
     fragile: "受到伤害增加",
     brave: "造成伤害增加",
-    panic: "造成伤害减少"
+    panic: "造成伤害减少",
+    magicVuln: "下次受到法伤翻倍"
   };
 
   P.STATUS_TEXT = {
@@ -30,6 +31,8 @@
     stun: "眩晕",
     noSkill: "无法释放技能",
     noBasic: "无法普攻",
+    noCharge: "无法蓄力",
+    daze: "眩晕（防抗 0）",
     noBreakOut: "伤害不造成击溃值",
     noDeath: "不会死亡",
     cannotAct: "无法行动",

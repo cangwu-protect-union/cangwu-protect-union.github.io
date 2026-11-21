@@ -60,18 +60,42 @@
     return { mp: mp, charge: charge, steps: steps };
   }
 
-  /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作 */
+  /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作。
+     on:"opponent" 的标记不挂自己，等双方都建好后由 initOpponentMarks 挂到对方身上。 */
   function initUnit(unit) {
     var defs = markDefs[unit.name] || [];
     if (!unit.marks) unit.marks = {};
     for (var i = 0; i < defs.length; i++) {
       var def = defs[i];
+      if (def.on === "opponent") continue;
       unit.marks[def.key] = {
         value: Number(def.init) || 0,
         name: def.name || def.key,
         max: def.max == null ? 99 : Number(def.max),
         hideMax: !!def.hideMax
       };
+    }
+  }
+
+  /* 把对方声明为 on:"opponent" 的标记挂到本侧英雄身上 */
+  function initOpponentMarks(state) {
+    var units = state.units || [];
+    for (var i = 0; i < units.length; i++) {
+      var unit = units[i];
+      var other = units[i === 0 ? 1 : 0];
+      if (!other) continue;
+      var defs = markDefs[other.name] || [];
+      if (!unit.marks) unit.marks = {};
+      for (var d = 0; d < defs.length; d++) {
+        var def = defs[d];
+        if (def.on !== "opponent" || unit.marks[def.key]) continue;
+        unit.marks[def.key] = {
+          value: Number(def.init) || 0,
+          name: def.name || def.key,
+          max: def.max == null ? 99 : Number(def.max),
+          hideMax: !!def.hideMax
+        };
+      }
     }
   }
 
@@ -339,6 +363,9 @@
     if (skill.unsupported) throw new Error(skill.unsupported);
     var check = B.conditions.evaluate(state, unit, skill);
     if (!check.ok) throw new Error(check.reason);
+    if ((action.kind === "charge" || check.needsCharge) && B.state.hasStatus(unit, "noCharge")) {
+      throw new Error("现在无法蓄力");
+    }
     if (action.kind === "charge" || check.needsCharge) {
       return chargeSkill(state, unit, skill, action, events);
     }
@@ -450,6 +477,7 @@
   api.rollDodge = rollDodge;
   api.immuneBuffs = immuneBuffs;
   api.initUnit = initUnit;
+  api.initOpponentMarks = initOpponentMarks;
   api.execute = execute;
   api.resolveTarget = resolveTarget;
   api.maxTauntUids = maxTauntUids;

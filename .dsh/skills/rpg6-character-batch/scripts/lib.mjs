@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
 
 export function repoRoot() {
@@ -37,8 +37,8 @@ function runWindowScript(root, relPaths, globalName) {
   return value;
 }
 
-const SEED_FILES = ["rpg6.0/data/characters.js", "rpg6.0/data/characters-2.js", "rpg6.0/data/characters-3.js", "rpg6.0/data/characters-4.js"];
-const SKILLS_FILES = ["rpg6.0/data/battle-skills.js", "rpg6.0/data/battle-skills-2.js", "rpg6.0/data/battle-skills-3.js"];
+const SEED_FILES = ["rpg6.0/data/seeds/characters.js", "rpg6.0/data/seeds/characters-2.js", "rpg6.0/data/seeds/characters-3.js", "rpg6.0/data/seeds/characters-4.js"];
+export const SKILLS_INDEX = "rpg6.0/data/skills/index.js";
 
 export function loadSeed(root) {
   const list = runWindowScript(root, SEED_FILES, "RPG_SEED_CHARACTERS");
@@ -46,8 +46,12 @@ export function loadSeed(root) {
   return list;
 }
 
-export function loadLibrary(root) {
-  return runWindowScript(root, SKILLS_FILES, "RPG6_SKILLS");
+/* 技能库已拆成一个角色一个 ESM 文件、index.js 聚合；Node 里直接 import。 */
+export async function loadLibrary(root) {
+  const file = path.join(root, SKILLS_INDEX);
+  if (!fs.existsSync(file)) throw new Error("找不到文件：" + file);
+  const mod = await import(pathToFileURL(file).href);
+  return mod.default;
 }
 
 export function norm(text) {
@@ -72,12 +76,27 @@ export function flattenLibrary(lib) {
   for (const [owner, list] of Object.entries(lib.characters || {})) {
     byOwner[owner] = [];
     for (const skill of list || []) {
-      byId[skill.id] = skill;
-      byOwner[owner].push(skill);
-      all.push(skill);
+      const item = Object.assign({ owner }, skill);
+      byId[item.id] = item;
+      byOwner[owner].push(item);
+      all.push(item);
     }
   }
   return { byOwner, byId, all };
+}
+
+/* 递归遍历 ops，把每个 op 交给 fn；plan 校验用它查 summon.key。 */
+export function eachOp(list, fn) {
+  if (!Array.isArray(list)) return;
+  for (const op of list) {
+    if (!op || typeof op !== "object") continue;
+    fn(op);
+    for (const key of ["then", "else", "ops"]) eachOp(op[key], fn);
+    for (const key of ["cases", "choices"]) {
+      if (!Array.isArray(op[key])) continue;
+      for (const item of op[key]) eachOp(item && item.ops, fn);
+    }
+  }
 }
 
 export function coverage(seed, lib) {

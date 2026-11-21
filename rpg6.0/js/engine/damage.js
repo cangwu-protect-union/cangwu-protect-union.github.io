@@ -74,6 +74,25 @@
     return true;
   }
 
+  /* 法伤一次性易伤：命中后消耗一层 magicVuln（技能「高冷如冰」） */
+  function consumeMagicVuln(state, target, events) {
+    var list = target.buffs || [];
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (list[i].kind !== "magicVuln") continue;
+      var buff = list.splice(i, 1)[0];
+      pushEvent(events, {
+        type: "buffConsume",
+        round: state.round,
+        uid: target.uid,
+        kind: buff.kind,
+        percent: buff.percent,
+        label: buff.label || ""
+      });
+      return true;
+    }
+    return false;
+  }
+
   function hit(state, spec, events) {
     var target = B.state.unitOf(state, spec.targetUid);
     var source = null;
@@ -88,14 +107,14 @@
     var amount = Number(spec.amount) || 0;
     var targetStats = { def: B.state.defOf(target), mres: B.state.mresOf(target) };
     var raw = B.rules.rawByType(type, amount, targetStats);
-    var mul = source ? B.rules.multiplier(source, target) : 1;
+    var mul = source ? B.rules.multiplier(source, target, type) : 1;
     var dmg = B.rules.finalDamage(raw, mul);
     var fromBuff = !!spec.fromBuff;
     var noBreak = !!spec.noBreak;
-    var noStun = !!spec.noStun;
+    var addStun = !!spec.addStun;
     if (source && source.isSummon) {
       noBreak = true;
-      noStun = true;
+      addStun = false;
     }
     if (source && B.state.hasStatus(source, "noBreakOut")) noBreak = true;
 
@@ -184,6 +203,7 @@
     }
 
     var beforeHp = target.hp;
+    if (dmg > 0 && type === "magic") consumeMagicVuln(state, target, events);
     target.hp = Math.max(0, target.hp - dmg);
     B.state.markHpLoss(target, beforeHp);
     target.lastDamageType = type;
@@ -209,10 +229,9 @@
       hpAfter: target.hp
     });
 
-    if (dmg > 0 && !noBreak && !fromBuff) {
-      addBreakValue(state, target, events);
-      if (!noStun) addStunValue(state, target, events);
-    }
+    /* 默认只有击溃值；眩晕值必须在技能里显式写「造成眩晕值」（damage.addStun） */
+    if (dmg > 0 && !noBreak && !fromBuff) addBreakValue(state, target, events);
+    if (dmg > 0 && addStun && !fromBuff) addStunValue(state, target, events);
     if (dmg > 0 && !fromBuff && canBreakCharge(target)) {
       clearCharge(state, target, "damage", events);
     }

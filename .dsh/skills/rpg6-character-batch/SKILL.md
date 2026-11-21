@@ -21,12 +21,12 @@ description: 回合制正传 6.0 的批量加角色/技能工作流。要从剩�
 node .dsh/skills/rpg6-character-batch/scripts/inventory.mjs --remaining
 ```
 
-盘点读 `data/characters.js`（33 人兜底，只作离线盘点）与 `data/battle-skills.js`（已接入块），输出已接入/剩余角色、逐技能状态。**数据库才是唯一数据源**：正式落地前用对局页/DB 核对角色的 `skills[]` 与 `condition`，不一致先修 seed/DB 再继续。
+盘点读 `rpg6.0/data/seeds/characters*.js`（33 人，数据库导出，只作离线盘点）与 `rpg6.0/data/skills/index.js`（技能库聚合入口，一个角色一个 ESM 文件），输出已接入/剩余角色、逐技能状态。**数据库才是唯一数据源**：正式落地前用对局页/DB 核对角色的 `skills[]` 与 `condition`，不一致先修 seed/DB 再继续。
 把候选清单交给用户确认；**这一步不要读技能效果就开写**。
 
 ### 1. 读档案，逐条确认技能逻辑（硬门禁）
 
-每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`data/characters.js` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。产出**逻辑确认表**，每个技能写清：名称与条件文本（与档案忽略空白一致）、目标、费用（蓝/力/血）、冷却、持续回合、触发时机、与原文不同的裁定（取整、从哪回合算、是否可叠加、受击溃/眩晕影响）、不确定处标「待确认」。
+每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`rpg6.0/data/seeds/characters*.js` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。产出**逻辑确认表**，每个技能写清：名称与条件文本（与档案忽略空白一致）、目标、费用（蓝/力/血）、冷却、持续回合、触发时机、与原文不同的裁定（取整、从哪回合算、是否可叠加、受击溃/眩晕影响）、不确定处标「待确认」。旧档案与 seed 冲突时以 seed 为准，并在表里写明差异。
 **用户明确确认这张表之前，不写数据、不写引擎。**
 
 ### 2. 引擎可行性分诊
@@ -52,15 +52,15 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json
 node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json
 ```
 
-`--scaffold` 只输出可粘贴的 `battle-skills.js` 角色块、marks/summons、`SHEET`/`CHAR`、测试清单与文档计数，不直接改源码。
+`--scaffold` 只输出可粘贴的一个角色一个文件（`rpg6.0/data/skills/<拼音>.js`）、`index.js` 的 import/characters/marks/summons 登记行、`SHEET`/`CHAR`、测试清单与文档计数，不直接改源码。
 **用户确认 plan 后才进入实现**；`engine-gap` 非空时 `engine.changes` 要列出每个新 op/钩子及其测试，不能边写边发明。
 
 ### 4. 实现（依赖顺序）
 
 1. **引擎**（有 gap 才做）：state/damage/effect-ops/skills/actions/conditions/timeline/summons；同步 `rpg6-battle` 的 op/钩子表；补单测；升 `data/config.js` 的 `engineVersion`。
-2. **数据**：`data/battle-skills.js`（或分片）的 `characters`、`marks`、`summons`；`conditionText` 逐字对齐；`unsupported` 写原因。
-3. **测试**：`skills.test.mjs` 的 `SHEET`/`CHAR`；每个 implemented 技能至少「条件不足 + 正常释放」两条；多段/召唤/目标选择补引擎用例；浏览器补 `run-all` 用例。
-4. **文档**：机制文档新一节、plan、`游戏说明`、`架构`、`test.html`、`README` 与 `rpg6-battle` 的数字/能力表。
+2. **数据**：`rpg6.0/data/skills/<拼音>.js` 新文件 + `index.js` 登记 `characters`/`marks`/`summons`；`conditionText` 逐字对齐；`unsupported` 写原因。
+3. **测试**：`skills.test.mjs` 的 `SHEET`/`CHAR`、角色/技能数断言；每个 implemented 技能至少「条件不足 + 正常释放」两条；多段/召唤/目标选择补引擎用例；浏览器补 `run-all` 用例。
+4. **文档**：机制文档新一节带 `<!-- skill:id -->` 锚点、plan、`游戏说明`、`架构`、`README` 与 `rpg6-battle` 的能力表；数字一律 `node _local/tools/rpg6-stats.js --write` 写回（`test.html` 运行时算）。
 
 ### 5. 验收
 
@@ -70,6 +70,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 默认：`plan --check` → `run.mjs` → `batch --pairs=smoke` → `run-all --group=回合制` → `check.ps1` → `audit-docs`。没有 Edge 加 `-SkipBrowser`；全量压测加 `-Full`。
 看：引擎异常 0、僵局按规则分类、新角色浏览器可选且技能行条件/置灰正确（有召唤物 844×390 一屏）、audit-docs 无漂移、check.ps1 提交后仍 0。
+`audit-docs` 现在直接复用 `_local/tools/rpg6-stats.js` 的区间渲染，不再逐条正则匹配文档；`_local` 缺失时整步跳过。
+
+**沙箱坑**：`tools/check.ps1` 的 ESM 语法校验会派生子 `node` 进程；在 DSH 文件沙箱里必然 `EPERM`，表现为一批 `data/skills/*.js`「Unexpected token 'export'」。要么用 `danger-full-access` 跑，要么在普通终端跑，别误判成技能库坏了。
 
 ### 6. 文档与推送
 
@@ -86,10 +89,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 ## 硬规则
 
 - 逻辑未确认不写代码；用户确认的是逐技能表，不是「大概懂了」。
-- 数据库是唯一数据源；`characters.js` 只用于离线盘点，不一致先修再继续。
+- 数据库是唯一数据源；`data/seeds/characters*.js` 只用于离线盘点，不一致先修再继续。
+- 技能库是 ESM 分文件（`data/skills/*.js` + `index.js`），不是当年的 `data/battle-skills.js`；脚本按 ESM 直接 import，别改回 vm 读 window 全局。
 - 不静默近似：只能用现有 op 近似时 plan 写 `notes` 并让用户签字；否则标 `engine-gap`/`unsupported`。
 - 每个角色至少 1 个 implemented 技能，否则默认不加；全技能覆盖，不做的也留 `unsupported`。
 - `conditionText` 逐字一致（忽略空白）；改规则升 `engineVersion`；召唤物/新钩子进 `state.hash` 与回放。
+- 新增 op/钩子/数值表达式/状态名/字段时同步 `_local/tools/rpg6-spec.js`，否则 `rpg6-lint.js` 会按白名单报错。
 - `_local/` 不推送；机制文档在 `_local` 也要更新；提交后重跑 check.ps1。
 - 同一工作区多会话：提交前看 `git status` 与 `git log`，别混别人的改动。
 

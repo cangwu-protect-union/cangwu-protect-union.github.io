@@ -15,7 +15,7 @@ export default [
             label: "吉罢之歌",
             breakOnSourceStatus: ["stun", "break"],
             ops: [
-              { op: "damage", type: "magic", value: 60, noStun: true }
+              { op: "damage", type: "magic", value: 60 }
             ]
           }
         ]
