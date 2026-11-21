@@ -115,14 +115,14 @@
     if (box) box.innerHTML = root.BattleView.renderBuffBox(null);
   }
 
-  P.showBuffPop = function (chip) {
+  P.showBuffPop = function (el, spec) {
     if (!P.state || !P.dom.buffPop) return;
-    var detail = root.BattleView.chipDetail(P.state, chip.getAttribute("data-detail"));
+    var detail = root.BattleView.chipDetail(P.state, spec || el.getAttribute("data-detail"));
     if (!detail) return;
     P.dom.buffPop.innerHTML = root.BattleView.renderBuffBox(detail);
     P.dom.buffPop.hidden = false;
     P.popShownAt = Date.now();
-    var rect = chip.getBoundingClientRect();
+    var rect = el.getBoundingClientRect();
     var w = P.dom.buffPop.offsetWidth;
     var h = P.dom.buffPop.offsetHeight;
     var left = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), root.innerWidth - w - 8);
@@ -317,14 +317,15 @@
     return Math.abs(Math.floor(n));
   }
 
-  P.onSummonClick = function (uid) {
+  P.onSummonClick = function (uid, el) {
     if (!P.state) return;
     var summon = null;
     try { summon = B.state.unitOf(P.state, uid); } catch (err) { return; }
     if (!root.BattlePick.isActive(P.pick)) {
-      var detail = summon.name + (summon.targetable ? "：" + summon.hp + "/" + summon.base.maxHp : "");
-      if (summon.ttl) detail += "，剩余 " + summon.ttl.remain + " 回合";
-      P.setHint(detail);
+      var hint = summon.name + (summon.targetable ? "：" + summon.hp + "/" + summon.base.maxHp : "");
+      if (summon.ttl) hint += "，剩余 " + summon.ttl.remain + " 回合";
+      P.setHint(hint);
+      if (P.isCompact() && el) P.showBuffPop(el, "summon:" + uid);
       return;
     }
     if (!summon.targetable) {

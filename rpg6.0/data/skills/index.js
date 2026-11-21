@@ -43,11 +43,13 @@ const lib = {
     "正盈利": [{ key: "fukui", name: "负亏损", max: 1, init: 0 }]
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
+     desc 是详情栏里的行为说明（手写），缺省时按 aura / attack / onExpire 自动拼；
      aura 每标准回合末，onExpire 到期时，attack 按自身速度攒行动条（每 100/速度 个标准回合末攻击一次；
      攒满那一拍被眩晕/击溃则作废，速度必须为正，否则永远不会出手）。 */
   summons: {
     "liubinlu.xiaoliu": {
       name: "小刘亦萱",
+      desc: "不占行动。4 个标准回合后消失，消失时对敌方全体造成 70 点真伤（不计击溃值）。",
       ttl: 4,
       onExpire: [
         { op: "damage", who: "allEnemies", type: "true", value: 70, noBreak: true }
@@ -55,6 +57,7 @@ const lib = {
     },
     "zhengyingli.kuihua2": {
       name: "葵花宝典",
+      desc: "不占行动。每个标准回合末对敌方全体造成 50 点法伤；2 个标准回合后消失时对敌方全体造成 75 点普伤（均不计击溃值）。",
       ttl: 2,
       aura: [
         { op: "damage", who: "allEnemies", type: "magic", value: 50, noBreak: true }
@@ -65,6 +68,7 @@ const lib = {
     },
     "zhengyingli.kuihua4": {
       name: "葵花宝典",
+      desc: "不占行动。每个标准回合末对敌方全体造成 50 点法伤；4 个标准回合后消失时对敌方全体造成 75 点普伤（均不计击溃值）。",
       ttl: 4,
       aura: [
         { op: "damage", who: "allEnemies", type: "magic", value: 50, noBreak: true }
@@ -75,6 +79,7 @@ const lib = {
     },
     "yangshuhan.tomb": {
       name: "杨舒然之墓",
+      desc: "不占行动，可被单体选中，免疫击溃。每个标准回合末速度条 +速度，满 100 出手一次，对敌方英雄造成等于自身攻击的真伤（不计击溃值）。",
       stats: { atk: 200, def: 0, mres: 0, hp: 1200, mp: 0, spd: 10 },
       targetable: true,
       breakImmune: true,

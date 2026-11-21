@@ -155,11 +155,13 @@
       var picked = pick && pick.targets && pick.targets.indexOf(s.uid) >= 0;
       var cls = "bu-summon" + (s.targetable ? " is-targetable" : " is-ghost") + (picked ? " is-picked" : "");
       var chips = "";
-      (s.statuses || []).forEach(function (st) {
-        chips += '<span class="bu-sum-status">' + P.esc(st.label || P.STATUS_TEXT[st.kind] || st.kind) + " " + st.remain + "</span>";
+      (s.statuses || []).forEach(function (st, i) {
+        chips += '<span class="bu-sum-status" data-detail="sumstatus:' + s.uid + ":" + i + '">' +
+          P.esc(st.label || P.STATUS_TEXT[st.kind] || st.kind) + " " + st.remain + "</span>";
       });
-      (s.buffs || []).forEach(function (b) {
-        chips += '<span class="bu-sum-buff">' + P.esc(({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[b.kind] || b.kind) + "%</span>";
+      (s.buffs || []).forEach(function (b, i) {
+        chips += '<span class="bu-sum-buff" data-detail="sumbuff:' + s.uid + ":" + i + '">' +
+          P.esc(({ strong: "坚强", fragile: "脆弱", brave: "勇猛", panic: "恐慌" })[b.kind] || b.kind) + "%</span>";
       });
       var def = B.skills && B.skills.summonDef ? B.skills.summonDef(s.summonKey) : null;
       var pace = "";
@@ -170,7 +172,8 @@
       var title = s.name + (s.targetable ? " · 血 " + s.hp + "/" + s.base.maxHp : "") +
         (s.ttl ? " · 剩 " + s.ttl.remain + " 回合" : "") + pace +
         (s.targetable ? "" : " · 不可选中");
-      html += '<button type="button" class="' + cls + '" data-summon="' + P.esc(s.uid) + '" title="' + P.esc(title) + '">' +
+      html += '<button type="button" class="' + cls + '" data-summon="' + P.esc(s.uid) +
+        '" data-summondetail="' + P.esc(s.uid) + '" title="' + P.esc(title) + '">' +
         "<b>" + P.esc(s.name) + "</b>" +
         (s.targetable ? '<span class="bu-sum-hp">' + s.hp + "/" + s.base.maxHp + "</span>" : "") +
         (s.ttl ? "<i>剩 " + s.ttl.remain + "</i>" : "") +
@@ -339,10 +342,11 @@
 
   P.renderBuffBox = function (detail) {
     if (!detail) {
-      return '<p class="bb-empty">把鼠标放到 Buff 或持续效果上查看详情</p>';
+      return '<p class="bb-empty">把鼠标放到 Buff、持续效果或召唤物上查看详情</p>';
     }
+    if (detail.kind === "summon") return P.renderSummonBox(detail);
     var left = detail.remain === B.state.PERMANENT ? "永久" : detail.remain + " 标准回合";
-    var kindText = detail.kind === "effect" ? "持续效果" : "Buff";
+    var kindText = detail.kind === "effect" ? "持续效果" : detail.kind === "status" ? "状态" : "Buff";
     return '<div class="bb-detail"><h2>' + P.esc(detail.name) + "</h2>" +
       '<p class="bb-meta"><b class="bb-kind">' + kindText + "</b> · 剩余 " + left + "</p>" +
       '<p class="bb-text">' + P.esc(detail.text) + "</p></div>";

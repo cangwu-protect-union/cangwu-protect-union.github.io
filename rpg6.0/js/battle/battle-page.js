@@ -391,7 +391,7 @@
       var summonChip = event.target.closest("[data-summon]");
       if (summonChip) {
         event.preventDefault();
-        P.onSummonClick(summonChip.getAttribute("data-summon"));
+        P.onSummonClick(summonChip.getAttribute("data-summon"), summonChip);
         return;
       }
       var choice = event.target.closest("[data-choice]");
@@ -446,15 +446,21 @@
 
     P.dom.stage.addEventListener("mouseover", function (event) {
       var chip = event.target.closest("[data-detail]");
-      if (chip) P.onBuffEnter(chip.getAttribute("data-detail"));
+      if (chip) {
+        P.onBuffEnter(chip.getAttribute("data-detail"));
+        return;
+      }
+      var summon = event.target.closest("[data-summondetail]");
+      if (summon) P.onBuffEnter("summon:" + summon.getAttribute("data-summondetail"));
     });
     P.dom.stage.addEventListener("mouseout", function (event) {
-      if (event.target.closest("[data-detail]")) P.onBuffLeave();
+      if (event.target.closest("[data-detail]") || event.target.closest("[data-summondetail]")) P.onBuffLeave();
     });
 
     document.addEventListener("click", function (event) {
       if (!P.dom.buffPop || P.dom.buffPop.hidden) return;
-      if (event.target.closest("[data-detail]") || event.target.closest("[data-buffpop]")) return;
+      if (event.target.closest("[data-detail]") || event.target.closest("[data-summondetail]") ||
+        event.target.closest("[data-buffpop]")) return;
       P.hideBuffPop();
     });
     root.addEventListener("scroll", P.onScrollHidePop, true);

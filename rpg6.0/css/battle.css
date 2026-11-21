@@ -437,6 +437,10 @@
   color: var(--muted);
 }
 
+.bu-summon:hover {
+  border-color: var(--accent);
+}
+
 .bu-summon.is-targetable:hover {
   border-color: var(--accent);
 }
@@ -456,6 +460,11 @@
 .bu-sum-buff {
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* 选目标时召唤物整块是点击区，挂件标签不抢点击 */
+.battle-grid.is-picking .bu-summons [data-detail] {
+  pointer-events: none;
 }
 
 .chip {
@@ -528,37 +537,6 @@
 /* 只在紧凑布局（手机横屏）里出现，桌面仍然是卡片内常显的日志 */
 .bu-log-toggle {
   display: none;
-}
-
-/* ---------- Buff 详情 ---------- */
-
-.battle-buff {
-  font-size: 12px;
-}
-
-.bb-empty {
-  margin: 0;
-  color: var(--muted);
-}
-
-.bb-detail h2 {
-  font-size: 14px;
-  margin: 0 0 4px;
-}
-
-.bb-meta {
-  margin: 0 0 6px;
-  color: var(--muted);
-}
-
-.bb-kind {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.bb-text {
-  margin: 0;
-  line-height: 1.6;
 }
 
 /* ---------- 角色查询 ---------- */
@@ -877,24 +855,6 @@ html.is-battle .site-footer {
 .rotate-gate .btn {
   font-size: 15px;
   padding: 10px 22px;
-}
-
-/* ---------- Buff 气泡（点 chip 弹出，取代手机上的 hover） ---------- */
-
-.buff-pop {
-  position: fixed;
-  z-index: 70;
-  max-width: 240px;
-  padding: 8px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--fg) 16%, transparent);
-}
-
-.buff-pop .bb-detail h2 {
-  font-size: 13px;
 }
 
 /* ---------- 手机横屏：一屏放完 ----------
