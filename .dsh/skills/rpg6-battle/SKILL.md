@@ -29,26 +29,26 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../summons.js` | 召唤物创建/移除/上限/计时/光环/到期自爆/自动攻击 |
 | `.../actions.js` | 普攻/击溃/蓄蓝、普攻前改判、`afterAction` 行动后钩子 |
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
-| `rpg6.0/data/battle-skills.js` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；角色块拆在 battle-skills-2/3.js） |
+| `rpg6.0/data/skills/` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；一个角色一个文件，`index.js` 聚合） |
 | `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放与界面细节拆在 battle-page-record.js / battle-page-ui.js） |
 | `_local/tests/engine/run.mjs` | 引擎单测入口 |
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 用 <!-- RPG6-STATS:START scripts -->35<!-- RPG6-STATS:END scripts --> 个 `<script>` 按序加载，`summons.js` 在 `skills.js` 之后、`actions.js` 之前。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->19 人 67 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.7<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->10<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
 单个角色可按本节手写；批量/多角色用 `rpg6-character-batch` 的 `plan.mjs`/`--scaffold`/`verify.ps1`，避免漏技能、漏 unsupported 原因和计数漂移。
 
 1. 档案里已经有这个角色（`rpg6.0` 的角色表或 `data/characters.js` 兜底），`skills[]` 有名称与条件文本。
-2. 在 `data/battle-skills.js` 的 `characters` 下加一个角色块，每条技能：
+2. 在 `data/skills/` 新建该角色的文件（拼音命名，`export default [...]`）并在 `index.js` 的 `characters` 里登记，每条技能：
    - `conditionText` **与档案逐字一致**（忽略空白），否则 `skills.validate` 会把这条技能标成不可用；
    - `target` 取值 `enemy / ally / self / allEnemies / allAllies / any`；
    - 条件里写到的蓝、力、冷却，要和 `conditionText` 对得上（`cost.mp`、`charge`、`cooldown`）；有累计失血降费就加 `costFromLost:{per}`。
-3. 需要计数器就在同文件的 `marks` 里声明 `{ key, name, max, init }`，技能用 `mark` / `markClear` 读写，用 `requires` 卡层数。
+3. 需要计数器就在 `index.js` 的 `marks` 里声明 `{ key, name, max, init }`，技能用 `mark` / `markClear` 读写，用 `requires` 卡层数。
 4. 要生成召唤物：
-   - 在同文件的 `summons` 块加定义（`stats`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`、`attack`、`onExpire`）；
+   - 在 `index.js` 的 `summons` 块加定义（`stats`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`、`attack`、`onExpire`）；
    - 技能 ops 写 `{op:"summon", key:"..."}`；
    - 记住无血计时物 `targetable:false`，有血单位才会进单体目标列表。
 5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`，把新角色补进 `skills.test.mjs` 的 `SHEET` 与 `CHAR`，再跑一次批量压测冒烟；有召唤物/目标选择就补一条浏览器用例。

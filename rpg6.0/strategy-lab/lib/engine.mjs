@@ -1,36 +1,25 @@
-/* 引擎接入：在 Node 里按序加载 12 个引擎文件与技能库。
-   顺序不能改，battle.mjs 依赖 root.RPG6B 这个全局。 */
+/* 引擎接入：经 js/engine/index.js 与 data/skills/index.js 以 ESM 加载，
+   不再维护自己的加载顺序清单。角色档案仍用 vm 沙箱读 data/seeds/。 */
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
+import "../../js/engine/index.js";
+import skillsLib from "../../data/skills/index.js";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "..", "..", "..");
 export const LAB_DIR = path.join(ROOT, "rpg6.0", "strategy-lab");
-const ENGINE_DIR = path.join(ROOT, "rpg6.0", "js", "engine");
-const require = createRequire(import.meta.url);
-
-export const LOAD_ORDER = [
-  "version", "rng", "rules", "traits", "state", "damage", "effect-ops", "effect-ops-helpers",
-  "effect-ops-2", "timeline", "conditions", "skills", "summons", "actions", "battle"
-];
 
 let cache = null;
 
 export function loadEngine() {
   if (cache) return cache;
-  globalThis.window = globalThis;
-  for (const name of LOAD_ORDER) require(path.join(ENGINE_DIR, name + ".js"));
-  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills.js"));
-  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills-2.js"));
-  require(path.join(ROOT, "rpg6.0", "data", "skills", "battle-skills-3.js"));
   const B = globalThis.RPG6B;
-  const LIB = globalThis.RPG6_SKILLS;
-  B.skills.load(LIB);
+  B.skills.load(skillsLib);
   const chars = readCharacters();
-  cache = { B, LIB, chars, engineVersion: engineVersionOf(B) };
+  cache = { B, LIB: skillsLib, chars, engineVersion: engineVersionOf(B) };
   return cache;
 }
 

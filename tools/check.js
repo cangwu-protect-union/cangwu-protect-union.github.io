@@ -64,10 +64,25 @@ function checkEncoding(file, buf) {
 
 /* ---------- JS ---------- */
 function checkJs(file, text) {
+  const code = text.replace(/^#![^\n]*\n/, "");
   try {
-    new Function(text.replace(/^#![^\n]*\n/, ""));
+    new Function(code);
+    return;
   } catch (e) {
     const m = /^(\d+)/.exec(e.message);
+    if (/(^|\n)\s*(import|export)\s/.test(code)) {
+      /* ESM：new Function 按经典脚本解析必报错，交给 node --check 的模块模式 */
+      try {
+        execFileSync(process.execPath, ["--check", "--input-type=module", "-"], { input: code, stdio: ["pipe", "ignore", "pipe"] });
+        return;
+      } catch (err) {
+        const stderr = String(err.stderr || "");
+        const lineM = /\[stdin\]:(\d+)/.exec(stderr);
+        const msgM = /(SyntaxError[^\n]*)/.exec(stderr);
+        bad(file, lineM ? Number(lineM[1]) : (m ? Number(m[1]) : 1), "js", "语法错误：" + (msgM ? msgM[1].trim() : e.message.replace(/\s*\(.*?\)\s*$/, "")));
+        return;
+      }
+    }
     bad(file, m ? Number(m[1]) : 1, "js", "语法错误：" + e.message.replace(/\s*\(.*?\)\s*$/, ""));
   }
 }
