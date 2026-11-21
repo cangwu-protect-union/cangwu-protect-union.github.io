@@ -587,11 +587,10 @@
   gap: 2px;
 }
 
+/* 桌面技能卡按段落流式排：名称、条件、效果共用一行。
+   不要改回 grid 分列——条件一长，效果列会被挤到只剩一个字宽。 */
 .bq-skill {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 4px;
-  align-items: baseline;
+  display: block;
   font-size: 12px;
   line-height: 1.5;
   padding: 3px 5px;
@@ -618,16 +617,15 @@
 
 .bq-skill-name {
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .bq-skill-cond {
   color: var(--muted);
-  white-space: nowrap;
 }
 
 .bq-skill-effect {
   color: var(--muted);
+  margin-left: 4px;
   overflow-wrap: anywhere;
 }
 
@@ -1112,6 +1110,7 @@ html.is-battle .site-footer {
   }
 
   .bq-skill {
+    display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 2px 6px;
     min-height: 32px;
@@ -1133,6 +1132,7 @@ html.is-battle .site-footer {
   .bq-skill.is-open .bq-skill-effect {
     display: block;
     grid-column: 1 / -1;
+    margin-left: 0;
     padding-top: 2px;
     font-size: 11px;
     line-height: 1.5;

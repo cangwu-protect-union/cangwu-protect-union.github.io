@@ -241,19 +241,18 @@
         ? "现在不是这个角色的回合"
         : (!skill ? "本版未编码这个技能" : (skill.unsupported || (check && check.reason) || ""));
       var picked = pick && (pick.mode === "skill" || pick.mode === "choice" || pick.mode === "input") && pick.id === (skill && skill.id);
-      var condText = row.condition;
+      var condText = "（" + row.condition + "）";
       if (skill && skill.costFromLost && B.skills.effectiveCost) {
         var eff = B.skills.effectiveCost(unit, skill);
         if (eff.mp !== ((skill.cost && skill.cost.mp) || 0) || eff.charge !== (skill.charge || 0)) {
-          condText += "（已损失 " + (unit.hpLost || 0) + "：实际 " + eff.mp + "蓝" +
-            (eff.charge ? eff.charge + "蓄力" : "") + "）";
+          condText += "（当前：" + eff.mp + "蓝" + (eff.charge ? eff.charge + "蓄力" : "") + "）";
         }
       }
       html += '<li class="bq-skill' + (disabled ? " is-disabled" : "") + (picked ? " is-picked" : "") + '"' +
         (skill ? ' data-skill="' + P.esc(skill.id) + '"' : "") +
         ' title="' + P.esc(reason) + '">' +
         '<span class="bq-skill-name">' + (i + 1) + "." + P.esc(row.name) + "</span>" +
-        '<span class="bq-skill-cond">（' + P.esc(condText) + "）</span>" +
+        '<span class="bq-skill-cond">' + P.esc(condText) + "</span>" +
         '<span class="bq-skill-effect">' + P.esc(row.effect) + "</span>" +
         '<button type="button" class="bq-skill-toggle">效果</button>' +
         "</li>";
