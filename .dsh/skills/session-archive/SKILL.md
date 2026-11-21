@@ -1,6 +1,6 @@
 ---
 name: session-archive
-description: 会话归档与交接的固定流程：盘点本轮改动、补 skill 与 AGENTS、重生成文档、跑校验、写交接、清点未提交改动。用户说"归档""交接""这个会话要结束""会话将会被归档"时加载。
+description: 会话归档与交接的固定流程：盘点本轮改动、补 skill 与 AGENTS、清理中间产物、重生成文档、跑校验、写交接、清点未提交改动。用户说"归档""交接""这个会话要结束""会话将会被归档"时加载。
 ---
 
 # 会话归档
@@ -19,9 +19,9 @@ node tools/archive-check.mjs --since=<会话开始前的 commit>
 
 `--since` 取本会话动手前的 `git log --oneline -1`。不确定就给 `--since=HEAD~10`，脚本会按范围算。
 
-输出六段：本轮提交、领域与对应 skill（含"该更新但没更新"）、工作区状态（哪些不属于本轮）、提交前要看的、校验命令、交接正文骨架。加 `--out=_local/docs/xxx-交接.md` 直接落盘。
+输出七段：本轮提交、领域与对应 skill（含"该更新但没更新"）、工作区状态（哪些不属于本轮）、待清理候选、提交前要看的、校验命令、交接正文骨架。加 `--out=_local/docs/xxx-交接.md` 直接落盘。
 
-## 五步
+## 六步
 
 ### 1. 盘点
 
@@ -37,7 +37,17 @@ node tools/archive-check.mjs --since=<会话开始前的 commit>
 - AGENTS 只放"每轮都必须生效"的规则；细节留在 skill 里，别把 skill 内容抄进 AGENTS。
 - 改了 skill 必须提交：`.dsh/skills/` 受版本管理，不能只留在本地。
 
-### 3. 重生成文档
+### 3. 清中间产物
+
+只留归档后还会被读的东西。先看盘点脚本第四段「待清理候选」，逐条确认引用再删。
+
+必删：本会话新建的草稿页、一次性脚本、截图、调试输出、临时数据、`runs/` 产物；被替换掉的旧文件与旧入口；代码里的调试打印、注释掉的旧实现、`TODO` 占位；文档 / skill / 交接里重复同一事实的段落（状态留交接，做法留 skill，用法留文档，一处一份）。
+
+必留：解释「为什么」的注释、踩坑记录、边界条件；`_local/docs/` 的交接正文与 SQL 迁移；git 历史。
+
+已提交的过程产物同样要删：先 `git grep -n "<文件名>"` 确认没被引用，连同引用一起改，单独一笔提交写明删了什么、为什么。删完再跑一次盘点，确认候选清零。
+
+### 4. 重生成文档
 
 ```
 node _local/tools/build-docs.js
@@ -45,7 +55,7 @@ node _local/tools/build-docs.js
 
 改了页面、脚本、数据或 `docgen.config.js` 之后必跑，否则 `check.ps1` 的 docs freshness 会失败。
 
-### 4. 校验
+### 5. 校验
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
@@ -60,7 +70,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 | 页面改动 | 浏览器实测（`guitu-browser-test`） |
 | 数据层/导航 | `run-all.mjs --group=数据源` / `--group=导航` |
 
-### 5. 写交接 + 提交
+### 6. 写交接 + 提交
 
 交接文档放 `_local/docs/<模块>-交接.md`（不推送），必须回答五个问题：
 
@@ -77,6 +87,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 | 该做 | 可以不做 |
 |---|---|
 | 新命令、新坑、新口径写进 skill | 把实现细节抄进 AGENTS |
+| 删本会话的草稿、一次性脚本、截图、调试残留、重复段落 | 删解释「为什么」的注释和踩坑记录 |
+| 已提交的过程产物单独一笔删除提交 | 把删除混进功能提交 |
 | 新子系统建 skill + AGENTS 挂钩 | 给只跑一次的临时脚本建 skill |
 | 交接写"下一轮先做什么" | 罗列所有历史 |
 | 提交 skill 与生成文档 | 提交 `_local/`、`*.sql`、运行产物 |
@@ -90,3 +102,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 5. **产物进了仓库**：`runs/`、`preview/` 之类要么进 `_local`，要么加进 `.gitignore`，否则 `check.ps1` 的文件扫描会越来越多。
 6. **归档不是终点**：交接里要写清楚"下一轮先做什么"，否则下一个会话会重做一遍已经做完的事。
 7. **新增模块后要改脚本**：新目录或新 skill 要把路径前缀加进 `tools/archive-check.mjs` 的 `AREAS`，否则盘点会把它归到「其他」，也就不会提醒你补 skill。
+8. **删文件不删引用**：`check.ps1` 的本地引用检查会红。先 `git grep -n "<文件名>"` 再删，含引用一起改。
+9. **删除单独提交**：和功能改动混在一笔里，revert 会把功能一起回滚。
+10. **沙箱里盘点会静默失真**：DSH 沙箱禁止 Node 用管道启动子进程（`spawnSync git EPERM`），脚本所有 git 调用返回空，`untracked` 恒为 0、候选段显示「没有」。此时改用 `git status --short` 手核，或放宽一次权限再跑。

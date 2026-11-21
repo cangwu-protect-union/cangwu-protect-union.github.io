@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/* 归档前盘点：这一轮改了什么、哪些 skill 该更新、哪些改动不该混进提交、该跑哪些校验。
-   只读，不写仓库（除非给 --out）。
+/* 归档前盘点：这一轮改了什么、哪些 skill 该更新、哪些改动不该混进提交、
+   哪些是待清理的过程产物、该跑哪些校验。只读，不写仓库（除非给 --out）。
 
    用法：
      node tools/archive-check.mjs --since=af6aab8
@@ -101,6 +101,44 @@ for (const file of staged) {
   if (/\.(sql|docx|zip)$/i.test(file)) risky.push("staged 里有迁移脚本或二进制：" + file);
 }
 
+/* 待清理候选：会话只留交付物，其余过程产物要删。已提交的也在清理范围内，
+   但删之前要先 grep 引用，并单独一笔提交说明删了什么。 */
+const PROC_EXT = /\.(tmp|temp|bak\d*|log|orig|rej|swp|swo|pid|dmp)$/i;
+const PROC_ASCII = /(^|\/)(\$[^/]*|tmp|temp\d*|draft\d*|old\d*|backup|copy|scratch|untitled|test-\d+|try|debug)([.\-/]|$)/i;
+const PROC_CN = /草稿|备份|副本|未命名|临时|调试|旧/;
+
+function procReason(file) {
+  if (PROC_EXT.test(file)) return "临时或日志扩展名";
+  if (PROC_ASCII.test(file)) return "文件名像草稿、备份或一次性脚本";
+  if (PROC_CN.test(file)) return "文件名带草稿、旧版本一类字样";
+  return "";
+}
+
+const base = since || git("rev-list", "--max-count=1", "--skip=9", "HEAD");
+const baseTs = Number(git("log", "-1", "--format=%ct", base) || 0) * 1000;
+
+function mtime(file) {
+  try {
+    return fs.statSync(path.resolve(root, file)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+const candidates = [];
+for (const file of committed) {
+  if (!fs.existsSync(path.resolve(root, file))) continue;
+  const reason = procReason(file);
+  if (reason) candidates.push({ file, kind: "已提交", why: reason });
+}
+for (const file of untracked) {
+  const fresh = mtime(file) >= baseTs;
+  const reason = procReason(file);
+  if (fresh || reason) {
+    candidates.push({ file, kind: fresh ? "未跟踪·本会话" : "未跟踪·更早", why: reason || "未进仓库的新文件" });
+  }
+}
+
 const out = [];
 out.push("# " + values.title);
 out.push("");
@@ -139,13 +177,29 @@ if (foreign.length) {
   for (const file of shortList(foreign, 20)) out.push("- " + file);
 }
 out.push("");
-out.push("## 四、提交前要看的");
+out.push("## 四、待清理候选");
+out.push("");
+out.push("归档只留交付物，过程产物删掉。逐条确认引用后手删，细则见 skill `session-archive` 第 3 步。");
+out.push("");
+if (candidates.length) {
+  out.push("| 文件 | 类别 | 依据 |");
+  out.push("|---|---|---|");
+  for (const item of candidates.slice(0, 40)) out.push("| " + item.file + " | " + item.kind + " | " + item.why + " |");
+  if (candidates.length > 40) out.push("| … 另有 " + (candidates.length - 40) + " 个 | | |");
+} else {
+  out.push("- 没有待清理候选。");
+}
+out.push("");
+out.push("- `_local/` 被 gitignore，不在此列；交接正文与 SQL 迁移要留。");
+out.push("- 已提交的那几项：先 `git grep -n \"<文件名>\"` 确认无引用，再单独一笔提交说明删了什么、为什么。");
+out.push("");
+out.push("## 五、提交前要看的");
 out.push("");
 if (risky.length) for (const item of risky) out.push("- " + item);
 else out.push("- 没有 _local、SQL、docx 被 staged。");
 out.push("- `git status --short` 与 `git diff --cached --stat` 各过一遍。");
 out.push("");
-out.push("## 五、校验命令");
+out.push("## 六、校验命令");
 out.push("");
 out.push("```");
 out.push("node _local/tools/build-docs.js");
@@ -157,7 +211,7 @@ for (const skill of byArea.keys()) {
 }
 out.push("```");
 out.push("");
-out.push("## 六、交接正文（手工补）");
+out.push("## 七、交接正文（手工补）");
 out.push("");
 out.push("- 现在能跑到哪一步：");
 out.push("- 这一轮的判断与取舍：");
