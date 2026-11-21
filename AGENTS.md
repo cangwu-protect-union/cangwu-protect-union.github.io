@@ -86,6 +86,8 @@ node _local/tests/run-all.mjs --group=回合制
 
 ## 提交前
 
+改动完成并跑完校验后直接提交，无需用户再批准。
+
 `git status --short` 逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。
 
 提交后再跑一次 `tools/check.ps1`：gitleaks 只扫 commit，工作区通过不代表提交后通过；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
