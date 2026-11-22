@@ -27,16 +27,19 @@ node .dsh/skills/rpg6-character-batch/scripts/inventory.mjs --remaining --triage
 
 ### 1. 读档案，写 plan（唯一作者面）
 
-每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`seed` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。按 `assets/plan.example.json` 写 `plan.json`，一个角色一块，**覆盖该角色档案里的全部技能**（不做的也留 `unsupported` 与原因）。
+每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`seed` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。先让工具把 seed 里的技能名、条件、面板抄成草稿（条件不再手抄，抄错会被校验器拦）：
 
-必须写的字段：`fixture`（小写拼音，技能文件名）、每条技能的 `id`、`name`、`condition`（与档案忽略空白一致）、`target`、`cost`/`charge`/`cooldown`、`ops`、`status`、`unsupported`（未实现时）、`tests`、`notes`（裁定：取整、从哪回合算、是否叠加、受击溃/眩晕影响；不确定处标「待确认」）。
+```powershell
+node .dsh/skills/rpg6-character-batch/scripts/inventory.mjs --character 朱弘毅 --plan --fixture zhuhongyi --out plan.json
+```
+
+再编辑 `plan.json`：`id` 改成技能拼音、`status` 按三选一填、写 `ops`/`tests`/`notes`（裁定：取整、从哪回合算、是否叠加、受击溃/眩晕影响；不确定处标「待确认」）。一个角色一块，**覆盖该角色档案里的全部技能**（不做的也留 `unsupported` 与原因）；字段写法见 `assets/plan.example.json`。
 
 ```powershell
 node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json
-node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json
 ```
 
-`--check` 直接输出逐技能确认表（条件/目标/费用/蓄力/冷却/状态/裁定），不再手抄。**用户明确确认这张表之前，不写数据、不写引擎。**
+`--check` 校验后直接输出逐技能确认表（条件/目标/费用/蓄力/冷却/状态/裁定）。**用户明确确认这张表之前，不写数据、不写引擎。**
 
 panel 与 seed 不一致时（档案攻击格是注记），plan 里加 `statOverrides:{atk:"0"}`；实际覆盖要在技能库 `index.js` 的 `panels` 里登记，否则 `makeUnit` 仍读 seed 注记而抛错。
 
