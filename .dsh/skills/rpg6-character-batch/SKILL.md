@@ -101,6 +101,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 - `index.js` 的四行 `RPG6-SCAFFOLD` 锚点不要删，`plan.mjs --write` 靠它们定位。
 - 文档里的数字、unsupported 表、op 一览都不要手写：`rpg6-stats.js --write` 写回（`verify` 会自动跑）。
 - `_local/` 不推送；机制文档在 `_local` 也要更新；同一工作区多会话，提交前看 `git status` 与 `git log`。
+- **子代理一次不超过 2 个、每个 ≤100 步**：同一批角色卡/档案只开一个代理，中间结果落盘（`plan.json` 或 `_local/`），只回摘要。2026-11-14 那批开了 6 个代理、共 170M tokens / 1487 步，是反例。
+- 角色卡图片 `read_image` 一次只取一张；不要把整批图在同一步连读，也不要为每张卡各开一个代理。
 
 ## 交付前检查
 

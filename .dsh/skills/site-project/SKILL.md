@@ -58,6 +58,16 @@ _local/                                不推送：sql/ docs/ notes/ preview/ te
 密钥：`publishableKey` 可公开，service_role 绝不能进前端。`_local/` 永不推送。
 浏览器端 key（天地图 tk）按**行**在 `.gitleaks.toml` 放行，不要放行整个文件。取令牌与天地图白名单的细节见 [powershell-坑.md](powershell-坑.md)。
 
+## 读文件的成本
+
+`read` 是历史上最贵的工具：全项目 1795 次、结果 17MB，占上下文构成的大头，而且是**每一步都重发**。
+
+- 不整读 >15KB 的文件：先 `grep` 定位键名/函数名，再 `read` 带 `offset/limit`，只读要改的那一段。
+- `edit` 之后不要重读整文件：结果里已经回显了改动片段。
+- 定位顺序：`改动索引.md` → 模块的 `架构.md` → `grep` → 片段 `read`。
+- 实测被同一会话重复整读最多的文件（数字是重复次数）：`quyu/js/zone-data.js` 29、`rpg6.0/js/engine/effect-ops.js` 21、`rpg6.0/js/battle/battle-page.js` 13、`rpg6.0/css/battle.css` 12、`_local/tools/build-docs.js` 11、`rpg6.0/data/battle-skills.js` 8、`rpg6.0/js/battle/battle-view.js` 8、`guitu/js/gui-data.js` 8。
+- 数据表类文件（`gui-data.js`、`zone-data.js`、`battle-skills.js`）先 `grep` `ENTRY_FIELDS`/`ZONE_FIELDS`/技能 id 再读片段。
+
 ## 文档生成
 
 ```

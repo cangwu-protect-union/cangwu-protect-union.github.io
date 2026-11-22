@@ -78,6 +78,12 @@ await ev(`(async function(){ try { await window.GuiGate.verifyValues(['<问题�
 await ev(`(async function(){ try { await window.GuiData.insertEntry({ id:"t-"+Date.now(), title:"测试", image:"", images:[], thumbs:[], intro:"x", body:"x", tags:[], date:"2026-01-01", refs:[] }); return "ok"; } catch(e){ return "fail: " + e.message; } })()`);
 ```
 
+## 截图只取关键页
+
+全项目 `read_image` 1134 次。验证一个改动，只在改动页取一张关键状态截图；逐页连拍、失败重试都重拍，会让图片一直留在上下文里。
+
+要对比多页，把截图写到 `_local/preview/`，用文件路径引用，不要每张都 `read_image`。
+
 ## 断言时机与判读
 
 不要固定 `sleep` 再读 DOM：分不清「还在载入」和「已经失败」。用 `waitForFunction` 等目标状态（示例见 [判读与细节.md](判读与细节.md)）。
