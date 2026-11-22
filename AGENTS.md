@@ -94,6 +94,8 @@ node _local/tests/run-all.mjs --group=回合制
 
 提交后再跑一次 `tools/check.ps1`：gitleaks 只扫 commit，工作区通过不代表提交后通过；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
 
+**DSH 沙箱**：`.git/` 不可写、node 派生不了子进程（`execFileSync` 报 EPERM）。所以 `git add`/`commit` 要一次 full-access；`tools/archive-check.mjs` 也只能在普通终端或 full-access 下跑（git 不可用时它直接退出 2，不再产出空白交接）。仓库卫生、体积闸、暂存区检查已经挪到 `check.ps1` 里用 PowerShell 调 git，`node tools/check.js` 里没有这三项。
+
 ## 归档或交接前
 
 用户提到「归档」「交接」时加载 `session-archive`，按它的六步走。先盘点：

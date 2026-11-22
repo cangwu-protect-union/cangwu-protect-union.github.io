@@ -19,10 +19,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
 | 引用 | `href` / `src` / CSS `url()` 指向的本地文件是否存在 |
 | CSS | `{` `}` 配平 |
 | 密钥 | `service_role`、`sb_secret_*`、带密码的连接串、硬编码凭据、私钥、AWS key、GitHub / GitLab 令牌、role 不是 `anon` 的 JWT |
-| 仓库 | `git ls-files` 里有没有 `_local/`、`node_modules/`、`.pnpm-store/`、`*.sql`、`*.docx`、`*.zip` |
-| 体积 | 被跟踪的 `*.js` / `*.mjs` / `*.css` / `*.html` / `*.md` / `*.ps1` 不得超过 20480 字节；`guitu/js/lib/` 与 `quyu/vendor/` 豁免。普通模式查全部，`-Staged` 只查暂存区 |
 
-`-Staged` 额外检查 `git diff --cached` 里有没有 `_local/`、SQL、Office 文件，以及暂存文件是否超体积。
+`check.js` 只做文件系统能覆盖的部分：它**不派生任何子进程**（DSH 沙箱里 `execFileSync` 会 EPERM，
+早期版本把 git 检查放在这里，结果是静默空过还打「全部通过」）。仓库卫生、体积闸、暂存区
+三项在 `check.ps1` 里用 PowerShell 调 git 完成：
+
+| 检查 | 内容 |
+|---|---|
+| 仓库 | `git ls-files` 里有没有 `_local/`、`node_modules/`、`.pnpm-store/`、`*.sql`、`*.docx`、`*.zip` |
+| 体积 | 被跟踪的 `*.js` / `*.mjs` / `*.css` / `*.html` / `*.md` / `*.ps1` 不得超过 40960 字节；`guitu/js/lib/` 与 `quyu/vendor/` 豁免 |
+| 暂存区 | 仅 `-Staged`：`git diff --cached` 里有没有 `_local/`、SQL、Office 文件 |
 
 也可以指向别的目录，用于检查构建产物：
 

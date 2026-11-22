@@ -33,6 +33,14 @@ function git(...args) {
   }
 }
 
+/* git 不可用时必须立刻报错退出：否则每一项都拿到空字符串，
+   输出成一份「本轮没有提交、没有改动」的空白交接，比不跑更坏。
+   DSH 文件沙箱里 node 派生不了子进程（EPERM），这个脚本要在普通终端或 full-access 下跑。 */
+if (!git("rev-parse", "--is-inside-work-tree")) {
+  console.error("git 不可用：无法盘点本轮改动。请在普通终端（或 DSH full-access）下运行本脚本。");
+  process.exit(2);
+}
+
 function lines(text) {
   return text ? text.split("\n").filter(Boolean) : [];
 }
@@ -45,7 +53,7 @@ function unique(list) {
 const AREAS = [
   { skill: "—", label: "生成物", generated: true, match: /(^rpg6\.0\/preview\/|^guitu\/.*\.png$|^quyu\/.*\.png$|\.png$)/ },
   { skill: "—", label: "skill 本体", generated: true, match: /^\.dsh\/skills\// },
-  { skill: "rpg6-strategy-lab", match: /^rpg6\.0\/(strategy-lab\/|lab\.html|css\/lab\.css|js\/lab\/|data\/lab-snapshot)/, label: "策略实验室" },
+  { skill: "—", label: "策略实验室（已终止）", generated: true, match: /^rpg6\.0\/(strategy-lab\/|lab\.html|css\/lab\.css|js\/lab\/|data\/lab-snapshot)/ },
   { skill: "rpg6-battle", match: /^rpg6\.0\/(js\/engine\/|js\/battle\/|data\/skills|test\.html)/, label: "战斗引擎" },
   { skill: "rpg6-character-batch", match: /^rpg6\.0\/data\/characters\.js|^_local\/docs\/回合制6\.0/, label: "角色批次" },
   { skill: "cloudbase-pg", match: /^_local\/sql\//, label: "数据库" },
@@ -205,7 +213,6 @@ out.push("```");
 out.push("node _local/tools/build-docs.js");
 out.push("powershell -NoProfile -ExecutionPolicy Bypass -File tools\\check.ps1");
 for (const skill of byArea.keys()) {
-  if (skill === "rpg6-strategy-lab") out.push("node rpg6.0/strategy-lab/selftest.mjs");
   if (skill === "rpg6-battle") out.push("node _local/tests/engine/run.mjs");
   if (skill === "site-e2e-tests") out.push("node _local/tests/run-all.mjs --group=回合制");
 }

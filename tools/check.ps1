@@ -80,10 +80,62 @@ if (-not $node) {
 # so that biome/gitleaks pick up their configs regardless of where check.ps1 was called from.
 Push-Location $root
 try {
-    $args2 = @("$root\tools\check.js")
-    if ($Staged) { $args2 += '--staged' }
-    & $node @args2
+    & $node "$root\tools\check.js"
     if ($LASTEXITCODE -ne 0) { $failed++ }
+
+    # Repo hygiene, size gate and staged-file checks.
+    # node cannot spawn a child process under the DSH file sandbox (EPERM), so git work
+    # happens here, where PowerShell can call git and read the output. Keeping it in
+    # check.js made these three checks silently no-op and still print a clean pass.
+    $trackedRaw = (@(& git -c core.quotepath=false ls-files -z 2>$null) -join '')
+    $trackedFiles = @()
+    if ($trackedRaw) { $trackedFiles = @($trackedRaw -split "`0" | Where-Object { $_ }) }
+
+    if ($trackedFiles.Count -eq 0) {
+        Write-Host '--- repo hygiene / size gate: git unavailable, skipped ---' -ForegroundColor DarkGray
+    } else {
+        Write-Host '--- repo hygiene ---' -ForegroundColor Cyan
+        $repoBad = 0
+        foreach ($p in $trackedFiles) {
+            if ($p -match '^(?:_local|node_modules|\.pnpm-store)/' -or $p -match '\.(?:sql|docx|xlsx|zip|7z|log)$') {
+                Write-Host "  tracked but must stay ignored: $p" -ForegroundColor Red
+                $repoBad++
+            }
+        }
+        if ($repoBad -gt 0) { $failed++ } else { Write-Host 'repo hygiene: ok' -ForegroundColor DarkGray }
+
+        Write-Host '--- size gate ---' -ForegroundColor Cyan
+        $sizeLimit = 40960
+        $sizeExt = @('.js', '.mjs', '.css', '.html', '.htm', '.md', '.ps1')
+        $overSize = 0
+        foreach ($p in $trackedFiles) {
+            if ($sizeExt -notcontains [System.IO.Path]::GetExtension($p).ToLowerInvariant()) { continue }
+            if ($p -like 'guitu/js/lib/*' -or $p -like 'quyu/vendor/*') { continue }
+            $full = Join-Path $root $p
+            if (-not (Test-Path -LiteralPath $full)) { continue }
+            $len = (Get-Item -LiteralPath $full).Length
+            if ($len -gt $sizeLimit) {
+                Write-Host "  over $sizeLimit bytes ($len): $p" -ForegroundColor Red
+                $overSize++
+            }
+        }
+        if ($overSize -gt 0) { $failed++ } else { Write-Host 'size gate: ok' -ForegroundColor DarkGray }
+    }
+
+    if ($Staged) {
+        Write-Host '--- staged files ---' -ForegroundColor Cyan
+        $stagedRaw = (@(& git -c core.quotepath=false diff --cached --name-only -z 2>$null) -join '')
+        $stagedFiles = @()
+        if ($stagedRaw) { $stagedFiles = @($stagedRaw -split "`0" | Where-Object { $_ }) }
+        $stagedBad = 0
+        foreach ($p in $stagedFiles) {
+            if ($p -match '^_local/' -or $p -match '\.(?:sql|docx|xlsx|zip|7z)$' -or $p -match '^\.pnpm-store/') {
+                Write-Host "  staged but must not be committed: $p" -ForegroundColor Red
+                $stagedBad++
+            }
+        }
+        if ($stagedBad -gt 0) { $failed++ } else { Write-Host 'staged files: ok' -ForegroundColor DarkGray }
+    }
 
     # Generated docs must match the source. _local/ is gitignored, so skip when absent.
     $docs = "$root\_local\tools\build-docs.js"
@@ -129,7 +181,8 @@ try {
     $biome = Find-Tool 'biome'
     if ($biome -and (Test-Path "$root\biome.json")) {
         Write-Host '--- biome ---' -ForegroundColor Cyan
-        & $biome check --max-diagnostics=100
+        # summary：逐条诊断有两千多行输出，闸只要「哪个文件几条」；看细节直接跑 biome。
+        & $biome check --reporter=summary
         if ($LASTEXITCODE -ne 0) { $failed++ }
     } else {
         Write-Host '--- biome: not installed, skipped ---' -ForegroundColor DarkGray

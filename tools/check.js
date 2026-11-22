@@ -2,17 +2,16 @@
 /* ============================================================
    tools/check.js —— 项目自检，零依赖，只用 node 内置模块
    ------------------------------------------------------------
-   用法：node tools/check.js [--staged]
-         --staged  额外检查暂存区里有没有 _local/、*.sql 等不该提交的东西
+   用法：node tools/check.js [扫描根目录]
+   一般由 tools/check.ps1 调用；仓库卫生、体积闸、暂存区三项在 check.ps1 里用 git 做
+   （node 在 DSH 沙箱里派生不了子进程，放这里会静默失效）。
 
    检查项：
      编码    UTF-8 无 BOM、LF 换行、不是非法 UTF-8
-     脚本    JS 能否被解析（不执行）
+     脚本    JS 能否被解析（不执行；ESM 依赖 node --check，子进程被沙箱拦下时交给 biome）
      页面    HTML 标签栈配平、重复 id、本地引用是否存在、charset/lang
      样式    CSS 大括号配平、url() 本地引用是否存在
      密钥    service_role、secret key、密码、带密码的连接串（publishableKey 放行）
-     仓库    已跟踪文件里不该出现的路径
-     体积    代码/文档文件不超过 20480 字节（vendor 目录豁免）
 
    退出码：0 全过，1 有问题。输出格式 路径:行: 代码: 说明
    ============================================================ */
@@ -30,6 +29,7 @@ const TEXT_EXT = new Set([".html", ".htm", ".js", ".css", ".json", ".md", ".yml"
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr", "param"]);
 
 const problems = [];
+let jsSpawnBlocked = 0;
 function bad(file, line, code, msg) {
   problems.push({ file: path.relative(ROOT, file).replace(/\\/g, "/"), line, code, msg });
 }
@@ -76,6 +76,12 @@ function checkJs(file, text) {
         execFileSync(process.execPath, ["--check", "--input-type=module", "-"], { input: code, stdio: ["pipe", "ignore", "pipe"] });
         return;
       } catch (err) {
+        /* 子进程起不来（沙箱拦管道）不是语法错误：报成语法错误会让整批 ESM 文件误报，
+           而且会掩盖真正的语法问题。这种情况交给 biome 兜底（check.ps1 紧随其后跑）。 */
+        if (err.code === "EPERM" || err.code === "EACCES" || err.code === "ENOENT") {
+          jsSpawnBlocked += 1;
+          return;
+        }
         const stderr = String(err.stderr || "");
         const lineM = /\[stdin\]:(\d+)/.exec(stderr);
         const msgM = /(SyntaxError[^\n]*)/.exec(stderr);
@@ -193,75 +199,10 @@ function checkSecrets(file, text, codeOnly) {
   }
 }
 
-/* ---------- 仓库卫生 ---------- */
-function git(args) {
-  try {
-    return execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 24 });
-  } catch {
-    return null;
-  }
-}
-
-function checkRepoTracked() {
-  const out = git(["ls-files", "-z"]);
-  if (out === null) return;
-  for (const p of out.split("\0")) {
-    if (!p) continue;
-    const full = path.join(ROOT, p);
-    if (/^(?:_local|node_modules|\.pnpm-store)\//.test(p) || /\.(?:sql|docx|xlsx|zip|7z|log)$/i.test(p)) {
-      bad(full, 1, "repo", "这类文件不该被 git 跟踪，检查 .gitignore");
-    }
-  }
-}
-
-function checkStaged() {
-  const out = git(["diff", "--cached", "--name-only", "-z"]);
-  if (out === null) return;
-  let n = 0;
-  for (const p of out.split("\0")) {
-    if (!p) continue;
-    if (/^_local\//.test(p) || /\.(?:sql|docx|xlsx|zip|7z)$/i.test(p) || /^\.pnpm-store\//.test(p)) {
-      bad(path.join(ROOT, p), 1, "staged", "已暂存，但不该提交");
-      n++;
-    }
-  }
-  if (n === 0) console.log("暂存区干净");
-}
-
-/* ---------- 体积闸 ---------- */
-const SIZE_LIMIT = 20480;
-const SIZE_EXT = new Set([".js", ".mjs", ".css", ".html", ".htm", ".md", ".ps1"]);
-
-function sizeExempt(p) {
-  return /^guitu\/js\/lib\//.test(p) || /^quyu\/vendor\//.test(p);
-}
-
-function sizeBad(p) {
-  const full = path.join(ROOT, p);
-  let st;
-  try { st = fs.statSync(full); } catch { return; }
-  if (st.size > SIZE_LIMIT) {
-    bad(full, 1, "size", `超过 ${SIZE_LIMIT} 字节（${(st.size / 1024).toFixed(1)} KB），请拆分`);
-  }
-}
-
-function checkSizes() {
-  const out = git(["ls-files", "-z"]);
-  if (out === null) return;
-  for (const p of out.split("\0")) {
-    if (!p) continue;
-    if (SIZE_EXT.has(path.extname(p).toLowerCase()) && !sizeExempt(p)) sizeBad(p);
-  }
-}
-
-function checkStagedSizes() {
-  const out = git(["diff", "--cached", "--name-only", "-z"]);
-  if (out === null) return;
-  for (const p of out.split("\0")) {
-    if (!p) continue;
-    if (SIZE_EXT.has(path.extname(p).toLowerCase()) && !sizeExempt(p)) sizeBad(p);
-  }
-}
+/* ---------- 仓库卫生 / 体积闸 / 暂存区 ---------- */
+/* 这三项在 tools/check.ps1 里用 PowerShell 调 git 完成。
+   原因：DSH 文件沙箱里 node 派生不了子进程（execFileSync 报 EPERM），
+   放在这里会静默变成空操作，还会打出「全部通过」。 */
 
 /* ---------- 主流程 ---------- */
 const files = walk(ROOT, []).sort();
@@ -280,14 +221,10 @@ for (const file of files) {
   if (path.resolve(file) !== SELF) checkSecrets(file, text, CODE.has(ext));
 }
 
-checkRepoTracked();
-checkSizes();
-if (process.argv.includes("--staged")) {
-  checkStaged();
-  checkStagedSizes();
-}
-
 console.log(`扫描 ${files.length} 个文件：${js} 个 JS、${html} 个 HTML、${css} 个 CSS`);
+if (jsSpawnBlocked > 0) {
+  console.log(`  注意：${jsSpawnBlocked} 个 ESM 文件无法派生 node 校验（沙箱拦了子进程），语法交给 biome`);
+}
 
 if (problems.length === 0) {
   console.log("全部通过");

@@ -73,7 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 看：引擎异常 0、僵局按规则分类、新角色浏览器可选且技能行条件/置灰正确（有召唤物 844×390 一屏）、audit-docs 无漂移、check.ps1 提交后仍 0。
 `audit-docs` 现在直接复用 `_local/tools/rpg6-stats.js` 的区间渲染，不再逐条正则匹配文档；`_local` 缺失时整步跳过。
 
-**沙箱坑**：`tools/check.ps1` 的 ESM 语法校验会派生子 `node` 进程；在 DSH 文件沙箱里必然 `EPERM`，表现为一批 `data/skills/*.js`「Unexpected token 'export'」。要么用 `danger-full-access` 跑，要么在普通终端跑，别误判成技能库坏了。
+**沙箱**：DSH 文件沙箱里 node 派生不了子进程，`check.ps1` 会打一行「46 个 ESM 文件无法派生 node 校验，语法交给 biome」，不阻塞、也不是技能库坏了（2026-11 之前这里会报 46 条假语法错误）。同一原因 `.git/` 不可写，`git add`/`commit` 要一次 full-access。
 
 ### 6. 文档与推送
 
@@ -90,7 +90,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 ## 硬规则
 
 - **`plan.mjs --check` 有验收态**：实现完成后再跑 `--check` 会报「已在技能库里」，要改成 `allowExisting:true`；同时 `docs.expectedSkills` 会把已入库技能重复计数（libSkills + plan 技能），验收时把 `docs` 块清空，文档计数交给 `rpg6-stats.js --check` 与 `audit-docs.mjs`。第六批是在实现前跑的 `--check`，所以没遇到；`verify.ps1 -Plan` 在实现后跑，plan 必须是验收态。
-- **`tools/check.ps1` 有 20480 字节单文件上限**（md/js/css，vendor 豁免）：改大文件前先量余量，超了就拆函数到分片文件或压缩注释；拆法示例见 `rpg6-battle` 的踩坑 45。
+- **`tools/check.ps1` 有 40960 字节单文件上限**（md/js/css/ps1，vendor 豁免）：改大文件前先量余量；真撞上了再拆函数到分片文件（拆法示例见 `rpg6-battle` 的踩坑 45）。上限 2026-11 从 20480 提到 40960，因为当时的余量只剩几十字节，分割又不减少阅读量。
 - 逻辑未确认不写代码；用户确认的是逐技能表，不是「大概懂了」。
 - 数据库是唯一数据源；`data/seeds/characters*.js` 只用于离线盘点，不一致先修再继续。
 - 技能库是 ESM 分文件（`data/skills/*.js` + `index.js`），不是当年的 `data/battle-skills.js`；脚本按 ESM 直接 import，别改回 vm 读 window 全局。
