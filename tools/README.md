@@ -8,7 +8,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged   # 
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Last     # 提交后：只扫最后一条提交的密钥
 ```
 
-退出码 0 表示全过。每一步按顺序跑，任何一步不过都算失败。`-Last` 只跑 gitleaks（`--log-opts=-1`），因为其余检查在提交前已经跑过。
+退出码 0 表示全过。每一步按顺序跑，任何一步不过都算失败。`-Last` 只跑 gitleaks（`--log-opts=-1`），因为其余检查在提交前已经跑过；`-History` 才复查整段历史。
 
 ## 1. `check.js`（零依赖，只用 node 内置模块）
 
@@ -69,11 +69,13 @@ Biome 走 npm 镜像而不是 GitHub Releases：镜像 34 MB 只要几秒，GitH
 
 版本 8.30.1，在 `_local\bin\gitleaks.exe`，配置是仓库根的 `.gitleaks.toml`。
 
-只扫 **git 历史**，不扫工作区：`_local/` 里本来就有密码和测试用 JWT，`gitleaks dir` 模式必然报 4 条无关的。判据是「有没有进过 git」——没进过就没事，进过一次就必须处理历史。
+只扫 **git diff**，不扫工作区文件：`_local/` 里本来就有密码和测试用 JWT，`gitleaks dir` 模式必然报无关项。判据是「有没有进过 git」——没进过就没事，进过一次就必须处理历史；每条提交入库时已经扫过，所以默认不再复查整段历史。
 
 ```powershell
-powershell -File tools\check.ps1            # 全历史扫描，38 个提交约 1 秒
+powershell -File tools\check.ps1            # 工作区 diff
 powershell -File tools\check.ps1 -Staged    # 只扫暂存区
+powershell -File tools\check.ps1 -Last      # 只扫最后一条提交
+powershell -File tools\check.ps1 -History   # 全历史复查（换机器、改 .gitleaks.toml 时用）
 ```
 
 `.gitleaks.toml` 用默认规则集全开，只按行内容放行 `publishableKey`（CloudBase 签给匿名访问的 JWT，payload 里 `role=anon`）。**不要改成放行整个 `guitu/data/config.js`**，那样有人把 `service_role` 写进去也扫不出来。

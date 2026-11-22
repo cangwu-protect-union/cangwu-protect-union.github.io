@@ -73,13 +73,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；用 `node tools/rpg6-bump.mjs <新版本>` 一次改两处并写回文档里的版本号。文档里的角色数/技能数/op 数/unsupported 表不要手写，由 `rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`：盘点 → `plan --table` 出确认表 → `plan --scaffold --write` 落盘 → `verify.ps1`。
 
-**眩晕值口径（6.0-engine.9 起）**：一般伤害**默认不加眩晕值**，只有伤害 op 标 `addStun: true` 才加（技能文本必须明确写「造成/算眩晕值」）；击溃值仍按默认 +1。新增或改技能时别按「造成伤害就涨眩晕值」的旧模型写。
+**眩晕值口径（6.0-engine.9 起）**：一般伤害默认不加眩晕值，只有伤害 op 标 `addStun: true` 才加；击溃值仍按默认 +1。其余口径（法伤、取整、击溃、召唤物）只看 `rpg6-battle` 的「已经定死的口径」一张表，别在别处再抄一份。
 
 ## 文档与配图
 
 项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成每个模块（含主站）的 `架构.md`、`访客流程图.md` 与 `preview/` 的 PNG 索引。`check.ps1` 会调 `build-docs.js --check` 比对文档与源码，过期即失败。
 
-回合制 6.0 的角色数/技能数/op 数/unsupported 表都由 `rpg6-stats.js --write` 写回（`verify.ps1` 会自动跑），不要手写；机制文档的新节由 `plan.mjs --write` 插骨架，正文手工写。
+回合制 6.0 的角色数/技能数/op 数/unsupported 表都由 `rpg6-stats.js --write` 写回（`verify.ps1` 会自动跑），不要手写；机制文档的新节由 `plan.mjs --write` 插入，正文直接取 plan 的 `notes`（没写就留「待补」，lint 会拦）。
 
 ## 提交前
 

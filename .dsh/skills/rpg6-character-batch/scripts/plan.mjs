@@ -24,8 +24,7 @@ const writeFiles = hasFlag(argv, "--write");
 const forceWrite = hasFlag(argv, "--force");
 const tableMode = hasFlag(argv, "--table");
 /* --mode=plan（默认）：实现前校验，角色已在技能库里就算错。
-   --mode=verify：实现后验收，允许角色已在库里，plan.docs 的期望值不再比对
-   （文档计数由 rpg6-stats.js --check 负责，plan 里再写一份只会误报）。 */
+   --mode=verify：实现后验收，允许角色已在库里；文档计数只由 rpg6-stats.js --check 负责。 */
 const mode = argValue(argv, "--mode") || "plan";
 if (mode !== "plan" && mode !== "verify") {
   console.error("--mode 只接受 plan 或 verify");
@@ -176,17 +175,6 @@ if (!plan.engine || !plan.engine.version) {
   warnings.push("engine.changes 非空但 engine.version 没变；改规则应升版本");
 }
 if (engineGap && !changes.length) fail("有 engine-gap 技能，但 plan.engine.changes 为空");
-
-if (plan.docs && mode !== "verify") {
-  const expectedChars = libCharactersCount() + newCharacters.length;
-  const expectedSkills = projectedSkills;
-  if (plan.docs.expectedCharacters != null && Number(plan.docs.expectedCharacters) !== expectedChars) {
-    fail("plan.docs.expectedCharacters 应为 " + expectedChars);
-  }
-  if (plan.docs.expectedSkills != null && Number(plan.docs.expectedSkills) !== expectedSkills) {
-    fail("plan.docs.expectedSkills 应为 " + expectedSkills);
-  }
-}
 
 const projected = mode === "verify"
   ? {
@@ -530,10 +518,13 @@ function addImports(text, fixtures) {
   return text.slice(0, start) + lines.sort().join("\n") + "\n" + text.slice(end);
 }
 
+/* 机制文档的骨架直接用 plan.notes 当正文：notes 是确认表里签过的那列，
+   不再让人对着 plan 再抄一遍；没写 notes 的留「待补」，lint 会拦。 */
 function docSkeleton(character) {
   const lines = ["", "## " + character.name + "（" + fixtureOf(character) + "）", ""];
   for (const skill of character.skills) {
-    lines.push("- **" + skill.name + "（" + skill.condition + "）** <!-- skill:" + skill.id + " -->：待补");
+    const note = String(skill.notes || "").trim();
+    lines.push("- **" + skill.name + "（" + skill.condition + "）** <!-- skill:" + skill.id + " -->：" + (note || "待补"));
   }
   return lines.join("\n") + "\n";
 }
@@ -618,7 +609,7 @@ async function writeScaffold(input) {
   for (const line of summary) console.log("  " + line);
   console.log("\n下一步：");
   console.log("  1. 有 engine-gap 才写引擎与单测；改规则后 node tools/rpg6-bump.mjs <新版本>");
-  console.log("  2. 机制文档里的「待补」改成正文；rpg6-lint 会把还缺的锚点行打出来");
+  console.log("  2. 机制文档正文取自 plan.notes；notes 空着的会留「待补」，补上后 rpg6-lint 才会过");
   console.log("  3. 验收：verify.ps1 -Plan <plan>（改了页面才加 -Browser）");
 }
 

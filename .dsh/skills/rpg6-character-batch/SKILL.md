@@ -27,7 +27,7 @@ node .dsh/skills/rpg6-character-batch/scripts/inventory.mjs --remaining --triage
 
 ### 1. 读档案，写 plan（唯一作者面）
 
-每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`seed` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。按 `assets/plan.template.json` 写 `plan.json`，一个角色一块，**覆盖该角色档案里的全部技能**（不做的也留 `unsupported` 与原因）。
+每个候选读三处互相校对：`rpg6.0/archive/6.0doc/回合制角色/` 原始档案、`seed` 的 `skills[]`、`_local/docs/回合制6.0测试功能-角色机制.md` 逐条裁定。按 `assets/plan.example.json` 写 `plan.json`，一个角色一块，**覆盖该角色档案里的全部技能**（不做的也留 `unsupported` 与原因）。
 
 必须写的字段：`fixture`（小写拼音，技能文件名）、每条技能的 `id`、`name`、`condition`（与档案忽略空白一致）、`target`、`cost`/`charge`/`cooldown`、`ops`、`status`、`unsupported`（未实现时）、`tests`、`notes`（裁定：取整、从哪回合算、是否叠加、受击溃/眩晕影响；不确定处标「待确认」）。
 
@@ -62,7 +62,7 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json --wr
 
 1. 新建 `rpg6.0/data/skills/<fixture>.js`（已存在则拒绝，覆盖加 `--force`）；
 2. 按 `index.js` 里的四行 `/* RPG6-SCAFFOLD:* */` 锚点登记 import / characters / marks / summons（锚点被删会拒绝写盘）；
-3. 在机制文档追加角色一节，每条技能一行 `<!-- skill:id -->：待补`；
+3. 在机制文档追加角色一节，每条技能一行 `<!-- skill:id -->：` 加 plan 的 `notes`（`notes` 为空才写「待补」）；
 4. 调 `rpg6-stats` 写回所有文档里的角色数/技能数/op 数/unsupported 表/版本号。
 
 写前会先查重复（角色已在库、fixture 已 import、mark/summon key 已存在），有问题一处不写。`--scaffold` 不加 `--write` 只打印，用于预览。
@@ -73,7 +73,7 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json --wr
 
 技能库测试不用手抄：`skills.test.mjs` 的 `SHEET`/`CHAR` 从 seed 现算，`全技能释放` 那条会把每条技能机械跑一遍。手写只写数值或裁定要盯住的（多段、掷骰分支、召唤、目标选择、状态交互）。
 
-机制文档里把「待补」改成正文；`rpg6-lint` 会把「待补」和缺的锚点当错误报出来。
+机制文档正文不用再抄一遍：它取的是 plan 的 `notes`，也就是你在 `--table` 里签过的那一列。`notes` 空着的会留「待补」，`rpg6-lint` 会把「待补」和缺的锚点当错误报出来。
 
 ### 5. 验收（一条命令）
 

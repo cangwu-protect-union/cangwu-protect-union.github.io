@@ -5,7 +5,7 @@
 # Usage:  powershell -ExecutionPolicy Bypass -File tools\check.ps1
 #         powershell -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
 #         powershell -ExecutionPolicy Bypass -File tools\check.ps1 -Last    (after commit: secrets in the new commit only)
-param([switch]$Staged, [switch]$Last)
+param([switch]$Staged, [switch]$Last, [switch]$History)
 
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -205,9 +205,12 @@ try {
     $gitleaks = Find-Tool 'gitleaks'
     if ($gitleaks) {
         Write-Host '--- gitleaks ---' -ForegroundColor Cyan
-        # 只扫 git 历史，不扫工作区：_local/ 里本来就有密码，dir 模式必然报一堆无关的
+        # Scan diffs only, never worktree files (_local/ holds real passwords).
+        # Every commit was scanned when it landed; rescanning the whole history on
+        # each run is pure repetition, so it is behind -History.
         if ($Staged) { & $gitleaks git --pre-commit --staged --redact --no-banner }
-        else { & $gitleaks git --redact --no-banner }
+        elseif ($History) { & $gitleaks git --redact --no-banner }
+        else { & $gitleaks git --pre-commit --redact --no-banner }
         if ($LASTEXITCODE -ne 0) { $failed++ }
     } else {
         Write-Host '--- gitleaks: not installed, skipped ---' -ForegroundColor DarkGray
