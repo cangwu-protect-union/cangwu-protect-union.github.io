@@ -60,7 +60,7 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json
 
 1. **引擎**（有 gap 才做）：state/damage/effect-ops/skills/actions/conditions/timeline/summons；同步 `rpg6-battle` 的 op/钩子表；补单测；升 `data/config.js` 的 `engineVersion`。
 2. **数据**：`rpg6.0/data/skills/<拼音>.js` 新文件 + `index.js` 登记 `characters`/`marks`/`summons`；`conditionText` 逐字对齐；`unsupported` 写原因。
-3. **测试**：`skills.test.mjs` 的 `SHEET`/`CHAR`、角色/技能数断言；每个 implemented 技能至少「条件不足 + 正常释放」两条；多段/召唤/目标选择补引擎用例；浏览器补 `run-all` 用例。
+3. **测试**：`skills.test.mjs` 的 `SHEET`/`CHAR` 已改成从 seed 现算，**不用手抄**，新角色进库就自动有了；`全技能释放` 那条 sweep 会把每条技能机械跑一遍（不抛错、血量/蓝/击溃值/眩晕值不越界、指纹可算），所以别再为每条技能补模板化的「条件不足 / 正常释放」两条。手写只写数值或裁定需要盯住的那几条（多段、掷骰分支、召唤、目标选择、状态交互）。浏览器侧由 `run-all --group=回合制` 的全角色冒烟自动覆盖，不用加用例。
 4. **文档**：机制文档新一节带 `<!-- skill:id -->` 锚点、plan、`游戏说明`、`架构`、`README` 与 `rpg6-battle` 的能力表；数字一律 `node _local/tools/rpg6-stats.js --write` 写回（`test.html` 运行时算）。
 
 ### 5. 验收

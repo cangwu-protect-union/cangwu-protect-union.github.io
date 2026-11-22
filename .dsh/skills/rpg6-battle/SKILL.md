@@ -51,7 +51,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
    - 在 `index.js` 的 `summons` 块加定义（`stats`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`、`attack`、`onExpire`）；
    - 技能 ops 写 `{op:"summon", key:"..."}`；
    - 记住无血计时物 `targetable:false`，有血单位才会进单体目标列表。
-5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`，把新角色补进 `skills.test.mjs` 的 `SHEET` 与 `CHAR`，再跑一次批量压测冒烟；有召唤物/目标选择就补一条浏览器用例。
+5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`——`SHEET`/`CHAR` 从 seed 现算不用补，`全技能释放` 那条会自动把新技能跑一遍；只有数值/裁定要盯的（多段、掷骰分支、召唤、目标选择）才手写用例。浏览器侧不用加用例，`run-all --group=回合制` 的全角色冒烟会覆盖。
 6. 在机制文档里给每条技能加锚点 `<!-- skill:角色拼音.技能 -->`（`### 1.1 技能名（条件） <!-- skill:... -->` 或 `- **技能名（条件）** <!-- skill:... -->：`），漏了 lint 会按「缺少锚点」报。
 7. 跑 `node _local/tools/rpg6-stats.js --write` 把 `test.html` 之外的计数写回 `游戏说明.md`、`架构.md` 机制文档、`README.md` 和本 skill；`test.html` 的数字是运行时算的，不用改。计数不要手写，`--check` 会抓住。
 
