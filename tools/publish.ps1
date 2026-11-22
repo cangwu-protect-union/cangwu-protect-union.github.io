@@ -30,6 +30,8 @@ Push-Location $root
 try {
   $dirty = @(git status --porcelain)
   if ($dirty.Count -gt 0) {
+    Write-Host "about to publish:" -ForegroundColor Cyan
+    git -c core.quotepath=false status --short
     # Stage first: -Staged checks (secret scan, staged-file list, engine version guard)
     # only look at the index, so running them before "git add" would check nothing.
     git add -A
