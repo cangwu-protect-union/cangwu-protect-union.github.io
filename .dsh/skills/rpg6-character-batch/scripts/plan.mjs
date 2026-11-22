@@ -18,11 +18,10 @@ const argv = process.argv.slice(2);
 const root = findRoot(argv);
 const checkFile = argValue(argv, "--check");
 const scaffoldFile = argValue(argv, "--scaffold");
-/* --scaffold --write：直接落盘（建技能文件、登记 index.js、机制文档骨架、写回文档计数）。
-   --check --table：把 plan 渲染成逐技能确认表，替代手抄。 */
+/* --scaffold --write：直接落盘（建技能文件、登记 index.js、机制文档一节、写回文档计数）。
+   --check 校验后直接打印逐技能确认表，不用再加一个开关。 */
 const writeFiles = hasFlag(argv, "--write");
 const forceWrite = hasFlag(argv, "--force");
-const tableMode = hasFlag(argv, "--table");
 /* --mode=plan（默认）：实现前校验，角色已在技能库里就算错。
    --mode=verify：实现后验收，允许角色已在库里；文档计数只由 rpg6-stats.js --check 负责。 */
 const mode = argValue(argv, "--mode") || "plan";
@@ -32,7 +31,7 @@ if (mode !== "plan" && mode !== "verify") {
 }
 const file = checkFile || scaffoldFile;
 if (!file) {
-  console.error("用法：node plan.mjs --check plan.json [--mode=plan|verify] [--table] | --scaffold plan.json [--write] [--out 文件] [--root 仓库]");
+  console.error("用法：node plan.mjs --check plan.json [--mode=plan|verify] | --scaffold plan.json [--write] [--out 文件] [--root 仓库]");
   process.exit(2);
 }
 
@@ -639,7 +638,7 @@ async function writeDocCounts() {
 }
 
 /* 入口放在文件末尾：上面的 const 必须先初始化，否则 writeScaffold 读标记表会撞 TDZ。 */
-if (checkFile && tableMode) console.log("\n" + renderTable(plan));
+if (checkFile) console.log("\n" + renderTable(plan));
 
 if (scaffoldFile) {
   if (writeFiles) {

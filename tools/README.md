@@ -10,6 +10,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Last     # 
 
 退出码 0 表示全过。每一步按顺序跑，任何一步不过都算失败。`-Last` 只跑 gitleaks（`--log-opts=-1`），因为其余检查在提交前已经跑过；`-History` 才复查整段历史。
 
+## 0. 一条命令提交并发布（`publish.ps1`）
+
+```powershell
+powershell -File tools\publish.ps1 -Message _local\tmp\msg.txt
+powershell -File tools\publish.ps1 -Message msg.txt -Url https://cangwu-protect-union.github.io/rpg6.0/test.html -Expect "新特征串"
+```
+
+依次：`check.ps1 -Staged` → `git add -A` + commit → push（失败自动换 HTTP/1.1 重试）→ `check.ps1 -Last` →（给了 `-Url/-Expect` 时）轮询到期望内容出现。工作区干净时只推送、不新建提交。
+
 ## 1. `check.js`（零依赖，只用 node 内置模块）
 
 | 检查 | 内容 |

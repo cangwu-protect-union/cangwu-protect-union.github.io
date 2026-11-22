@@ -9,6 +9,8 @@ description: 把 CPU 官网/鬼图鉴的改动提交并发布到 GitHub Pages：
 
 ## 提交
 
+日常用一条命令：`powershell -File tools\publish.ps1 -Message msg.txt [-Url <页面> -Expect <特征串>]`——它跑 `check.ps1 -Staged`、`git add -A`、commit、push（带重试）、`check.ps1 -Last`，给了 `-Url` 还会轮询到上线。下面是要手工处理时的细节。
+
 提交信息用文件传入，避免引号和换行被 shell 吃掉：
 
 ```powershell

@@ -33,10 +33,10 @@ node .dsh/skills/rpg6-character-batch/scripts/inventory.mjs --remaining --triage
 
 ```powershell
 node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json
-node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json --table
+node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --check plan.json
 ```
 
-`--table` 直接输出逐技能确认表（条件/目标/费用/蓄力/冷却/状态/裁定），不再手抄。**用户明确确认这张表之前，不写数据、不写引擎。**
+`--check` 直接输出逐技能确认表（条件/目标/费用/蓄力/冷却/状态/裁定），不再手抄。**用户明确确认这张表之前，不写数据、不写引擎。**
 
 panel 与 seed 不一致时（档案攻击格是注记），plan 里加 `statOverrides:{atk:"0"}`；实际覆盖要在技能库 `index.js` 的 `panels` 里登记，否则 `makeUnit` 仍读 seed 注记而抛错。
 
@@ -73,7 +73,7 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json --wr
 
 技能库测试不用手抄：`skills.test.mjs` 的 `SHEET`/`CHAR` 从 seed 现算，`全技能释放` 那条会把每条技能机械跑一遍。手写只写数值或裁定要盯住的（多段、掷骰分支、召唤、目标选择、状态交互）。
 
-机制文档正文不用再抄一遍：它取的是 plan 的 `notes`，也就是你在 `--table` 里签过的那一列。`notes` 空着的会留「待补」，`rpg6-lint` 会把「待补」和缺的锚点当错误报出来。
+机制文档正文不用再抄一遍：它取的是 plan 的 `notes`，也就是你在确认表里签过的那一列。`notes` 空着的会留「待补」，`rpg6-lint` 会把「待补」和缺的锚点当错误报出来。
 
 ### 5. 验收（一条命令）
 
@@ -87,11 +87,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 ### 6. 提交
 
-按 `guitu-deploy` 提交，提交信息写清本批角色/技能数与未落地原因；提交后跑 `tools\check.ps1 -Last`（只扫这条提交的密钥）。
+一条命令：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message msg.txt`（内部跑 `check.ps1 -Staged`、提交、push、`check.ps1 -Last`）。提交信息写清本批角色/技能数与未落地原因。
 
 ## 硬规则
 
-- **逻辑未确认不写代码**；用户确认的是逐技能表（`--table` 的输出），不是「大概懂了」。
+- **逻辑未确认不写代码**；用户确认的是逐技能表（`--check` 打印的那张），不是「大概懂了」。
 - 数据库是唯一数据源；seed 只用于离线盘点，不一致先修再继续。
 - `conditionText` 逐字一致（忽略空白）；改规则升 `engineVersion`；召唤物/新钩子进 `state.hash` 与回放。
 - 新增 op/钩子/数值表达式/状态名/字段时同步 `_local/tools/rpg6-spec.js`，否则 `rpg6-lint.js` 按白名单报错。
@@ -101,7 +101,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 ## 交付前检查
 
-- [ ] 用户已确认 `--table` 的逐技能表；`plan --check` 通过；engine-gap 都有引擎方案与用户确认
+- [ ] 用户已确认 `--check` 打印的逐技能表；`plan --check` 通过；engine-gap 都有引擎方案与用户确认
 - [ ] `plan --scaffold --write` 已落盘；`index.js` 四处登记正确；机制文档锚点齐全且没有「待补」
 - [ ] `verify.ps1 -Plan plan.json` 全绿（改了页面再加 `-Browser`）
 - [ ] 每批 unsupported/engine-gap 有可核对原因；提交后 `check.ps1 -Last` 通过；`_local/` 未进提交

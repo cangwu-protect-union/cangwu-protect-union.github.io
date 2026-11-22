@@ -71,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 它依次跑 plan（给 `-Plan` 时）、引擎单测、冒烟压测、`check.ps1`。改了对局页、技能结算或样式才加 `-Browser` 跑浏览器组（默认不跑，结尾打一行提示）；全量压测用 `-Full`。
 
-改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；用 `node tools/rpg6-bump.mjs <新版本>` 一次改两处并写回文档里的版本号。文档里的角色数/技能数/op 数/unsupported 表不要手写，由 `rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`：盘点 → `plan --table` 出确认表 → `plan --scaffold --write` 落盘 → `verify.ps1`。
+改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；用 `node tools/rpg6-bump.mjs <新版本>` 一次改两处并写回文档里的版本号。文档里的角色数/技能数/op 数/unsupported 表不要手写，由 `rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`：盘点 → `plan --check` 出确认表 → `plan --scaffold --write` 落盘 → `verify.ps1`。
 
 **眩晕值口径（6.0-engine.9 起）**：一般伤害默认不加眩晕值，只有伤害 op 标 `addStun: true` 才加；击溃值仍按默认 +1。其余口径（法伤、取整、击溃、召唤物）只看 `rpg6-battle` 的「已经定死的口径」一张表，别在别处再抄一份。
 
@@ -83,11 +83,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 ## 提交前
 
-改动完成并跑完校验后直接提交，无需用户再批准。
+改动完成并跑完校验后直接提交，无需用户再批准。提交与推送用一条命令：
 
-`git status --short` 逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message <提交信息文件> [-Url <页面> -Expect <特征串>]
+```
 
-提交后再跑一次 `tools/check.ps1 -Last`：gitleaks 只扫 commit，工作区通过不代表提交后通过；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
+它依次跑 `check.ps1 -Staged`、`git add -A`、commit、push（失败自动重试）、`check.ps1 -Last`；给了 `-Url/-Expect` 就轮询到线上出现特征串。
+
+`git status --short` 仍要逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。gitleaks 只扫 commit（`-Last`/`-History`）；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
 
 **DSH 沙箱**：`.git/` 不可写、node 派生不了子进程（`execFileSync` 报 EPERM）。所以 `git add`/`commit` 要一次 full-access；`tools/archive-check.mjs` 也只能在普通终端或 full-access 下跑（git 不可用时它直接退出 2，不再产出空白交接）。仓库卫生、体积闸、暂存区检查已经挪到 `check.ps1` 里用 PowerShell 调 git，`node tools/check.js` 里没有这三项。
 
