@@ -33,13 +33,13 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放与界面细节拆在 battle-page-record.js / battle-page-ui.js） |
 | `_local/tests/engine/run.mjs` | 引擎单测入口 |
 | `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
-| `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（19 人可选、召唤物带、墓回血、844×390） |
+| `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |
 
 规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->29 人 104 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
-单个角色可按本节手写；批量/多角色用 `rpg6-character-batch` 的 `plan.mjs`/`--scaffold`/`verify.ps1`，避免漏技能、漏 unsupported 原因和计数漂移。
+单角色手写按本节；批量/多角色用 `rpg6-character-batch` 的 `plan.mjs --check --table`（确认表）与 `--scaffold --write`（落盘：建文件 + 登记 `index.js` + 机制文档骨架 + 文档计数）。
 
 1. 档案里已经有这个角色（`rpg6.0` 的角色表或 `data/characters.js` 兜底），`skills[]` 有名称与条件文本。
 2. 在 `data/skills/` 新建该角色的文件（拼音命名，`export default [...]`）并在 `index.js` 的 `characters` 里登记，每条技能：
@@ -52,8 +52,8 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
    - 技能 ops 写 `{op:"summon", key:"..."}`；
    - 记住无血计时物 `targetable:false`，有血单位才会进单体目标列表。
 5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`——`SHEET`/`CHAR` 从 seed 现算不用补，`全技能释放` 那条会自动把新技能跑一遍；只有数值/裁定要盯的（多段、掷骰分支、召唤、目标选择）才手写用例。浏览器侧不用加用例，`run-all --group=回合制` 的全角色冒烟会覆盖。
-6. 在机制文档里给每条技能加锚点 `<!-- skill:角色拼音.技能 -->`（`### 1.1 技能名（条件） <!-- skill:... -->` 或 `- **技能名（条件）** <!-- skill:... -->：`），漏了 lint 会按「缺少锚点」报。
-7. 跑 `node _local/tools/rpg6-stats.js --write` 把 `test.html` 之外的计数写回 `游戏说明.md`、`架构.md` 机制文档、`README.md` 和本 skill；`test.html` 的数字是运行时算的，不用改。计数不要手写，`--check` 会抓住。
+6. 机制文档锚点用 `<!-- skill:角色拼音.技能 -->`；`plan.mjs --write` 会插骨架，手写时以 lint 打出的可粘贴行为准。
+7. 文档里的数字、op 表、unsupported 表都由 `node _local/tools/rpg6-stats.js --write` 写回（本 skill 也在 DOCS 里）；不要手写，`--check` 会抓。
 
 ## 技能 DSL 速查
 
@@ -130,18 +130,13 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 
 ## 测试
 
-```powershell
-$node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\bin\node.exe" |
-  Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName   # 本机 PATH 没有 node
+一条命令验收（在仓库根跑，脚本自己找 node）：
 
-& $node _local/tests/engine/run.mjs
-& $node _local/tests/engine/batch.mjs --pairs=smoke --seeds=1
-& $node _local/tests/engine/batch.mjs --seeds=4
-& $node _local/tools/rpg6-lint.js
-& $node _local/tools/rpg6-stats.js --check
-& $node _local/tests/run-all.mjs --group=回合制
-& powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1
 ```
+
+它依次跑 `run.mjs` → `batch --pairs=smoke --seeds=1` → `check.ps1`（含 lint 与 stats --check）。改了对局页、技能结算或样式加 `-Browser` 跑 `run-all --group=回合制`；全量压测加 `-Full`（`--seeds=4`）。单跑某一步看细项时再直接调对应脚本。
 
 压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。用例条数不要写在这一行（会过期），看 `run.mjs` 与 `run-all.mjs --list` 的实际输出。
 
@@ -149,16 +144,13 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 
 ## 交付前检查
 
-- [ ] `run.mjs` 全绿
-- [ ] `batch --pairs=smoke` 无引擎异常
-- [ ] `rpg6-lint.js` 退出码 0（结构、锚点、版本号）
-- [ ] `rpg6-stats.js --check` 退出码 0（文档数字；改了数据先 `--write`）
-- [ ] `run-all.mjs --group=回合制` 全绿（含 `844×390` 横屏用例；带召唤物时一屏）
-- [ ] `check.ps1` 退出码 0
-- [ ] 文档里的角色数/技能数由 `rpg6-stats.js --write` 写回，没有手写数字（`test.html` 是运行时算的）
+- [ ] `verify.ps1` 退出码 0（plan/单测/冒烟/check 全过）
+- [ ] 改了对局页或结算：`verify.ps1 -Browser` 全绿（含 `844×390` 横屏用例；带召唤物时一屏）
+- [ ] `rpg6-lint.js` 退出码 0（结构、锚点、版本号）；机制文档没有「待补」
+- [ ] 文档里的数字/op 表/unsupported 表由 `rpg6-stats.js --write` 写回，没有手写（`test.html` 是运行时算的）
 - [ ] 新角色写进机制文档并带 `<!-- skill:id -->` 锚点，`unsupported` 的技能写明原因；召唤物写进 `summons` 块与 `state.hash`
 - [ ] 动过对局页：桌面 1280×900 与手机 844×390 各截一张图核对，确认没有任何一块要横向滚动
-- [ ] 会话要归档时，把新增口径/命令/坑写进本 skill 和根 `AGENTS.md`，再推送
+- [ ] 提交后 `tools\check.ps1 -Last` 通过；会话要归档时把新增口径/命令/坑写进本 skill 和根 `AGENTS.md`
 
 ## 踩过的坑
 

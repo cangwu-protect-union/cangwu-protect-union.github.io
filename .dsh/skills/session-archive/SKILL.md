@@ -65,8 +65,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 
 | 领域 | 补跑 |
 |---|---|
-| 策略实验室 | `node rpg6.0/strategy-lab/selftest.mjs` |
-| 战斗引擎 | `node _local/tests/engine/run.mjs`、`batch.mjs --pairs=smoke --seeds=1` |
+| 战斗引擎 | `verify.ps1`（plan/单测/冒烟/check 一条命令；改页面再加 `-Browser`） |
 | 页面改动 | 浏览器实测（`guitu-browser-test`） |
 | 数据层/导航 | `run-all.mjs --group=数据源` / `--group=导航` |
 

@@ -4,21 +4,13 @@
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File tools\check.ps1
 #         powershell -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
-param([switch]$Staged)
+#         powershell -ExecutionPolicy Bypass -File tools\check.ps1 -Last    (after commit: secrets in the new commit only)
+param([switch]$Staged, [switch]$Last)
 
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $failed = 0
-
-function Find-Node {
-    $cmd = Get-Command node -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    $cands = @()
-    $cands += Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\bin\node.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName
-    $cands += 'C:\Program Files\nodejs\node.exe'
-    foreach ($c in $cands) { if ($c -and (Test-Path $c)) { return $c } }
-    return $null
-}
+. "$root\tools\node.ps1"
 
 function Find-Tool([string]$name) {
     $cmd = Get-Command $name -ErrorAction SilentlyContinue
@@ -70,7 +62,29 @@ function Test-EngineVersionGuard {
 
 Write-Host '=== project check ===' -ForegroundColor Cyan
 
-$node = Find-Node
+# Post-commit mode: only the new commit can contain secrets that the working tree pass missed.
+# Everything else was already checked before the commit.
+if ($Last) {
+    $gitleaksLast = Find-Tool 'gitleaks'
+    if (-not $gitleaksLast) {
+        Write-Host 'gitleaks: not installed, skipped' -ForegroundColor DarkGray
+        exit 0
+    }
+    Push-Location $root
+    try {
+        & $gitleaksLast git --log-opts=-1 --redact --no-banner
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host 'FAILED: the last commit has leaks' -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host 'POST-COMMIT CHECK PASSED' -ForegroundColor Green
+    exit 0
+}
+
+$node = Get-NodeExe
 if (-not $node) {
     Write-Host 'node not found. Install Node.js LTS or keep the DSH bundled runtime.' -ForegroundColor Red
     exit 2

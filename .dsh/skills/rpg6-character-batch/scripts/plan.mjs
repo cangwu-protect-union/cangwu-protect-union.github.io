@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import {
   argValue,
   eachOp,
@@ -9,6 +10,7 @@ import {
   loadLibrary,
   loadSeed,
   norm,
+  repoRoot,
   seedStats
 } from "./lib.mjs";
 
@@ -16,9 +18,14 @@ const argv = process.argv.slice(2);
 const root = findRoot(argv);
 const checkFile = argValue(argv, "--check");
 const scaffoldFile = argValue(argv, "--scaffold");
+/* --scaffold --write：直接落盘（建技能文件、登记 index.js、机制文档骨架、写回文档计数）。
+   --check --table：把 plan 渲染成逐技能确认表，替代手抄。 */
+const writeFiles = hasFlag(argv, "--write");
+const forceWrite = hasFlag(argv, "--force");
+const tableMode = hasFlag(argv, "--table");
 /* --mode=plan（默认）：实现前校验，角色已在技能库里就算错。
    --mode=verify：实现后验收，允许角色已在库里，plan.docs 的期望值不再比对
-   （文档计数由 rpg6-stats.js --check 与 audit-docs.mjs 负责，重复计数只会误报）。 */
+   （文档计数由 rpg6-stats.js --check 负责，plan 里再写一份只会误报）。 */
 const mode = argValue(argv, "--mode") || "plan";
 if (mode !== "plan" && mode !== "verify") {
   console.error("--mode 只接受 plan 或 verify");
@@ -26,7 +33,7 @@ if (mode !== "plan" && mode !== "verify") {
 }
 const file = checkFile || scaffoldFile;
 if (!file) {
-  console.error("用法：node plan.mjs --check plan.json [--mode=plan|verify] | --scaffold plan.json [--out 文件] [--root 仓库]");
+  console.error("用法：node plan.mjs --check plan.json [--mode=plan|verify] [--table] | --scaffold plan.json [--write] [--out 文件] [--root 仓库]");
   process.exit(2);
 }
 
@@ -60,6 +67,9 @@ for (const [index, character] of (plan.characters || []).entries()) {
   if (!seedChar) {
     fail(where + " 的角色不在 seed 的 33 人里：" + character.name);
     continue;
+  }
+  if (!/^[a-z][a-z0-9_-]*$/.test(String(character.fixture || ""))) {
+    fail(character.name + " 的 fixture 只能是小写字母、数字、下划线或短横线（用作技能文件名）：" + character.fixture);
   }
   const inLibrary = Object.hasOwn(lib.characters || {}, character.name);
   if (inLibrary && !allowExisting) fail(character.name + " 已在技能库里；更新已有角色要显式 allowExisting:true");
@@ -124,10 +134,9 @@ for (const [index, character] of (plan.characters || []).entries()) {
   }
 }
 
-projectedSkills += (plan.characters || []).reduce(
-  (n, c) => n + (c.skills || []).length,
-  0
-);
+/* allowExisting 的条目是改已有角色，不该再加进预计总量。 */
+const addedCharacters = (plan.characters || []).filter((c) => newCharacters.includes(c.name));
+projectedSkills += addedCharacters.reduce((n, c) => n + (c.skills || []).length, 0);
 
 for (const [owner, marks] of Object.entries(plan.marks || {})) {
   if (!Array.isArray(marks)) {
@@ -190,9 +199,9 @@ const projected = mode === "verify"
     characters: libCharactersCount() + newCharacters.length,
     skills: projectedSkills,
     implemented: libSkills.filter((s) => !s.unsupported).length +
-      (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status === "implemented").length, 0),
+      addedCharacters.reduce((n, c) => n + (c.skills || []).filter((s) => s.status === "implemented").length, 0),
     unsupported: projectedUnsupported +
-      (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status && s.status !== "implemented").length, 0)
+      addedCharacters.reduce((n, c) => n + (c.skills || []).filter((s) => s.status && s.status !== "implemented").length, 0)
   };
 
 for (const warning of warnings) console.warn("WARN " + warning);
@@ -207,17 +216,6 @@ console.log("计划通过：" + plan.characters.length + " 名角色 / " +
 console.log((mode === "verify" ? "技能库现状：角色 " : "预计总量：角色 ") + projected.characters + " / 技能 " + projected.skills +
   "（implemented " + projected.implemented + " / unsupported " + projected.unsupported + "）");
 if (plan.engine) console.log("引擎：" + plan.engine.version + (changes.length ? "，变更 " + changes.length + " 项" : ""));
-
-if (scaffoldFile) {
-  const text = scaffold(plan);
-  const out = argValue(argv, "--out");
-  if (out) {
-    fs.writeFileSync(path.resolve(out), text, "utf8");
-    console.log("脚手架写到 " + path.resolve(out));
-  } else {
-    console.log("\n" + text);
-  }
-}
 
 function validateSkill(owner, skill, source) {
   const name = owner + " · " + skill.name;
@@ -354,34 +352,7 @@ function scaffold(input) {
     registry.push('    ' + JSON.stringify(character.name) + ": " + file + ",");
 
     parts.push("// ===== rpg6.0/data/skills/" + file + ".js =====");
-    parts.push("/* 回合制正传 6.0 · 技能库 · " + character.name + " */");
-    parts.push("export default [");
-    const list = [];
-    for (const skill of character.skills) {
-      const data = {
-        id: skill.id,
-        name: skill.name,
-        conditionText: skill.condition
-      };
-      if (skill.passive) data.passive = true;
-      data.cost = skill.cost || { mp: 0 };
-      data.charge = Number(skill.charge) || 0;
-      data.cooldown = Number(skill.cooldown) || 0;
-      data.target = skill.target || "enemy";
-      if (skill.once) data.once = true;
-      if (skill.costFromLost) data.costFromLost = skill.costFromLost;
-      if (skill.requires && skill.requires.length) data.requires = skill.requires;
-      if (skill.input) data.input = skill.input;
-      data.ops = skill.ops || [];
-      if (skill.chargeOps && skill.chargeOps.length) data.chargeOps = skill.chargeOps;
-      if (skill.hooks && Object.keys(skill.hooks).length) data.hooks = skill.hooks;
-      if (skill.choices && skill.choices.length) data.choices = skill.choices;
-      if (skill.unsupported) data.unsupported = skill.unsupported;
-      list.push(JSON.stringify(data, null, 2));
-    }
-    const indented = list.map((item) => item.split("\n").map((line) => "    " + line).join("\n"));
-    parts.push(indented.join(",\n"));
-    parts.push("];");
+    parts.push(skillFileText(character));
   }
 
   parts.push("\n// ===== rpg6.0/data/skills/index.js · import 追加 =====");
@@ -404,32 +375,6 @@ function scaffold(input) {
       .join(",\n"));
   }
 
-  parts.push("\n// ===== _local/tests/engine/skills.test.mjs · SHEET 追加 =====");
-  const sheet = {};
-  for (const character of input.characters) {
-    sheet[character.name] = character.skills.map((s) => [s.name, s.condition]);
-  }
-  parts.push(JSON.stringify(sheet, null, 2));
-
-  parts.push("\n// ===== _local/tests/engine/skills.test.mjs · CHAR fixture =====");
-  for (const [index, character] of input.characters.entries()) {
-    const seedChar = seedByName.get(character.name);
-    const fixture = character.fixture || ("c" + index);
-    const fixtureId = character.fixtureId || ("t-" + fixture);
-    const shown = Object.assign({}, seedStats(seedChar), character.statOverrides || {});
-    parts.push(JSON.stringify(fixture) + ": { id: " + JSON.stringify(fixtureId) +
-      ", name: " + JSON.stringify(character.name) +
-      ", gender: " + JSON.stringify(seedChar.gender) +
-      ", occupation: " + JSON.stringify(seedChar.occupation) +
-      ", side_job: " + JSON.stringify(seedChar.side_job || "") +
-      ", atk: " + JSON.stringify(shown.atk) +
-      ", def: " + JSON.stringify(shown.def) +
-      ", mres: " + JSON.stringify(shown.mres) +
-      ", hp: " + JSON.stringify(shown.hp) +
-      ", mp: " + JSON.stringify(shown.mp) +
-      ", spd: " + JSON.stringify(shown.spd) + " },");
-  }
-
   parts.push("\n// ===== 测试清单 =====");
   for (const character of input.characters) {
     for (const skill of character.skills) {
@@ -440,10 +385,282 @@ function scaffold(input) {
     }
   }
 
-  parts.push("\n// ===== 文档计数（预计） =====");
-  parts.push("// 角色 " + (libCharactersCount() + newCharacters.length) +
-    " / 技能 " + (libSkills.length + input.characters.reduce((n, c) => n + c.skills.length, 0)));
-  parts.push("// 跑 node _local/tools/rpg6-stats.js --write 写回，再跑 audit-docs.mjs 与 check.ps1");
+  parts.push("\n// ===== 下一步 =====");
+  parts.push("// 跑 plan.mjs --scaffold plan.json --write：建技能文件、登记 index.js、写机制文档骨架、写回文档计数");
 
   return parts.join("\n");
+}
+
+/* ---------------- 落盘（--scaffold --write） ---------------- */
+
+/* index.js 里的四行锚点。删了它们 --write 会拒绝写盘，因为没法安全定位插入点。 */
+const SCAFFOLD_MARKERS = {
+  imports: "/* RPG6-SCAFFOLD:imports */",
+  marks: "/* RPG6-SCAFFOLD:marks */",
+  summons: "/* RPG6-SCAFFOLD:summons */",
+  characters: "/* RPG6-SCAFFOLD:characters */"
+};
+
+function fixtureOf(character) {
+  return String(character.fixture || "");
+}
+
+const KEY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function keyText(key) {
+  return KEY_RE.test(key) ? key : JSON.stringify(key);
+}
+
+/* 单行不超过 96 列的写成一行，超了才展开；输出是 JS 字面量，键名尽量不带引号。 */
+function literal(value, depth) {
+  const flat = flatText(value);
+  if (flat.indexOf("\n") < 0 && flat.length + depth * 2 <= 96) return flat;
+  const pad = "  ".repeat(depth);
+  const inner = "  ".repeat(depth + 1);
+  if (Array.isArray(value)) {
+    return "[\n" + value.map((item) => inner + literal(item, depth + 1)).join(",\n") + "\n" + pad + "]";
+  }
+  const keys = Object.keys(value);
+  return "{\n" + keys.map((key) => inner + keyText(key) + ": " + literal(value[key], depth + 1)).join(",\n") + "\n" + pad + "}";
+}
+
+function flatText(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "[" + value.map(flatText).join(", ") + "]";
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    if (!keys.length) return "{}";
+    return "{ " + keys.map((key) => keyText(key) + ": " + flatText(value[key])).join(", ") + " }";
+  }
+  return JSON.stringify(value);
+}
+
+/* plan 的技能对象 → 技能库里的技能对象（notes 只留在 plan 里，不写进游戏数据）。 */
+function skillData(skill) {
+  const data = { id: skill.id, name: skill.name, conditionText: skill.condition };
+  if (skill.passive) data.passive = true;
+  data.cost = skill.cost || { mp: 0 };
+  data.charge = Number(skill.charge) || 0;
+  data.cooldown = Number(skill.cooldown) || 0;
+  data.target = skill.target || "enemy";
+  if (skill.once) data.once = true;
+  if (skill.costFromLost) data.costFromLost = skill.costFromLost;
+  if (skill.requires && skill.requires.length) data.requires = skill.requires;
+  if (skill.input) data.input = skill.input;
+  data.ops = skill.ops || [];
+  if (skill.chargeOps && skill.chargeOps.length) data.chargeOps = skill.chargeOps;
+  if (skill.hooks && Object.keys(skill.hooks).length) data.hooks = skill.hooks;
+  if (skill.choices && skill.choices.length) data.choices = skill.choices;
+  if (skill.unsupported) data.unsupported = skill.unsupported;
+  return data;
+}
+
+function skillFileText(character) {
+  const items = character.skills.map((skill) => "  " + literal(skillData(skill), 1));
+  return "/* 回合制正传 6.0 · 技能库 · " + character.name + "（plan.mjs --write 生成，之后直接改这里） */\n" +
+    "export default [\n" + items.join(",\n") + "\n];\n";
+}
+
+/* 逐技能确认表：条件、目标、费用、蓄力、冷却、裁定，签完再落盘。 */
+function renderTable(input) {
+  const lines = [
+    "| 角色 | 技能 | 条件 | 目标 | 费用 | 蓄力 | 冷却 | 状态 | 裁定 |",
+    "|---|---|---|---|---|---|---|---|---|"
+  ];
+  for (const character of input.characters) {
+    for (const skill of character.skills) {
+      const status = skill.status === "implemented" ? "实现" : skill.status === "engine-gap" ? "缺引擎" : "置灰";
+      lines.push("| " + [
+        character.name,
+        skill.name,
+        skill.condition,
+        skill.target || "enemy",
+        costText(skill),
+        skill.charge ? String(skill.charge) : "-",
+        skill.cooldown ? String(skill.cooldown) : "-",
+        status,
+        skill.notes || skill.unsupported || ""
+      ].map(cellText).join(" | ") + " |");
+    }
+  }
+  return lines.join("\n");
+}
+
+function cellText(value) {
+  return String(value == null ? "" : value).replace(/\|/g, "\\|");
+}
+
+function costText(skill) {
+  const cost = skill.cost || {};
+  const parts = [];
+  if (cost.mp) parts.push("蓝" + cost.mp);
+  if (cost.hp) parts.push("血" + cost.hp);
+  if (cost.def) parts.push("防" + cost.def);
+  if (cost.maxMp) parts.push("蓝上限" + cost.maxMp);
+  return parts.length ? parts.join(" + ") : "-";
+}
+
+const SECTION_HEADERS = {
+  [SCAFFOLD_MARKERS.imports]: "import ",
+  [SCAFFOLD_MARKERS.marks]: "marks: {",
+  [SCAFFOLD_MARKERS.summons]: "summons: {",
+  [SCAFFOLD_MARKERS.characters]: "characters: {"
+};
+
+function sectionText(text, marker) {
+  const at = text.indexOf(marker);
+  if (at < 0) return "";
+  const from = text.lastIndexOf(SECTION_HEADERS[marker], at);
+  return from < 0 ? "" : text.slice(from, at);
+}
+
+/* 插到锚点所在行的行首，块的缩进由调用方给，不会叠出 8 个空格。 */
+function insertBlock(text, marker, block) {
+  const at = text.indexOf(marker);
+  const lineStart = text.lastIndexOf("\n", at) + 1;
+  return text.slice(0, lineStart) + block + text.slice(lineStart);
+}
+
+function addImports(text, fixtures) {
+  const marker = SCAFFOLD_MARKERS.imports;
+  const end = text.indexOf(marker);
+  const start = text.indexOf("import ");
+  const lines = text.slice(start, end).split("\n").filter((line) => line.startsWith("import "));
+  for (const fixture of fixtures) lines.push('import ' + fixture + ' from "./' + fixture + '.js";');
+  return text.slice(0, start) + lines.sort().join("\n") + "\n" + text.slice(end);
+}
+
+function docSkeleton(character) {
+  const lines = ["", "## " + character.name + "（" + fixtureOf(character) + "）", ""];
+  for (const skill of character.skills) {
+    lines.push("- **" + skill.name + "（" + skill.condition + "）** <!-- skill:" + skill.id + " -->：待补");
+  }
+  return lines.join("\n") + "\n";
+}
+
+async function writeScaffold(input) {
+  const problems = [];
+  const indexFile = path.join(root, "rpg6.0", "data", "skills", "index.js");
+  const docFile = path.join(root, "_local", "docs", "回合制6.0测试功能-角色机制.md");
+  const index = fs.existsSync(indexFile) ? fs.readFileSync(indexFile, "utf8") : "";
+
+  if (!index) problems.push("读不到 rpg6.0/data/skills/index.js");
+  for (const marker of Object.values(SCAFFOLD_MARKERS)) {
+    const count = index.split(marker).length - 1;
+    if (count !== 1) problems.push("index.js 的锚点 " + marker + " 出现 " + count + " 次，应恰好 1 次；不要删锚点行");
+  }
+
+  const planned = [];
+  for (const character of input.characters) {
+    const fixture = fixtureOf(character);
+    const file = path.join(root, "rpg6.0", "data", "skills", fixture + ".js");
+    if (fs.existsSync(file) && !forceWrite) problems.push("rpg6.0/data/skills/" + fixture + ".js 已存在（要覆盖加 --force）");
+    if (index.includes('import ' + fixture + ' from "')) problems.push("index.js 里已经 import 过 " + fixture);
+    if (sectionText(index, SCAFFOLD_MARKERS.characters).includes('"' + character.name + '":')) {
+      problems.push("index.js 的 characters 里已经有 " + character.name);
+    }
+    planned.push({ character, fixture, file, text: skillFileText(character) });
+  }
+  for (const owner of Object.keys(input.marks || {})) {
+    if (sectionText(index, SCAFFOLD_MARKERS.marks).includes('    "' + owner + '":')) {
+      problems.push("index.js 的 marks 里已经有 " + owner + "（合并进已有条目，别重复登记）");
+    }
+  }
+  for (const key of Object.keys(input.summons || {})) {
+    if (sectionText(index, SCAFFOLD_MARKERS.summons).includes('"' + key + '":')) {
+      problems.push("index.js 的 summons 里已经有 " + key);
+    }
+  }
+  if (problems.length) {
+    for (const problem of problems) console.error("ERROR " + problem);
+    console.error("\n没有写任何文件。");
+    process.exit(1);
+  }
+
+  const summary = [];
+  for (const item of planned) {
+    fs.writeFileSync(item.file, item.text, "utf8");
+    summary.push("新建 rpg6.0/data/skills/" + item.fixture + ".js（" + item.character.skills.length + " 条技能）");
+  }
+
+  let next = addImports(index, planned.map((item) => item.fixture));
+  const markEntries = Object.entries(input.marks || {});
+  if (markEntries.length) {
+    next = insertBlock(next, SCAFFOLD_MARKERS.marks,
+      markEntries.map(([owner, marks]) => "    " + JSON.stringify(owner) + ": " + literal(marks, 2) + ",\n").join(""));
+    summary.push("index.js 登记 marks：" + markEntries.map(([owner]) => owner).join("、"));
+  }
+  const summonEntries = Object.entries(input.summons || {});
+  if (summonEntries.length) {
+    next = insertBlock(next, SCAFFOLD_MARKERS.summons,
+      summonEntries.map(([key, summon]) => "    " + JSON.stringify(key) + ": " + literal(summon, 2) + ",\n").join(""));
+    summary.push("index.js 登记 summons：" + summonEntries.map(([key]) => key).join("、"));
+  }
+  next = insertBlock(next, SCAFFOLD_MARKERS.characters,
+    planned.map((item) => "    " + JSON.stringify(item.character.name) + ": " + item.fixture + ",\n").join(""));
+  fs.writeFileSync(indexFile, next, "utf8");
+  summary.push("index.js 登记 characters：" + planned.map((item) => item.character.name).join("、") + "（" + planned.length + " 人）");
+
+  if (fs.existsSync(docFile)) {
+    let doc = fs.readFileSync(docFile, "utf8");
+    for (const item of planned) {
+      doc += docSkeleton(item.character);
+      summary.push("机制文档追加 " + item.character.name + " 的 " + item.character.skills.length + " 个锚点（正文写「待补」）");
+    }
+    fs.writeFileSync(docFile, doc, "utf8");
+  } else {
+    summary.push("SKIP 没有 _local/docs/回合制6.0测试功能-角色机制.md，锚点骨架未写");
+  }
+
+  summary.push(...(await writeDocCounts()));
+
+  console.log("\n已落盘：");
+  for (const line of summary) console.log("  " + line);
+  console.log("\n下一步：");
+  console.log("  1. 有 engine-gap 才写引擎与单测；改规则后 node tools/rpg6-bump.mjs <新版本>");
+  console.log("  2. 机制文档里的「待补」改成正文；rpg6-lint 会把还缺的锚点行打出来");
+  console.log("  3. 验收：verify.ps1 -Plan <plan>（改了页面才加 -Browser）");
+}
+
+/* 文档计数直接调 rpg6-stats 的渲染逻辑，不派生子进程（DSH 沙箱下 spawn 会 EPERM）。 */
+async function writeDocCounts() {
+  const file = path.join(root, "_local", "tools", "rpg6-stats.js");
+  if (!fs.existsSync(file)) return ["SKIP 没有 _local/tools/rpg6-stats.js，文档计数未写回"];
+  if (path.resolve(root) !== path.resolve(repoRoot())) return ["SKIP 演练目录不写文档计数"];
+  const require = createRequire(import.meta.url);
+  const tool = require(file);
+  const stats = await tool.computeStats();
+  const out = [];
+  for (const doc of tool.DOCS) {
+    if (!fs.existsSync(doc.file)) continue;
+    const before = fs.readFileSync(doc.file, "utf8");
+    const result = tool.renderDocument(before, stats, doc.file);
+    if (result.errors.length) {
+      out.push("文档计数区间有问题（" + doc.file + "）：" + result.errors.join("；"));
+      continue;
+    }
+    if (result.text === before) continue;
+    fs.writeFileSync(doc.file, result.text, "utf8");
+    out.push("写回文档计数 " + path.relative(root, doc.file).replace(/\\/g, "/"));
+  }
+  out.push("文档计数：" + stats.characters + " 名角色 / " + stats.skills + " 条技能");
+  return out;
+}
+
+/* 入口放在文件末尾：上面的 const 必须先初始化，否则 writeScaffold 读标记表会撞 TDZ。 */
+if (checkFile && tableMode) console.log("\n" + renderTable(plan));
+
+if (scaffoldFile) {
+  if (writeFiles) {
+    await writeScaffold(plan);
+  } else {
+    const text = scaffold(plan);
+    const out = argValue(argv, "--out");
+    if (out) {
+      fs.writeFileSync(path.resolve(out), text, "utf8");
+      console.log("脚手架写到 " + path.resolve(out));
+    } else {
+      console.log("\n" + text);
+    }
+  }
 }

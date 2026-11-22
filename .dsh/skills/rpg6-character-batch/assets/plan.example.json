@@ -1,13 +1,9 @@
 {
-  "batch": "示例：赵云哲（真实候选，未写入游戏；只演示 plan 格式与脚手架）",
-  "allowExisting": false,
+  "batch": "示例：赵云哲（已在技能库；allowExisting 演示改已有角色，--check 可通过，不要 --write）",
+  "allowExisting": true,
   "engine": {
-    "version": "6.0-engine.8",
+    "version": "6.0-engine.11",
     "changes": []
-  },
-  "docs": {
-    "expectedCharacters": 20,
-    "expectedSkills": 71
   },
   "characters": [
     {

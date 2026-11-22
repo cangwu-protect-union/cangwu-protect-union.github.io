@@ -6,7 +6,9 @@ import {
   loadLibrary,
   loadSeed,
   printCounts,
-  statusMark
+  printTriage,
+  statusMark,
+  triageRows
 } from "./lib.mjs";
 
 const argv = process.argv.slice(2);
@@ -36,6 +38,10 @@ if (only) {
 }
 
 const all = hasFlag(argv, "--all");
+if (hasFlag(argv, "--triage")) {
+  printTriage(triageRows(rows, all));
+  process.exit(0);
+}
 const list = all ? rows : rows.filter((r) => !r.inLibrary);
 console.log("\n" + (all ? "全部角色" : "剩余角色") + "：" + list.length);
 for (const row of list) printCharacter(row, all);

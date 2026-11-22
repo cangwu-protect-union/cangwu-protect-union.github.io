@@ -4,10 +4,11 @@
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged   # 提交前：多查暂存区与引擎版本闸
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Last     # 提交后：只扫最后一条提交的密钥
 ```
 
-退出码 0 表示全过。每一步按顺序跑，任何一步不过都算失败。
+退出码 0 表示全过。每一步按顺序跑，任何一步不过都算失败。`-Last` 只跑 gitleaks（`--log-opts=-1`），因为其余检查在提交前已经跑过。
 
 ## 1. `check.js`（零依赖，只用 node 内置模块）
 
@@ -103,12 +104,21 @@ node _local\tools\build-docs.js --check
 | 脚本 | 管什么 | 失败长什么样 |
 |---|---|---|
 | `rpg6-lint.js` | 技能库结构：op 在 `opNames` 里、每个 op 的字段与必填项、`mark` / `counter` / `summon` / `use` 的引用存在、数值表达式的 8 个键、`hooks` 名字存在、`conditionText` 与档案一致、`test.html` 加载了全部引擎脚本、`version.js` 与 `config.js` 版本一致、机制文档每个技能 id 都有 `<!-- skill:id -->` 锚点 | 退出码 1，按 `角色 / 技能 / 字段: 原因` 列出来 |
-| `rpg6-stats.js --check` | 文档里的角色数、技能数、op 数、`unsupported` 条数、引擎版本、`test.html` 的 script 数、op 表整表 | 退出码 1，报 `文件:行号` 与「磁盘 / 应为」 |
+| `rpg6-stats.js --check` | 文档里的角色数、技能数、op 数、`unsupported` 条数与表格、op 一览、被动钩子、引擎版本、`test.html` 的 script 数 | 退出码 1，报 `文件:行号` 与「磁盘 / 应为」 |
 
 ```powershell
 node _local\tools\rpg6-lint.js            # --json 给机器读，--warn 只提醒
 node _local\tools\rpg6-stats.js --check   # --write 把数字写回去，--json 打印统计
+node tools\rpg6-bump.mjs 6.0-engine.12    # 升版本：version.js、data/config.js 与文档一起改
 ```
+
+回合制改动的验收只需一条命令（plan → 引擎单测 → 冒烟压测 → 本节所有闸）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1
+```
+
+改了对局页、技能结算或样式加 `-Browser` 跑浏览器组；全量压测加 `-Full`。
 
 文档里的数字写在带名字的标记区间里，区间内容由脚本整段重写，区间外的句子仍是手写：
 
@@ -116,7 +126,7 @@ node _local\tools\rpg6-stats.js --check   # --write 把数字写回去，--json 
 - 引擎版本：`<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`
 ```
 
-区间名就是生成器名，见 `rpg6-stats.js` 的 `RENDERERS`。参与生成的文档只有三处：`rpg6.0/游戏说明.md`（玩家看的数）、`rpg6.0/README.md`（含 op 表）、`.dsh/skills/rpg6-battle/SKILL.md`。**不要手改这些数字**，`--check` 会抓住。其它文档不再复制这些数字，需要时指向《游戏说明》。
+区间名就是生成器名，见 `rpg6-stats.js` 的 `RENDERERS`。参与生成的文档有六处：`rpg6.0/游戏说明.md`（玩家看的数与 unsupported 表）、`rpg6.0/README.md`（op 表）、`rpg6.0/架构.md`（op 数）、`tools/README.md`（本节版本号）、`.dsh/skills/rpg6-battle/SKILL.md`、`.dsh/skills/rpg6-character-batch/引擎能力表.md`（op 一览与钩子）。**不要手改这些数字**，`--check` 会抓住。其它文档不再复制这些数字，需要时指向《游戏说明》。
 
 op 的参数字典在 `_local/tools/rpg6-spec.js`：`OPS` 同时是 lint 的字段白名单和 `rpg6.0/README.md` 里 op 表的来源。新增一个 op 要改三处 —— `effect-ops.js` 的 `case`、同文件的 `opNames`、字典里的一条；`lint.test.mjs` 会断言 `opNames` 与 `runOp` 的 `case` 集合一致。
 

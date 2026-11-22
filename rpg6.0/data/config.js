@@ -3,9 +3,7 @@ window.RPG_APP = {
     characters: "rpg_characters",
     versions: "rpg_character_versions",
     submissions: "rpg_submissions",
-    battles: "rpg_battles",
-    labRuns: "rpg_lab_runs",
-    labPairs: "rpg_lab_pairs"
+    battles: "rpg_battles"
   },
   engineVersion: "6.0-engine.11",
   pageSize: 12

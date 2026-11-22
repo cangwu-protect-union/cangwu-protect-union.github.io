@@ -7,11 +7,11 @@ description: 给 CPU 官网/鬼图鉴做本地端到端验证：起静态服务�
 
 ## 路径
 
-需要时调 `load_workspace_dependencies` 取绝对路径。实测值：
+需要时调 `load_workspace_dependencies` 取绝对路径。本机实测：
 
 ```
 python  C:\Users\L\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe
-node    C:\Users\L\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe
+node    用 tools/node.ps1：. .\tools\node.ps1; $node = Get-NodeExe（PATH 里没有 node）
 ```
 
 ## 起服务

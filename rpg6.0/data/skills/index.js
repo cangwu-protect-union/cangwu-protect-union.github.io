@@ -1,7 +1,7 @@
 /* 回合制正传 6.0 · 技能库聚合入口
-   一个角色一个文件（见本目录 *.js），本文件把 29 人合并成 { version, marks, summons, characters }。
-   浏览器（js/battle/entry.js）与 Node 测试（run.mjs / batch.mjs / strategy-lab）都从这里 import。
-   唯一数据源；加角色就新建一个角色文件并在这里登记。 */
+   一个角色一个文件（见本目录 *.js），本文件合并成 { version, marks, summons, characters }。
+   浏览器（js/battle/entry.js）与 Node 测试（run.mjs / batch.mjs）都从这里 import。
+   唯一数据源；加角色用 plan.mjs --write，它会建文件并登记到下面四行 RPG6-SCAFFOLD 锚点处。 */
 import baobiran from "./baobiran.js";
 import guwenda from "./guwenda.js";
 import handongxiao from "./handongxiao.js";
@@ -31,6 +31,7 @@ import zhaoyunzhe from "./zhaoyunzhe.js";
 import zhengwanwan from "./zhengwanwan.js";
 import zhengyingli from "./zhengyingli.js";
 import zhuangwenxi from "./zhuangwenxi.js";
+/* RPG6-SCAFFOLD:imports */
 
 const lib = {
   version: 1,
@@ -75,7 +76,8 @@ const lib = {
       { key: "taken", name: "受击次数", max: 5, init: 0 },
       { key: "apple", name: "碎苹果", max: 36, init: 0 }
     ],
-    "吕场龄": [{ key: "gongde", name: "功德", max: 99, init: 0 }]
+    "吕场龄": [{ key: "gongde", name: "功德", max: 99, init: 0 }],
+    /* RPG6-SCAFFOLD:marks */
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
      desc 是详情栏里的行为说明（手写），缺省时按 aura / attack / onExpire 自动拼；
@@ -148,7 +150,8 @@ const lib = {
         { op: "damage", who: { of: "allEnemies", limit: 3 }, type: "true", value: 100 },
         { op: "buff", who: { of: "allEnemies", limit: 3 }, kind: "fragile", percent: 50, duration: 5 }
       ]
-    }
+    },
+    /* RPG6-SCAFFOLD:summons */
   },
   characters: {
     "刘文哲": liuwenzhe,
@@ -179,7 +182,8 @@ const lib = {
     "刘亦萱": liuyixuan,
     "吕场龄": lvchangling,
     "王春雨": wangchunyu,
-    "韩东晓": handongxiao
+    "韩东晓": handongxiao,
+    /* RPG6-SCAFFOLD:characters */
   }
 };
 
