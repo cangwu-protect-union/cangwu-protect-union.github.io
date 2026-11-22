@@ -46,8 +46,7 @@ try {
       Write-Host "pre-commit check failed; changes are unstaged, nothing committed" -ForegroundColor Red
       exit 1
     }
-    # The pre-commit hook runs exactly the same -Staged check; skip the duplicate run.
-    git commit -q --no-verify -F $msgPath
+    git commit -q -F $msgPath
     if ($LASTEXITCODE -ne 0) {
       Write-Host "git commit failed" -ForegroundColor Red
       exit 1

@@ -72,7 +72,7 @@ node .dsh/skills/rpg6-character-batch/scripts/plan.mjs --scaffold plan.json --wr
 
 ### 4. 实现引擎与测试（有 gap 才做）
 
-依赖顺序：`state/damage/effect-ops/skills/actions/conditions/timeline/summons` → 同步 `_local/tools/rpg6-spec.js` → 补单测 → 升版本。升版本一条命令：`node tools/rpg6-bump.mjs 6.0-engine.12`（同时改 `version.js`、`data/config.js` 与文档）。
+依赖顺序：`state/damage/effect-ops/skills/actions/conditions/timeline/summons` → 同步 `tools/rpg6-spec.js` → 补单测 → 升版本。升版本一条命令：`node tools/rpg6-bump.mjs 6.0-engine.12`（同时改 `version.js`、`data/config.js` 与文档）。
 
 技能库测试不用手抄：`skills.test.mjs` 的 `SHEET`/`CHAR` 从 seed 现算，`全技能释放` 那条会把每条技能机械跑一遍。手写只写数值或裁定要盯住的（多段、掷骰分支、召唤、目标选择、状态交互）。
 
@@ -97,7 +97,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 - **逻辑未确认不写代码**；用户确认的是逐技能表（`--check` 打印的那张），不是「大概懂了」。
 - 数据库是唯一数据源；seed 只用于离线盘点，不一致先修再继续。
 - `conditionText` 逐字一致（忽略空白）；改规则升 `engineVersion`；召唤物/新钩子进 `state.hash` 与回放。
-- 新增 op/钩子/数值表达式/状态名/字段时同步 `_local/tools/rpg6-spec.js`，否则 `rpg6-lint.js` 按白名单报错。
+- 新增 op/钩子/数值表达式/状态名/字段时同步 `tools/rpg6-spec.js`，否则 `rpg6-lint.js` 按白名单报错。
 - `index.js` 的四行 `RPG6-SCAFFOLD` 锚点不要删，`plan.mjs --write` 靠它们定位。
 - 文档里的数字、unsupported 表、op 一览都不要手写：`rpg6-stats.js --write` 写回（`verify` 会自动跑）。
 - `_local/` 不推送；机制文档在 `_local` 也要更新；同一工作区多会话，提交前看 `git status` 与 `git log`。

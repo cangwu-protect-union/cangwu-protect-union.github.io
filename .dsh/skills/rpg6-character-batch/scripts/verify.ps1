@@ -37,13 +37,13 @@ if ($Plan) {
 }
 
 # 2. engine tests
-Invoke-Step "engine tests" { & $node (Join-Path $root "_local\tests\engine\run.mjs") }
+Invoke-Step "engine tests" { & $node (Join-Path $root "tests\engine\run.mjs") }
 
 # 3. stress: smoke by default, -Full for 4 seeds
 if ($Full) {
-  Invoke-Step "batch full" { & $node (Join-Path $root "_local\tests\engine\batch.mjs") --seeds=4 }
+  Invoke-Step "batch full" { & $node (Join-Path $root "tests\engine\batch.mjs") --seeds=4 }
 } else {
-  Invoke-Step "batch smoke" { & $node (Join-Path $root "_local\tests\engine\batch.mjs") --pairs=smoke --seeds=1 }
+  Invoke-Step "batch smoke" { & $node (Join-Path $root "tests\engine\batch.mjs") --pairs=smoke --seeds=1 }
 }
 
 # 4. repo gates: encoding, lint, doc numbers, biome, gitleaks (full history)

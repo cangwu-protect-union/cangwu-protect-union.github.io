@@ -27,3 +27,7 @@ Thumbs.db
 
 # Office 打开文件时生成的临时锁文件，形如 ~$README.md
 ~$*
+
+# 压测报告是中间结果，不进仓库
+tests/reports/
+

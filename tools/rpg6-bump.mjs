@@ -2,8 +2,8 @@
    用法：node tools/rpg6-bump.mjs 6.0-engine.12 [--dry]
    两处必须逐字一致（rpg6-lint 与 check.ps1 -Staged 都会比对）；本脚本只改版本号，不碰结算逻辑。 */
 import fs from "node:fs";
-import path from "node:path";
 import { createRequire } from "node:module";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,9 +54,9 @@ if (dry) process.exit(0);
 const versions = new Set(seen.map((item) => item.current));
 if (versions.size > 1) console.warn("WARN 改之前两处版本号就不一致：" + seen.map((item) => item.rel + "=" + item.current).join("，"));
 
-const statsFile = path.join(root, "_local", "tools", "rpg6-stats.js");
+const statsFile = path.join(root, "tools", "rpg6-stats.js");
 if (!fs.existsSync(statsFile)) {
-  console.log("SKIP 没有 _local/tools/rpg6-stats.js，文档里的版本号未写回");
+  console.log("SKIP 没有 tools/rpg6-stats.js，文档里的版本号未写回");
   process.exit(0);
 }
 const tool = createRequire(import.meta.url)(statsFile);

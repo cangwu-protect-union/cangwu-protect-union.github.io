@@ -365,7 +365,7 @@
   }
 
   /* op 全表：直接从注册表推导（排序后稳定），不手写清单；
-     文档的 op 表与 _local/tools/rpg6-lint.js 都读这里。新增 op 只需 registerOp。 */
+     文档的 op 表与 tools/rpg6-lint.js 都读这里。新增 op 只需 registerOp。 */
   Object.defineProperty(api, "opNames", {
     get: function () { return Object.keys(OP_REGISTRY).sort(); }
   });

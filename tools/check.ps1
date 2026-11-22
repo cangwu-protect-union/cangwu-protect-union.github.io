@@ -120,16 +120,20 @@ try {
 
         Write-Host '--- size gate ---' -ForegroundColor Cyan
         $sizeLimit = 40960
+        # Engine test fixtures are allowed to be larger; cap them so it stays a gate.
+        $testSizeLimit = 163840
         $sizeExt = @('.js', '.mjs', '.css', '.html', '.htm', '.md', '.ps1')
         $overSize = 0
         foreach ($p in $trackedFiles) {
             if ($sizeExt -notcontains [System.IO.Path]::GetExtension($p).ToLowerInvariant()) { continue }
             if ($p -like 'guitu/js/lib/*' -or $p -like 'quyu/vendor/*') { continue }
+            $limit = $sizeLimit
+            if ($p -like 'tests/*') { $limit = $testSizeLimit }
             $full = Join-Path $root $p
             if (-not (Test-Path -LiteralPath $full)) { continue }
             $len = (Get-Item -LiteralPath $full).Length
-            if ($len -gt $sizeLimit) {
-                Write-Host "  over $sizeLimit bytes ($len): $p" -ForegroundColor Red
+            if ($len -gt $limit) {
+                Write-Host "  over $limit bytes ($len): $p" -ForegroundColor Red
                 $overSize++
             }
         }
@@ -162,24 +166,15 @@ try {
     }
 
     # RPG6 skill library structure: unknown op, undeclared mark, bad field, missing anchor.
-    $rpg6lint = "$root\_local\tools\rpg6-lint.js"
-    if (Test-Path $rpg6lint) {
-        Write-Host '--- rpg6 skill lint ---' -ForegroundColor Cyan
-        & $node $rpg6lint
-        if ($LASTEXITCODE -ne 0) { $failed++ }
-    } else {
-        Write-Host '--- rpg6 skill lint: _local/tools/rpg6-lint.js not found, skipped ---' -ForegroundColor DarkGray
-    }
+    # Both tools are tracked in tools/, so a missing one is a broken checkout, not a skip.
+    Write-Host '--- rpg6 skill lint ---' -ForegroundColor Cyan
+    & $node "$root\tools\rpg6-lint.js"
+    if ($LASTEXITCODE -ne 0) { $failed++ }
 
     # Character / skill / op / version numbers written into docs must match the data.
-    $rpg6stats = "$root\_local\tools\rpg6-stats.js"
-    if (Test-Path $rpg6stats) {
-        Write-Host '--- rpg6 doc numbers ---' -ForegroundColor Cyan
-        & $node $rpg6stats --check
-        if ($LASTEXITCODE -ne 0) { $failed++ }
-    } else {
-        Write-Host '--- rpg6 doc numbers: _local/tools/rpg6-stats.js not found, skipped ---' -ForegroundColor DarkGray
-    }
+    Write-Host '--- rpg6 doc numbers ---' -ForegroundColor Cyan
+    & $node "$root\tools\rpg6-stats.js" --check
+    if ($LASTEXITCODE -ne 0) { $failed++ }
 
     # Engine rule files changed but ENGINE_VERSION did not: old battle records would replay wrong.
     if ($Staged) {

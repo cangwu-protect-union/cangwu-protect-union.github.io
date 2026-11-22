@@ -614,8 +614,8 @@ async function writeScaffold(input) {
 
 /* 文档计数直接调 rpg6-stats 的渲染逻辑，不派生子进程（DSH 沙箱下 spawn 会 EPERM）。 */
 async function writeDocCounts() {
-  const file = path.join(root, "_local", "tools", "rpg6-stats.js");
-  if (!fs.existsSync(file)) return ["SKIP 没有 _local/tools/rpg6-stats.js，文档计数未写回"];
+  const file = path.join(root, "tools", "rpg6-stats.js");
+  if (!fs.existsSync(file)) return ["SKIP 没有 tools/rpg6-stats.js，文档计数未写回"];
   if (path.resolve(root) !== path.resolve(repoRoot())) return ["SKIP 演练目录不写文档计数"];
   const require = createRequire(import.meta.url);
   const tool = require(file);

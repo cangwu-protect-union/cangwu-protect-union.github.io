@@ -31,11 +31,11 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
 | `rpg6.0/data/skills/` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；一个角色一个文件，`index.js` 聚合） |
 | `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放与界面细节拆在 battle-page-record.js / battle-page-ui.js） |
-| `_local/tests/engine/run.mjs` | 引擎单测入口 |
-| `_local/tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
+| `tests/engine/run.mjs` | 引擎单测入口 |
+| `tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->29 人 104 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node _local/tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->29 人 104 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -51,9 +51,9 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
    - 在 `index.js` 的 `summons` 块加定义（`stats`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`、`attack`、`onExpire`）；
    - 技能 ops 写 `{op:"summon", key:"..."}`；
    - 记住无血计时物 `targetable:false`，有血单位才会进单体目标列表。
-5. 跑 `node _local/tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`——`SHEET`/`CHAR` 从 seed 现算不用补，`全技能释放` 那条会自动把新技能跑一遍；只有数值/裁定要盯的（多段、掷骰分支、召唤、目标选择）才手写用例。浏览器侧不用加用例，`run-all --group=回合制` 的全角色冒烟会覆盖。
+5. 跑 `node tools/rpg6-lint.js`：op 名、字段、mark/counter/summon 引用、锚点、版本号，一次报全；再跑 `run.mjs`——`SHEET`/`CHAR` 从 seed 现算不用补，`全技能释放` 那条会自动把新技能跑一遍；只有数值/裁定要盯的（多段、掷骰分支、召唤、目标选择）才手写用例。浏览器侧不用加用例，`run-all --group=回合制` 的全角色冒烟会覆盖。
 6. 机制文档锚点用 `<!-- skill:角色拼音.技能 -->`；`plan.mjs --write` 会插骨架，手写时以 lint 打出的可粘贴行为准。
-7. 文档里的数字、op 表、unsupported 表都由 `node _local/tools/rpg6-stats.js --write` 写回（本 skill 也在 DOCS 里）；不要手写，`--check` 会抓。
+7. 文档里的数字、op 表、unsupported 表都由 `node tools/rpg6-stats.js --write` 写回（本 skill 也在 DOCS 里）；不要手写，`--check` 会抓。
 
 ## 技能 DSL 速查
 

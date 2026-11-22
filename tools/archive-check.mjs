@@ -212,7 +212,7 @@ out.push("```");
 out.push("node _local/tools/build-docs.js");
 out.push("powershell -NoProfile -ExecutionPolicy Bypass -File tools\\check.ps1");
 for (const skill of byArea.keys()) {
-  if (skill === "rpg6-battle") out.push("node _local/tests/engine/run.mjs");
+  if (skill === "rpg6-battle") out.push("node tests/engine/run.mjs");
   if (skill === "site-e2e-tests") out.push("node _local/tests/run-all.mjs --group=回合制");
 }
 out.push("```");

@@ -28,3 +28,11 @@ description = "battle-skills 的召唤物 key 是数据 id，不是 API key"
 paths = ['''rpg6\.0/data/battle-skills\.js''']
 regexTarget = "line"
 regexes = ['''key:\s*"zhengyingli\.kuihua[24]"''']
+
+# 引擎测试断言召唤物 key 的那一行（summonKey === "zhengyingli.kuihua4"）也是数据 id。
+# 只放行这个文件里的 summonKey 行。
+[[allowlists]]
+description = "tests 里断言召唤物 key 的行是数据 id"
+paths = ['''tests/engine/skills\.test\.mjs''']
+regexTarget = "line"
+regexes = ['''summonKey''']

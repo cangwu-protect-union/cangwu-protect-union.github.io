@@ -1,85 +1,49 @@
 ---
 name: guitu-deploy
-description: 把 CPU 官网/鬼图鉴的改动提交并发布到 GitHub Pages：中文提交信息、推送重试、轮询部署、上线核对，以及本机连 github.com 的证书处理。准备上线时加载。
+description: 把 CPU 官网/鬼图鉴的改动提交并发布到 GitHub Pages：一条 publish 命令、推送卡住的排查、等部署、上线核对，以及本机连 github.com 的证书与 hosts 处理。准备上线时加载。
 ---
 
 # 提交与发布
 
 仓库 `cangwu-protect-union/cangwu-protect-union.github.io`，`main` 根目录直接发布；本地 `D:\CPU\关于CPU的网页`。
 
-## 提交
-
-日常用一条命令：`powershell -File tools\publish.ps1 -Message msg.txt [-Url <页面> -Expect <特征串>]`——它跑 `check.ps1 -Staged`、`git add -A`、commit、push（带重试）、`check.ps1 -Last`，给了 `-Url` 还会轮询到上线。下面是要手工处理时的细节。
-
-提交信息用文件传入，避免引号和换行被 shell 吃掉：
+## 一条命令
 
 ```powershell
-$env:Path = "C:\Program Files\Git\cmd;$env:Path"
-Set-Location "D:\CPU\关于CPU的网页"
-git add -A
-git status --short          # 确认没有 _local/、*.docx、*.sql 被带进来
-# 信息写进 $env:TEMP\msg.txt（UTF-8 无 BOM），再提交
-git commit -q -F $f
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message msg.txt [-Url <页面> -Expect <特征串>]
 ```
 
-`git add -A` 会把工作区里所有改动一次带走。提交前逐行看 `git status --short`：
-出现不属于本次任务的改动（用户没提交的界面调整、误建的空文件），先单独提交或至少分开说明，
-别让它混进本次提交却不在提交信息里。
+- `-Message`：UTF-8 无 BOM 的提交信息文件，避免引号和换行被 shell 吃掉。
+- 内部依次：`check.ps1 -Staged` → `git add -A` + commit → push（卡住自动换 HTTP/1.1 重试）→ `check.ps1 -Last` → 给了 `-Url/-Expect` 就轮询到上线。
+- 工作区干净时只推送、不新建提交。
 
-同一个仓库可能有两个会话/两个人同时在改。提交前顺手 `git log --oneline -3`：
-上游已有别人替你提交的中间成果时，`git status` 只剩你最后那点差异，提交信息就只描述这部分，
-不要把别人已提交的内容再写一遍；反过来，看到一大片陌生改动先问清楚再 `add -A`。
+提交前仍要逐行看 `git status --short`：同一仓库可能有两个会话在改，别把别人的半成品混进这次提交或提交信息里。`_local/`、`*.sql`、`*.docx` 不进提交。
 
-## 推送
+## 推送卡在「Pushing to …」不动
 
-```powershell
-$env:GIT_TERMINAL_PROMPT = "0"
-for ($i=1; $i -le 20; $i++) {
-  git push origin main 2>&1 | Out-Null
-  if ($LASTEXITCODE -eq 0) { "推送成功（第 $i 次）"; break }
-  Start-Sleep -Seconds 8
-}
-```
-
-几分钟还不行就转后台 job 继续重试，不要堵在那里。
-
-### 推送卡在「Pushing to …」不动
-
-症状：`git push --verbose` 打完 `Pushing to <url>` 就没了下文，`ls-remote` 却秒回。
-原因是分片上传被代理挂住。改成分块之外的 Content-Length 就通：
+症状：`git push --verbose` 打完 `Pushing to <url>` 就没了下文，`ls-remote` 却秒回。原因是分片上传被代理挂住。改成分块之外的 Content-Length 就通：
 
 ```powershell
 git -c http.postBuffer=104857600 -c http.version=HTTP/1.1 push origin main
 ```
 
-实测这一条命令一次成功，重试循环里的普通 `git push` 反而会一直挂着。
-
-凭据：`gh-proxy.com` 是远端前缀，但 Windows 凭据库里存的是 `git:https://github.com`
-（用户名 `cangwu-protect-union`）。`git credential fill` 能直接取到，不需要重新登录；
-取不到时会一直等 GCM 弹窗（这个环境弹不出来），表现为推送无响应。
+凭据：Windows 凭据库里存的是 `git:https://github.com`（用户名 `cangwu-protect-union`）。`git credential fill` 能直接取到，不需要重新登录；取不到时会一直等 GCM 弹窗（这个环境弹不出来），表现为推送无响应。
 
 ## 等部署
 
-Pages 有 30–90 秒延迟。轮询**本次改动特有的字符串**判断生效，不要只看状态码。
-新文件落在子目录（如 `suggest/suggest.html`）时，轮询地址要带子目录；新目录刚推上去的头几轮
-大概率还是 404，那是部署没完成，不是路径写错。实测这个站约 40 秒生效。
+Pages 有 30–90 秒延迟，实测约 40 秒。轮询**本次改动特有的字符串**，不要只看状态码；新文件落在子目录时地址要带子目录，刚推上去的头几轮 404 是部署没完成，不是路径写错。
 
 ```powershell
-for ($i=1; $i -le 12; $i++) {
-  Start-Sleep -Seconds 10
-  $r = Invoke-WebRequest -Uri "$base/js/xxx.js" -UseBasicParsing -Headers @{ 'Cache-Control'='no-cache' }
-  if ($r.Content -match '本次新增的特征串') { "已是最新"; break }
-}
+node --use-system-ca tools/poll-live.mjs https://cangwu-protect-union.github.io/<路径> "<特征串>"
 ```
 
 ## 上线后核对
 
 1. 改动的页面 200、含新文案；依赖的脚本样式 200。
 2. 旧路径按预期 404（迁移时）。
-3. `guitu-browser-test` / `site-e2e-tests` 跑一次真浏览器验证，无 JS 异常、无资源 404。
-4. 涉及 `_local/` 的，确认 `/_local/...` 返回 404。
-5. 提交前跑过 `check.ps1`；如果改了页面结构、脚本或数据，`check.ps1` 里的
-   `build-docs.js --check` 会比对六份文档是否过期，过期就重跑一次生成器再提交。
+3. 跑一次真浏览器验证（`guitu-browser-test` / `site-e2e-tests`），无 JS 异常、无资源 404。
+4. `/_local/...` 返回 404。
+5. 改了页面结构时重跑 `build-docs.js` 并提交；`check.ps1` 会拦文档过期。
 
 ## 从会话里访问 github.com（实测）
 
@@ -94,7 +58,7 @@ node 下载：加 `--use-system-ca` 读 Windows 根存储。
 & $node --use-system-ca -e "fetch('https://api.github.com/rate_limit').then(r=>console.log(r.status))"
 ```
 
-git 走 HTTPS：`.git/config` 在工作区不可写，用环境变量注入，只对当前进程生效。
+git 走 HTTPS：`.git/config` 在工作区不可写时用环境变量注入，只对当前进程生效。
 
 ```powershell
 $env:GIT_CONFIG_COUNT='2'

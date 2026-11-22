@@ -98,7 +98,7 @@ js/
 
 ## 技能 op 表
 
-由 `effect-ops.js` 的 `opNames` 与 `rpg6-spec.js` 的参数字典生成，不要手改；改 op 后跑 `node _local/tools/rpg6-stats.js --write`。
+由 `effect-ops.js` 的 `opNames` 与 `rpg6-spec.js` 的参数字典生成，不要手改；改 op 后跑 `node tools/rpg6-stats.js --write`。
 
 <!-- RPG6-STATS:START ops-table -->
 | op | 参数 | 作用 |
