@@ -10,7 +10,9 @@ param(
 #   powershell -File tools\publish.ps1 -Message _local\tmp\msg.txt
 #   powershell -File tools\publish.ps1 -Message msg.txt -Url https://example.github.io/page.html -Expect "new text"
 
-$ErrorActionPreference = "Stop"
+# Native stderr (git push progress) becomes a terminating error under "Stop" in PS 5.1,
+# so failures are handled by explicit exit-code checks instead.
+$ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $root "tools\node.ps1")
 $node = Get-NodeExe
