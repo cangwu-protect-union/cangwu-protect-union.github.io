@@ -16,9 +16,17 @@ const argv = process.argv.slice(2);
 const root = findRoot(argv);
 const checkFile = argValue(argv, "--check");
 const scaffoldFile = argValue(argv, "--scaffold");
+/* --mode=plan（默认）：实现前校验，角色已在技能库里就算错。
+   --mode=verify：实现后验收，允许角色已在库里，plan.docs 的期望值不再比对
+   （文档计数由 rpg6-stats.js --check 与 audit-docs.mjs 负责，重复计数只会误报）。 */
+const mode = argValue(argv, "--mode") || "plan";
+if (mode !== "plan" && mode !== "verify") {
+  console.error("--mode 只接受 plan 或 verify");
+  process.exit(2);
+}
 const file = checkFile || scaffoldFile;
 if (!file) {
-  console.error("用法：node plan.mjs --check plan.json | --scaffold plan.json [--out 文件] [--root 仓库]");
+  console.error("用法：node plan.mjs --check plan.json [--mode=plan|verify] | --scaffold plan.json [--out 文件] [--root 仓库]");
   process.exit(2);
 }
 
@@ -35,7 +43,7 @@ const hookNames = readHookNames(root);
 
 if (!plan || typeof plan !== "object") fail("plan 不是对象");
 if (!Array.isArray(plan.characters)) fail("plan.characters 必须是数组");
-const allowExisting = !!plan.allowExisting;
+const allowExisting = !!plan.allowExisting || mode === "verify";
 
 let projectedSkills = libSkills.length;
 let projectedUnsupported = libSkills.filter((s) => s.unsupported).length;
@@ -154,12 +162,13 @@ if (!plan.engine || !plan.engine.version) {
   warnings.push("plan.engine.version 缺省；应写当前或目标 engineVersion");
 } else if (plan.engine.version !== engineVersion) {
   if (!changes.length) fail("plan.engine.version 变了但 engine.changes 为空");
-} else if (changes.length) {
+} else if (changes.length && mode !== "verify") {
+  /* 验收时版本已经升过了，plan.engine.version 与 version.js 相等是预期，不再提醒。 */
   warnings.push("engine.changes 非空但 engine.version 没变；改规则应升版本");
 }
 if (engineGap && !changes.length) fail("有 engine-gap 技能，但 plan.engine.changes 为空");
 
-if (plan.docs) {
+if (plan.docs && mode !== "verify") {
   const expectedChars = libCharactersCount() + newCharacters.length;
   const expectedSkills = projectedSkills;
   if (plan.docs.expectedCharacters != null && Number(plan.docs.expectedCharacters) !== expectedChars) {
@@ -170,14 +179,21 @@ if (plan.docs) {
   }
 }
 
-const projected = {
-  characters: libCharactersCount() + newCharacters.length,
-  skills: projectedSkills,
-  implemented: libSkills.filter((s) => !s.unsupported).length +
-    (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status === "implemented").length, 0),
-  unsupported: projectedUnsupported +
-    (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status && s.status !== "implemented").length, 0)
-};
+const projected = mode === "verify"
+  ? {
+    characters: libCharactersCount(),
+    skills: libSkills.length,
+    implemented: libSkills.filter((s) => !s.unsupported).length,
+    unsupported: libSkills.filter((s) => s.unsupported).length
+  }
+  : {
+    characters: libCharactersCount() + newCharacters.length,
+    skills: projectedSkills,
+    implemented: libSkills.filter((s) => !s.unsupported).length +
+      (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status === "implemented").length, 0),
+    unsupported: projectedUnsupported +
+      (plan.characters || []).reduce((n, c) => n + (c.skills || []).filter((s) => s.status && s.status !== "implemented").length, 0)
+  };
 
 for (const warning of warnings) console.warn("WARN " + warning);
 if (errors.length) {
@@ -188,7 +204,7 @@ if (errors.length) {
 
 console.log("计划通过：" + plan.characters.length + " 名角色 / " +
   plan.characters.reduce((n, c) => n + (c.skills || []).length, 0) + " 条技能");
-console.log("预计总量：角色 " + projected.characters + " / 技能 " + projected.skills +
+console.log((mode === "verify" ? "技能库现状：角色 " : "预计总量：角色 ") + projected.characters + " / 技能 " + projected.skills +
   "（implemented " + projected.implemented + " / unsupported " + projected.unsupported + "）");
 if (plan.engine) console.log("引擎：" + plan.engine.version + (changes.length ? "，变更 " + changes.length + " 项" : ""));
 

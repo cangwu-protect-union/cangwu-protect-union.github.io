@@ -20,7 +20,10 @@ export function hasFlag(argv, name) {
 export function argValue(argv, name, fallback = "") {
   const i = argv.indexOf(name);
   if (i >= 0 && argv[i + 1] != null && !argv[i + 1].startsWith("--")) return argv[i + 1];
-  return fallback;
+  /* 同时接受 --name=value，省得为写法差异排查一轮 */
+  const pref = name + "=";
+  const hit = argv.find((a) => a.startsWith(pref));
+  return hit ? hit.slice(pref.length) : fallback;
 }
 
 function runWindowScript(root, relPaths, globalName) {

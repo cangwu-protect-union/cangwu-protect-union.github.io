@@ -113,17 +113,12 @@ node _local\tools\rpg6-stats.js --check   # --write 把数字写回去，--json 
 文档里的数字写在带名字的标记区间里，区间内容由脚本整段重写，区间外的句子仍是手写：
 
 ```markdown
-共 <!-- RPG6-STATS:START ops -->34<!-- RPG6-STATS:END ops --> 个，全部来自 `effect-ops.js` 的 `opNames`。
-
-<!-- RPG6-STATS:START ops-table -->
-| op | 参数 | 作用 |
-...
-<!-- RPG6-STATS:END ops-table -->
+- 引擎版本：`<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`
 ```
 
-区间名就是生成器名，见 `rpg6-stats.js` 的 `RENDERERS`。参与生成的文档：`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`rpg6.0/README.md`、`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`、`.dsh/skills/rpg6-battle/SKILL.md`。**不要手改这些数字**，`--check` 会抓住。
+区间名就是生成器名，见 `rpg6-stats.js` 的 `RENDERERS`。参与生成的文档只有三处：`rpg6.0/游戏说明.md`（玩家看的数）、`rpg6.0/README.md`（含 op 表）、`.dsh/skills/rpg6-battle/SKILL.md`。**不要手改这些数字**，`--check` 会抓住。其它文档不再复制这些数字，需要时指向《游戏说明》。
 
-op 的参数字典在 `_local/tools/rpg6-spec.js`：`OPS` 同时是 lint 的字段白名单和文档 op 表的来源。新增一个 op 要改三处 —— `effect-ops.js` 的 `case`、同文件的 `opNames`、字典里的一条；`lint.test.mjs` 会断言 `opNames` 与 `runOp` 的 `case` 集合一致。
+op 的参数字典在 `_local/tools/rpg6-spec.js`：`OPS` 同时是 lint 的字段白名单和 `rpg6.0/README.md` 里 op 表的来源。新增一个 op 要改三处 —— `effect-ops.js` 的 `case`、同文件的 `opNames`、字典里的一条；`lint.test.mjs` 会断言 `opNames` 与 `runOp` 的 `case` 集合一致。
 
 ### 引擎版本守卫（`check.ps1 -Staged`）
 

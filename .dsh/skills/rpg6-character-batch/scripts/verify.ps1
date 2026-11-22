@@ -31,7 +31,7 @@ function Invoke-Step([string]$Name, [scriptblock]$Block) {
 
 if ($Plan) {
   $planPath = (Resolve-Path $Plan).Path
-  Invoke-Step "plan check" { & $node (Join-Path $scripts "plan.mjs") --check $planPath }
+  Invoke-Step "plan check" { & $node (Join-Path $scripts "plan.mjs") --check $planPath --mode=verify }
 }
 
 Invoke-Step "engine tests" { & $node (Join-Path $root "_local\tests\engine\run.mjs") }

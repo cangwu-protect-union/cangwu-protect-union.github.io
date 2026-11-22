@@ -57,7 +57,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 
 ## 技能 DSL 速查
 
-- op 全表见 plan 第 5 节（由 `_local/tools/rpg6-stats.js` 生成，来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`（可带 `untilRecast`/`debuff`）、`stat`（可带 `restore`、`untilRecast`、`debuff`）、`buff`、`status`（可带 `chargeOk`：noSkill 下仍可蓄力，Q2）、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`、`debuff`）、`schedule`、`reflect`、`interrupt`、`dispel`（scope 含 `status`/`marked`）、`dice`（`times` 连续独立掷）、`if`（`cond.effect` 按持续效果 key 判断）、`counter`、`mark`（`delta` 支持数值表达式）、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`、`removeEffect`（移除并回滚 `untilRecast`）、`decay`（Buff 逐回合衰减）、`convert`（beforeDamage 转血上限）。
+- op 全表见 `rpg6.0/README.md` 的「技能 op 表」（来源是 op 注册表，即 `engine/ops/` 里的 `registerOp`）；常用：`damage`（`type` 可为 `phys/magic/true/last/basic`、`times`、`noBreak`、`addStun`、`fromBuff`、`healBack`、`factor`）、`directLoss`、`heal`、`mp`、`maxHp`/`maxMp`（可带 `untilRecast`/`debuff`）、`stat`（可带 `restore`、`untilRecast`、`debuff`）、`buff`、`status`（可带 `chargeOk`：noSkill 下仍可蓄力，Q2）、`breakValue`、`forceBreak`、`tick`（可带 `breakOnHolderStatus`、`debuff`）、`schedule`、`reflect`、`interrupt`、`dispel`（scope 含 `status`/`marked`）、`dice`（`times` 连续独立掷）、`if`（`cond.effect` 按持续效果 key 判断）、`counter`、`mark`（`delta` 支持数值表达式）、`markClear`、`clearMods`（可带 `stats` 只清指定属性）、`summon`（`key`）、`setBasicMode`、`strike`、`deny`、`roll`、`use`、`note`、`removeEffect`（移除并回滚 `untilRecast`）、`decay`（Buff 逐回合衰减）、`convert`（beforeDamage 转血上限）。
 - `who` 可以是对象 `{of:"allEnemies",limit:N}`：群体目标截断到前 N 个（土豆地雷最多打 3 个）。
 - 时长单位 `enemyRound`：按持有者对手英雄的回合计时（学富五车），被跳过的回合也算；selfRound 需要 `sourceUid`（已存）。
 - 技能字段 `items` + 动作 `kind:"item"`：额外动作（吃碎苹果/功德回血），不消耗行动、不吃掷骰跳过；`requires` 卡库存、`oncePerRound` 每回合限 1 次、`noEffect` 效果在身时不列入口；眩晕/击溃不可用，onlyBasic/noSkill 不拦（Q14）；入口 conditions.itemsOf/itemAvailable 与 actions.list/execute。
@@ -143,7 +143,7 @@ $node = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies\node\b
 & powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。当前基线：引擎单测 158 条（含 `lint.test.mjs` 14 条）、浏览器 12 条；19 人 4 seed 压测 0 引擎异常（2026-11-15 加「皮糙肉厚」后 20 局僵局，全是宋知远/江雨轩的盾卫回血，规则问题不是引擎异常）。
+压测把「引擎异常」与「僵局」分开算：异常（崩溃、越界、残留状态、重放不一致）才算失败；僵局是规则问题，列进报告。浏览器用例需要本机 Edge，不需要令牌；跑完会把战报写进数据库。用例条数不要写在这一行（会过期），看 `run.mjs` 与 `run-all.mjs --list` 的实际输出。
 
 `rpg6-lint.js` 与 `rpg6-stats.js --check` 已经挂在 `check.ps1` 里，单跑是为了看细项。`--warn` 只提醒不阻断，`--json` 给机器读；`rpg6-stats.js --write` 改数字，手改会被 `--check` 抓。
 

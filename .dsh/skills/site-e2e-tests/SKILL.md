@@ -32,19 +32,22 @@ _local/tests/
 ## 跑
 
 ```powershell
-node _local/tests/run-all.mjs                       # 只跑不需要令牌的组
-node _local/tests/run-all.mjs --token=<令牌>         # 全量
-node _local/tests/run-all.mjs --group=公开 --token=…
+node _local/tests/run-all.mjs                       # 全部用例（现在都不需要令牌）
+node _local/tests/run-all.mjs --group=公开
 node _local/tests/run-all.mjs --list                # 只列用例
 ```
 
-环境变量 `QUYU_TK` 等价于 `--token`。服务由脚本自己在 `127.0.0.1:9300` 起，跑完关掉；
-浏览器进程要 `danger-full-access`（命名管道），否则 Edge 起不来。
+服务由脚本自己在 `127.0.0.1:9300` 起，跑完关掉；浏览器进程要 `danger-full-access`（命名管道），否则 Edge 起不来。
 
-现有分组：`导航`、`数据源`、`区域 · 公开`、`区域 · 关联回填`、`区域 · 编辑`、`鬼图鉴 · 关联与引用`、`站点建议 · 提交与审核`。
-`区域 · 关联回填` 不需要令牌：用 `lib/dev-editor.html` 挂同一份编辑器，验证选择页回来后关联框立刻显示新勾的条目。
-前两组、区域公开、建议的前两条都不需要令牌；动了数据层或导航，至少跑 `--group=数据源` 与 `--group=导航`。
+现有分组：`导航`、`数据源`、`区域 · 公开`、`区域 · 关联回填`、`站点建议 · 提交与审核`、`回合制 · 对局与战报`。
+前四组、区域公开、建议的两条都不需要令牌；`区域 · 关联回填` 用 `lib/dev-editor.html` 挂同一份 `ZoneEditor`，验证选择页回来后关联框立刻显示新勾的条目。
 `--group=` 是子串匹配，`--group=建议` 就够。
+
+## 令牌用例已经删了
+
+原来 10 条 `needsToken` 用例（区域新建/改名/删除、鬼侧引用、审核页删除）要人工答两题验证码拿令牌，实际上从来没跑过，只是让目录显得覆盖完整。已全部删除；`--token` / `QUYU_TK` / `lib/token.html` 的管道保留着，但当前没有用例用它。
+
+要恢复写路径的覆盖，不要回到「人工取令牌」：照 `lib/dev-editor.html` 的做法写一个 dev 页面直接挂待测模块、跳过验证，`quyu-relations.mjs` 就是这么做的。
 
 ## 硬约束：必须 127.0.0.1
 

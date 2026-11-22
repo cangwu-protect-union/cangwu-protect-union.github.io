@@ -60,7 +60,7 @@ js/
 │   ├── traits.js      8 主业 + 6 副业
 │   ├── state.js       建局、面板结算、深拷贝、状态指纹
 │   ├── damage.js      伤害/回血/强扣/死亡
-│   ├── effect-ops.js  效果解释器框架、注册表与出口（<!-- RPG6-STATS:START ops -->38<!-- RPG6-STATS:END ops --> 个 op；opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
+│   ├── effect-ops.js  效果解释器框架、注册表与出口（opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
 │   ├── skills.js      技能执行与档案校验
@@ -94,7 +94,54 @@ js/
 
 `data/seeds/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。副本由 `_local/tools/gen-rpg-seed.js` 生成，拆成 4 个文件（characters-2/3/4.js 只做 push）。
 
-`data/skills/` 是技能库（角色技能 + marks + summons）：一个角色一个文件，`index.js` 聚合并导出。`data/lab-snapshot.js` 是策略实验室的兜底快照，拆成多个文件按顺序加载，重新导出：`node rpg6.0/strategy-lab/lab.mjs --stage=export`。
+`data/skills/` 是技能库（角色技能 + marks + summons）：一个角色一个文件，`index.js` 聚合并导出。
+
+## 技能 op 表
+
+由 `effect-ops.js` 的 `opNames` 与 `rpg6-spec.js` 的参数字典生成，不要手改；改 op 后跑 `node _local/tools/rpg6-stats.js --write`。
+
+<!-- RPG6-STATS:START ops-table -->
+| op | 参数 | 作用 |
+|---|---|---|
+| `breakValue` | `delta` 必填 | 击溃值增减，钳制在 0..上限 |
+| `buff` | `kind` strong/fragile/brave/panic、`percent` 必填、`duration`、`stacking` false 则不叠层 | 四类 Buff |
+| `clearMods` | `source` 来源标记、`stats` 属性名数组 | 按来源移除属性修正，`stats` 只清指定属性 |
+| `convert` | `to` 必填 | 配合 beforeDamage 钩子：把这次受击标记为伤害转血上限（不扣血、等量加血上限） |
+| `counter` | `key` 必填、`delta` 默认 +1、`perTarget` 默认 true | 计数器增减，供 `{counter}` 读取 |
+| `damage` | `value` 必填、`type` phys/magic/true/last/basic、`times` 段数、`factor` 倍率、`noBreak`、`addStun` 计眩晕值、`fromBuff`、`healBack` | 造成伤害；默认只加击溃值，`addStun` 才加眩晕值；`healBack` 按造成的伤害给自己回血 |
+| `decay` | `kind` 必填、`delta` 必填 | 把目标身上指定 kind 的 Buff 百分比减 delta，减到 0 移除（我是天才的勇猛逐回合 −20%） |
+| `deny` | `reason` | 否决这次动作，`reason` 显示给玩家 |
+| `dice` | `sides` 默认 6、`times` 掷几次、`cases` [{in|roll, ops}]、`else` 都没命中时 | 掷骰分支；`times` 连续独立掷 |
+| `directLoss` | `value` 必填 | 强扣：不减免、不加击溃值 |
+| `dispel` | `scope` debuff/all/status/marked/breakValue/marks，默认 debuff | 清 Debuff / 清异常状态 / 清带标记的负面修正 / 清击溃值 / 清标记 |
+| `dodge` | 无 | 把这次受击标记为已闪避 |
+| `forceBreak` | 无 | 按当前击溃值直接进入击溃，击溃值不足时不生效 |
+| `heal` | `value` 必填、`bonus` 额外值、`rounding` round5/int/ten/none | 回血，受血量上限钳制 |
+| `healFull` | 无 | 回满血 |
+| `if` | `cond` 必填、`then` 必填、`else` 可选 | 条件分支；`cond` 支持 gender/status/effect/summon/summonCount/left+op+right |
+| `interrupt` | `tag` | 打断带 `tag` 的持续效果 |
+| `mark` | `key` 必填、`mode` add/set，默认 add、`value` set 时必填、`delta` 默认 +1 | 标记层数增减，`mode:"set"` 直接赋值；delta 支持数值表达式 |
+| `markClear` | `key` | 清空标记，不写 `key` 就清该单位全部标记 |
+| `maxHp` | `delta` 增减量、`percent` 按当前上限的百分比、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 血上限增减，常驻修正 |
+| `maxMp` | `delta` 增减量、`percent` 按当前上限的百分比、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 蓝上限增减，常驻修正 |
+| `mp` | `delta` 必填 | 蓝增减，钳制在 0..蓝上限 |
+| `note` | `text` 必填 | 只产出日志，不改变状态；用于「无法打断」这类声明的落点 |
+| `reflect` | `factor` 默认 2、`stunRounds` | 蓄力期间的伤害反射（江雨轩） |
+| `removeEffect` | `key` 必填 | 按 key 移除持续效果，并把 `untilRecast` 标记为该 key 的属性修正一并回滚（剃发为僧复原） |
+| `roll` | `sides` 默认 6、`key` 计数器名、`perTarget` 默认 true | 掷骰并存进计数器，供 `{counter}` 读取 |
+| `schedule` | `after` 必填、`ops` 必填 | 延迟结算；`after` 是几个标准回合后 |
+| `setBasicMod` | `type`、`factor`、`healInstead`、`hits`、`noBreak`、`misfire` | 改这次普攻：类型、倍率、段数、回血、无击溃、哑火 |
+| `setBasicMode` | `healSummon` 召唤物 key、`mode` | 把普攻改成给召唤物回血 |
+| `shield` | `hp` 必填、`duration` 标准回合数，默认 1、`label`、`onExpire` 到期执行的 ops | 护盾：独立血量池，伤害全额吸收；标准回合末计时，到期执行 `onExpire`（杨冬明坚若磐石） |
+| `stat` | `stat` 必填、`mode` add/set/mul，默认 add、`value`、`duration` 数字或 {unit,count}、`restore` 每标准回合恢复量（配合 mode:set）、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 面板修改，进 `mods`；`restore` 让 set 归零后逐标准回合恢复原值 |
+| `status` | `kind` 必填、`duration` 数字或 {unit,count}、`rounds` 同 duration、`skillId` 只封锁该技能时填、`chargeOk` noSkill 下仍可蓄力（只禁释放） | 状态，按标准回合计时 |
+| `strike` | `target` source 表示打来源、`victim` 显式指定打谁（target/enemyHero 等）、`noBreak` | 立刻执行一次普攻 |
+| `stunValue` | `delta` 必填 | 眩晕值增减，钳制在 0..上限 |
+| `summon` | `key` 必填、`ttl` 覆盖定义里的 ttl | 生成召唤物，`key` 指向 `summons` 定义 |
+| `taunt` | `delta` 必填 | 嘲讽值增减 |
+| `tick` | `ops` 必填、`duration`、`period` 每 N 回合、`permanent`、`unstoppable`、`desc` chip 说明、`tag` 给 interrupt 用、`key` 给 if.cond.effect 用、`gate` {sides,cancel}、`breakOnSourceStatus`、`breakOnHolderStatus`、`fromBuff`、`debuff` 负面标记，dispel marked 清除、`guard` {remaining,onBreak,ops}、`immune` {buffs,statuses}、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic` | 逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明 |
+| `use` | `skillId` 必填、`times` 重复次数 | 内联执行另一个技能的 ops |
+<!-- RPG6-STATS:END ops-table -->
 
 `data/rule-docs.js` 是规则条目的标题与 HTML 正文，也是规则唯一的来源。改它等于改规则，刷新页面就生效，不写数据库、没有后台界面。
 

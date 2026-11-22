@@ -89,7 +89,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 ## 硬规则
 
-- **`plan.mjs --check` 有验收态**：实现完成后再跑 `--check` 会报「已在技能库里」，要改成 `allowExisting:true`；同时 `docs.expectedSkills` 会把已入库技能重复计数（libSkills + plan 技能），验收时把 `docs` 块清空，文档计数交给 `rpg6-stats.js --check` 与 `audit-docs.mjs`。第六批是在实现前跑的 `--check`，所以没遇到；`verify.ps1 -Plan` 在实现后跑，plan 必须是验收态。
+- **`plan.mjs` 有两种模式**：`--check` 默认是实现前校验（角色已在技能库里算错，`plan.docs` 的期望值参与比对）；`--check --mode=verify` 是实现后验收（允许已在库里，不再比对 `plan.docs`，计数打印的是技能库现状）。`verify.ps1 -Plan` 用 `--mode=verify`，不需要再手改 `allowExisting:true` 或清空 `docs` 块。
 - **`tools/check.ps1` 有 40960 字节单文件上限**（md/js/css/ps1，vendor 豁免）：改大文件前先量余量；真撞上了再拆函数到分片文件（拆法示例见 `rpg6-battle` 的踩坑 45）。上限 2026-11 从 20480 提到 40960，因为当时的余量只剩几十字节，分割又不减少阅读量。
 - 逻辑未确认不写代码；用户确认的是逐技能表，不是「大概懂了」。
 - 数据库是唯一数据源；`data/seeds/characters*.js` 只用于离线盘点，不一致先修再继续。
