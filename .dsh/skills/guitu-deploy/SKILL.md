@@ -41,9 +41,9 @@ node --use-system-ca tools/poll-live.mjs https://cangwu-protect-union.github.io/
 
 1. 改动的页面 200、含新文案；依赖的脚本样式 200。
 2. 旧路径按预期 404（迁移时）。
-3. 跑一次真浏览器验证（`guitu-browser-test` / `site-e2e-tests`），无 JS 异常、无资源 404。
+3. 跑一次真浏览器验证（`site-e2e-tests`），无 JS 异常、无资源 404。
 4. `/_local/...` 返回 404。
-5. 改了页面结构时重跑 `build-docs.js` 并提交；`check.ps1` 会拦文档过期。
+5. 文档生成已冻结（2026-11-24），不再重跑 `build-docs.js`。
 
 ## 从会话里访问 github.com（实测）
 

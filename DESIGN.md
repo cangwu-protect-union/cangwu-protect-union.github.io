@@ -100,4 +100,4 @@
 - 改界面前：读本文 + 跑 `node tools/design-audit.js`，记下当前数字。
 - 改完：重跑，字号种类、圆角种类、硬编码颜色三个数应当下降或不涨；涨了要能说出理由，并把新取值补进本文。
 - 本文与 `css/style.css` 不一致时，以实测为准，改本文。
-- 清单的可执行版在 skill `guitu-design` 里；本文只放取值和规则。
+- 清单的可执行版已归档到 `_local/skills-archive/guitu-design/SKILL.md`；本文只放取值和规则。

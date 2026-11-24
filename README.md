@@ -163,10 +163,8 @@ python -m http.server 8000
 | 加了字段，表单和列表有一边不认 | 字段定义没有走单点 | 只改 `ENTRY_FIELDS` / `ZONE_FIELDS`，再加表单、`mapRow` / `toRow` 与数据库列 |
 | 中文句子中间多出空格 | HTML 里一句话跨了行 | 一个中文字段写成一行 |
 | 传 iPhone 原图很慢或失败 | 浏览器端压缩 + HEIC 转码，HEIC 库 1.3 MB 按需加载 | 别改成 CDN，也别预加载 |
-| `build-docs.js --check` 报「文档已过期」 | 改了页面、脚本或跨模块引用 | 跑 `node _local/tools/build-docs.js`；这是拦截，不是脚本坏了 |
 | 统计页的流量一直是 0 | `visit-beacon.js` 在 `localhost` / `127.0.0.1` 上不发请求 | 只有部署域名会打点；本地验证用控制台往 `site_views` 插测试行 |
 | 统计页三块都空、提示「统计后端还没启用」 | 没执行 `_local/sql/editor-stats-setup.sql`，RPC 不存在 | 先跑迁移再刷新；前端不会因此报错 |
-| 生成 PNG 时卡住不动 | 无头 Edge 在受限终端里起不来 | 换普通终端跑；四份 md 已经写好，PNG 只是配图 |
 
 各模块的细节以 `guitu/README.md`、`quyu/README.md` 和两份 `架构.md` 的第四、五节为准。
 

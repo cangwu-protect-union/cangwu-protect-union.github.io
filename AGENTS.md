@@ -4,7 +4,16 @@
 
 ## 复杂任务先盘问、确认清单再开工
 
-任务复杂、需要多步才能完成时，不要直接动手。顺序是：先仔细盘问我，直到需求明确而完善 → 输出具体任务清单 → 等我修改并明确决定开工，再开工。
+任务复杂、需要多步完成时，不要直接动手。顺序：先仔细盘问，直到需求明确 → 输出具体任务清单 → 等我修改并明确决定开工，再开工。
+
+## 红线
+
+- 编码：UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码。
+- 数据源：数据库是唯一数据源，`data/gui-entries.js` 的种子只作云端不可用时的兜底。
+- 密钥：`guitu/data/config.js` 的 `publishableKey` 可公开；`API Key`（service_role）绝不能出现在前端。
+- `_local/` 永不推送：SQL 迁移脚本含题库答案哈希，文档含密码。
+- 题库答案只存在数据库 `gui_secrets` 表，任何 JS 里都不能出现明文或哈希。
+- 真实姓名不上面，页脚统一用组织名。
 
 ## 写 SQL 不加注释
 
@@ -12,47 +21,38 @@
 
 ## 架构升级不要走捷径
 
-新增一类基础设施时不要为省事选临时方案。典型是**后端**（可信执行点、共享数据、密钥保护、支付回调、定时任务），也包括前期将就、后期返工代价高的：认证、数据模型、权限模型、数据库选型、构建部署方式、数据访问层边界。
+新增一类基础设施（后端、认证、数据模型、权限模型、数据库选型、构建部署、数据访问层边界）时不要为省事选临时方案。先说明欠账与爆发条件、给出方案与取舍，等我确认再实施。例外：纯可替换、访问已收敛到单一模块的实现细节。
 
-做法：停下来说明「现在这个做法的欠账、什么条件下会爆」→ 给出可行方案与取舍 → 等我确认再实施。
+## 改动范围（2026-11-24 起）
 
-判断依据：**数据必须可信 / 必须跨用户共享 / 必须存在我控制的地方**，任一条成立前端就不够了。
-
-例外：纯可替换、且访问已收敛到单一模块（如 `api.ts`）的实现细节，可以直接换。
-
-## 红线
-
-- **编码**：UTF-8 无 BOM，LF。项目含大量中文，编码一变全站乱码。
-- **数据源**：数据库是唯一数据源，`data/gui-entries.js` 的种子只作云端不可用时的兜底。
-- **密钥**：`guitu/data/config.js` 的 `publishableKey` 可公开；`API Key`（service_role）绝不能出现在前端。
-- **`_local/` 永不推送**：SQL 迁移脚本含题库答案哈希，文档含密码。
-- **题库答案**只存在数据库 `gui_secrets` 表，任何 JS 里都不能出现明文或哈希。
-- **真实姓名**不上面，页脚统一用组织名。
+- 活跃线只有两条：rpg6.0 对局（4 项）与角色（33 人终点）。细节见 `范围收敛计划.md`。
+- 主站、guitu、quyu、suggest、rpg6 角色档案一律 L1+L2：不加功能、不做维护，只修阻塞错误（页面打不开、数据错、控制台报错）。
+- 不撤入口、不删代码（策略实验室除外）。
+- 想加回冻结面：从活跃列表划掉等量的面，记进 `backlog.md`；一个窗口最多改 1 次。
+- 改动尽量只碰 `rpg6.0/`；必须碰 `css/style*.css`、`guitu/data/config.js`、导航时单独提交，并跑对应测试。
 
 ## 改代码前先加载对应 skill
 
 | 场景 | skill |
 |---|---|
-| 读或改任何项目文件（主站 / guitu / quyu / 新模块） | `site-project` |
-| 改完页面要实测 | `guitu-browser-test` |
-| 跑或写端到端测试（`_local/tests`） | `site-e2e-tests` |
-| 改样式或调整视觉 | `guitu-design` |
+| 读或改任何项目文件 | `site-project` |
 | 改 rpg6.0 战斗引擎、技能库、召唤物或对局页 | `rpg6-battle` |
-| 批量加角色/技能、评估剩余角色、做角色批次方案 | `rpg6-character-batch` |
+| 批量加角色/技能、评估剩余角色 | `rpg6-character-batch` |
+| 跑或写端到端测试（`_local/tests`） | `site-e2e-tests` |
 | 准备上线 | `guitu-deploy` |
 | 动数据库或权限 | `cloudbase-pg` |
 
 ## 不确定改哪里时
 
-先看 `改动索引.md`：按「要做的事」列了要动的文件与连带项。
+先看 `改动索引.md`。
 
-## 省 token 的硬规则
+## 省 token
 
-- **一个任务一个会话**：单会话过 150 步或上下文过 150k，先写交接再 `/compact` 或新开，不要用一个会话跑完整个批次。
-- **不整读大文件**：先 `grep`/`glob` 定位，`read` 带 `offset/limit`；`edit` 之后不要重读整文件（结果里已回显改动）。见 `site-project` 的「读文件的成本」。
-- **reasoning 默认 medium**（`~/.dsh/profiles/desktop/cordis.patch.yml` 已改；改前是 `max`，这个文件别的会话也会改，动过就重看一遍）：机械步骤（跑校验、改文案、批量搬文件）开工前切 `off`，改规则/排查疑难再调回来。
-- **子代理一次不超过 2 个、每个 ≤100 步**，同一批输入只开一个，中间结果落盘只回摘要；大文件一次写完，统计/索引类由脚本生成，不在对话里输出整份内容。
-- **shell 合并调用**：一次探查覆盖多个目录，校验只跑 `check.ps1` / `verify.ps1` 那一条。用量报表：`node _local/tools/token-report.mjs`。
+- 一个任务一个会话：单会话过 100 步或上下文过 150k，先写交接再新开。
+- 不整读大文件：先 `grep`/`glob` 定位，`read` 带 `offset/limit`；`edit` 后不要重读整文件。
+- 机械步骤（跑校验、改文案、搬文件）把 reasoning 切 `off`；改规则/排查疑难再调回来。
+- 子代理一次不超过 2 个、每个 ≤100 步；统计/索引类由脚本生成，不在对话里输出整份内容。
+- shell 合并调用；用量报表 `node _local/tools/token-report.mjs`。
 
 ## 改完必跑校验
 
@@ -60,69 +60,51 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生、代码行额度，以及文档是否过期（`build-docs.js --check`）。退出码 0 才算过，细节见 `tools/README.md`。提交前用 `-Staged`（多查暂存区与引擎版本闸），提交后用 `-Last`（只扫这一条提交的密钥）。
+覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生、代码行额度、rpg6 lint 与文档计数。提交前 `-Staged`，提交后 `-Last`。文档生成已冻结，`check.ps1` 不再比对 `build-docs`。
 
-动了数据层（`list()` 的兜底合并）或导航，再跑对应测试，两组都不需要令牌：
+日常测试只跑两组：
 
 ```
-node _local/tests/run-all.mjs --group=数据源
-node _local/tests/run-all.mjs --group=导航
+node tests/engine/run.mjs
+node _local/tests/run-all.mjs --group=回合制
 ```
+
+改了冻结模块（只修阻塞 bug）时，才跑对应组：`--group=数据源` / `--group=导航` / `--group=quyu` / `--group=suggest`。
 
 ### 回合制 6.0
 
-改 `rpg6.0/js/engine`、`data/skills/`、召唤物、对局页或战报时，加载 `rpg6-battle`，然后跑一条命令验收：
+改 `rpg6.0/js/engine`、`data/skills/`、召唤物、对局页或战报时，加载 `rpg6-battle`，跑：
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1
 ```
 
-它依次跑 plan（给 `-Plan` 时）、引擎单测、冒烟压测、`check.ps1`。改了对局页、技能结算或样式才加 `-Browser` 跑浏览器组（默认不跑，结尾打一行提示）；全量压测用 `-Full`。
+改了对局页、技能结算或样式加 `-Browser`；全量压测 `-Full`。
 
-改规则要升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处必须一致，`rpg6-lint.js` 比对；`check.ps1 -Staged` 会在改了引擎规则却没升版本时失败）；用 `node tools/rpg6-bump.mjs <新版本>` 一次改两处并写回文档里的版本号。文档里的角色数/技能数/op 数/unsupported 表不要手写，由 `rpg6-stats.js --write` 写回（`test.html` 的数字是运行时算的）。召唤物/新钩子要进状态指纹与回放。批量加角色先加载 `rpg6-character-batch`：盘点 → `plan --check` 出确认表 → `plan --scaffold --write` 落盘 → `verify.ps1`。
+改规则升 `js/engine/version.js` 的 `ENGINE_VERSION` 与 `data/config.js` 的 `engineVersion`（两处一致，`rpg6-lint` 比对），用 `node tools/rpg6-bump.mjs <新版本>`。角色数/技能数/op 数/unsupported 表由 `rpg6-stats.js --write` 写回。召唤物与新钩子要进状态指纹与回放。
 
-**眩晕值口径（6.0-engine.9 起）**：一般伤害默认不加眩晕值，只有伤害 op 标 `addStun: true` 才加；击溃值仍按默认 +1。其余口径（法伤、取整、击溃、召唤物）只看 `rpg6-battle` 的「已经定死的口径」一张表，别在别处再抄一份。
+眩晕值口径（6.0-engine.9 起）：一般伤害默认不加眩晕值，只有伤害 op 标 `addStun: true` 才加；击溃值仍按默认 +1。其余口径只看 `rpg6-battle` 的「已经定死的口径」表。
 
-## 文件长度与拆分
+## 文件长度
 
-额度按**代码行**（非空、非注释）算，注释和空行不占额度；规则在 `tools/size-budget.json`，`check.ps1` 每次都会报超限与接近 75% 的文件。
+额度按代码行算，规则在 `tools/size-budget.json`，`check.ps1` 每次报超限。冻结期不再拆文件：撞线就调 `budgets` 或 `hardCap`，在 `改动索引.md` 记一条待拆。`.ps1` 只写 ASCII（5.1 读 UTF-8 无 BOM 会乱码）。
 
-- 默认 500 行（CSS 1000、工具 800、硬顶 1000）。**到 75% 就安排拆分**，不要等撞线。
-- 拆分的时机是功能做完、测试绿的时候；功能做到一半撞线，就上调额度并在 `改动索引.md` 记一条待拆，**不要压缩代码过关**（额度按代码行算，压缩没有收益）。
-- 拆完要同步 `js/engine/index.js` / `js/battle/entry.js` 的加载顺序，以及 `tools/rpg6-lint.js` 的 `LOAD_ORDER`；`.ps1` 只写 ASCII（5.1 读 UTF-8 无 BOM 会乱码，会静默读坏管道）。
-- 豁免只给“拆了会出事”的文件（现为 `state.js` 的字段↔指纹、`rpg6-lint.js` 的单遍上下文），四样齐全才生效：`{path, class, cap, why}`。数据文件（`rpg6.0/data/`、`tests/engine/skills.test.mjs`）不计额度。
-- 改额度或加豁免只动 `tools/size-budget.json`；单文件明细用 `node tools/size-report.js --file <路径>`。
+## 文档
 
-## 文档与配图
-
-项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成每个模块（含主站）的 `架构.md`、`访客流程图.md` 与 `preview/` 的 PNG 索引。`check.ps1` 会调 `build-docs.js --check` 比对文档与源码，过期即失败。
-
-回合制 6.0 的角色数/技能数/op 数/unsupported 表都由 `rpg6-stats.js --write` 写回（`verify.ps1` 会自动跑），不要手写；机制文档的新节由 `plan.mjs --write` 插入，正文直接取 plan 的 `notes`（没写就留「待补」，lint 会拦）。
+文档生成已冻结（2026-11-24）：不再跑 `build-docs.js`，模块 `架构.md`/`访客流程图.md` 不再随源码更新。`rpg6-stats --write` 与 `plan.mjs --write` 仍随角色批次跑。
 
 ## 提交前
 
-改动完成并跑完校验后直接提交，无需用户再批准。提交与推送用一条命令：
+改动完成并跑完校验后直接提交，无需再批准：
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message <提交信息文件> [-Url <页面> -Expect <特征串>]
 ```
 
-它依次跑 `check.ps1 -Staged`、`git add -A`、commit、push（失败自动重试）、`check.ps1 -Last`；给了 `-Url/-Expect` 就轮询到线上出现特征串。
+它跑 `check.ps1 -Staged`、`git add -A`、commit、push、`check.ps1 -Last`。`git status --short` 仍要逐行看；`_local/`、`*.sql`、`*.docx` 不进提交。
 
-`git status --short` 仍要逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。gitleaks 只扫 commit（`-Last`/`-History`）；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
+DSH 沙箱：`.git/` 不可写，`git add`/`commit` 要一次 full-access。
 
-**DSH 沙箱**：`.git/` 不可写、node 派生不了子进程（`execFileSync` 报 EPERM）。所以 `git add`/`commit` 要一次 full-access；`tools/archive-check.mjs` 也只能在普通终端或 full-access 下跑（git 不可用时它直接退出 2，不再产出空白交接）。仓库卫生、代码行闸、暂存区检查已经挪到 `check.ps1` 里用 PowerShell 调 git，`node tools/check.js` 里没有这三项。
+## 交接
 
-## 归档或交接前
-
-用户提到「归档」「交接」时加载 `session-archive`，按它的六步走。先盘点：
-
-```
-node tools/archive-check.mjs --since=<会话开始前的 commit>
-```
-
-脚本列出本轮的提交、按领域对应的 skill（含哪个没更新）、不属于本轮的工作区改动、待清理候选、该跑的校验。交接正文仍然手写：现在能跑到哪、取舍、卡点、下一轮先做什么。
-
-归档只留交付物：本会话的草稿、一次性脚本、截图、调试残留、重复段落都删掉，已提交的过程产物同样删（先 `git grep` 确认无引用，单独一笔提交）。解释「为什么」的注释、踩坑记录、交接正文、SQL 迁移要留。
-
-把本会话新增的规则、测试命令、踩过的坑写进对应 skill 和本文件，再提交并推送。技能文件 `.dsh/skills/*/SKILL.md` 受版本管理，不能只留在对话或本地；`_local/` 仍然不推送。
+不再加载 `session-archive`，也不再跑 `archive-check`。交接写 10 行：现在能跑到哪、取舍、卡点、下一轮先做什么。新增规则写进对应 skill 和本文件。

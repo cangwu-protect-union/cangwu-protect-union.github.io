@@ -1,6 +1,6 @@
 ---
 name: site-project
-description: 维护 D:\CPU\关于CPU的网页 的约定：目录与模块、编码、数据源与兜底、组织验证、上传、地图坐标、跨模块引用、文档生成与校验。主站、guitu、quyu 以及以后新增的模块共用这一份，读或改任何文件前加载。
+description: 维护 D:\CPU\关于CPU的网页 的约定：目录与模块、编码、数据源与兜底、组织验证、上传、地图坐标、跨模块引用、冻结范围。主站、guitu、quyu 以及以后新增的模块共用这一份，读或改任何文件前加载。
 ---
 
 # 本站约定（所有模块共用）
@@ -14,7 +14,7 @@ suggest/ guitu/ quyu/                  三个模块
 _local/                                不推送：sql/ docs/ notes/ preview/ tests/ pw/ tools/
 ```
 
-**新增模块不写新 skill**：在 `_local/tools/docgen.config.js` 里加一条配置，跑一次生成脚本即可（流程见「新增模块」）。
+**冻结期不加模块、不加页面**：要加先记 `backlog.md`，见 `范围收敛计划.md`。
 
 ## 写文件与编码
 
@@ -68,35 +68,13 @@ _local/                                不推送：sql/ docs/ notes/ preview/ te
 - 实测被同一会话重复整读最多的文件（数字是重复次数）：`quyu/js/zone-data.js` 29、`rpg6.0/js/engine/effect-ops.js` 21、`rpg6.0/js/battle/battle-page.js` 13、`rpg6.0/css/battle.css` 12、`_local/tools/build-docs.js` 11、`rpg6.0/data/battle-skills.js` 8、`rpg6.0/js/battle/battle-view.js` 8、`guitu/js/gui-data.js` 8。
 - 数据表类文件（`gui-data.js`、`zone-data.js`、`battle-skills.js`）先 `grep` `ENTRY_FIELDS`/`ZONE_FIELDS`/技能 id 再读片段。
 
-## 文档生成
+## 文档（已冻结）
 
-```
-node _local/tools/build-docs.js          # 生成 md + 渲染 PNG + 预览索引
-node _local/tools/build-docs.js --check  # 只比对，不写盘（check.ps1 会调）
-```
+2026-11-24 起不再生成 `架构.md`/`访客流程图.md`，`check.ps1` 也不再比对。要恢复：从 git 历史取回 `check.ps1` 的 docs 段，再跑 `node _local/tools/build-docs.js`。平时不要跑。
 
-- `docgen.config.js` 是唯一人工入口；生成物：每个模块（含主站）的 `架构.md` 与 `访客流程图.md`，有 `preview/` 的再出 PNG。
-- 别手改 `AUTO-GENERATED` 区间；区间外的手写说明保留。
-- 渲染 mermaid 用本地 `_local/tools/vendor/mermaid.min.js`，别改回 unpkg/CDN（本机连不上 unpkg，会卡几分钟再整批失败）。
+## 新增页面 / 模块（冻结期不做）
 
-## 新增模块
-
-1. 建目录：页面 `<模块>/*.html`、脚本 `<模块>/js/`、数据 `<模块>/data/`（可省）；现成例子 `suggest/`。
-2. `docgen.config.js` 加一条：`id`（主站空串）、`access`（public/gate/editor）、`roles`、`backend`（没有写 `nodes: []`）、`flow`（`lock: []` 不画虚线框）。
-3. 跑 `build-docs.js` 生成两份 md 骨架，手工补「怎么读」。
-4. 跑 `tools\check.ps1`：未登记的模块直接报错。
-5. `改动索引.md` 与根 `README.md` 目录树登记；导航用例按 `a[href]` 写死的入口要跟着改。
-
-## 新增页面
-
-1. 抄同类页，配自己的页面脚本。
-2. `docgen.config.js` 的 `access`、`roles`、`flow.nodes` 三处都登记，漏了 `--check` 失败。
-3. 跑 `check.ps1`，必要时 `node _local/tests/run-all.mjs --group=导航`。
-
-## 新模块不要写新 skill
-
-模块特有的坑写进 `<模块>/README.md`，结构写进 `<模块>/架构.md`；本 skill 只放跨模块约定。
-`docgen.config.js` 的 scriptNote/tableNote/crossNote/readTable 可写模块特有说明，生成进架构图，不用额外文件。
+先记进 `backlog.md`。解冻后按旧流程：抄同类页、在 `docgen.config.js` 登记 `access`/`roles`/`flow.nodes`、跑 `check.ps1`。新增模块不写新 skill，坑写进模块 `README.md`。
 
 ## 改完必跑
 

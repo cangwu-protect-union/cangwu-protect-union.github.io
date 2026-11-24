@@ -186,7 +186,7 @@ if (foreign.length) {
 out.push("");
 out.push("## 四、待清理候选");
 out.push("");
-out.push("归档只留交付物，过程产物删掉。逐条确认引用后手删，细则见 skill `session-archive` 第 3 步。");
+out.push("归档只留交付物，过程产物删掉。逐条确认引用后手删。");
 out.push("");
 if (candidates.length) {
   out.push("| 文件 | 类别 | 依据 |");
@@ -209,7 +209,6 @@ out.push("");
 out.push("## 六、校验命令");
 out.push("");
 out.push("```");
-out.push("node _local/tools/build-docs.js");
 out.push("powershell -NoProfile -ExecutionPolicy Bypass -File tools\\check.ps1");
 for (const skill of byArea.keys()) {
   if (skill === "rpg6-battle") out.push("node tests/engine/run.mjs");

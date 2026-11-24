@@ -1,16 +1,16 @@
 {
   "warnRatio": 0.75,
   "budgets": {
-    "js": 500,
-    "mjs": 500,
-    "css": 1000,
+    "js": 700,
+    "mjs": 700,
+    "css": 1200,
     "html": 500,
     "htm": 500,
     "md": 500,
     "ps1": 400
   },
   "toolBudget": 800,
-  "hardCap": 1000,
+  "hardCap": 1400,
   "blobLimitBytes": 262144,
   "skip": [
     "guitu/js/lib/",

@@ -145,15 +145,7 @@ try {
         if ($stagedBad -gt 0) { $failed++ } else { Write-Host 'staged files: ok' -ForegroundColor DarkGray }
     }
 
-    # Generated docs must match the source. _local/ is gitignored, so skip when absent.
-    $docs = "$root\_local\tools\build-docs.js"
-    if (Test-Path $docs) {
-        Write-Host '--- docs freshness ---' -ForegroundColor Cyan
-        & $node $docs --check
-        if ($LASTEXITCODE -ne 0) { $failed++ }
-    } else {
-        Write-Host '--- docs freshness: build-docs.js not found, skipped ---' -ForegroundColor DarkGray
-    }
+    # Docs generation frozen 2026-11-24: rpg6.0 is the only active line, so no docs freshness gate.
 
     # RPG6 skill library structure: unknown op, undeclared mark, bad field, missing anchor.
     # Both tools are tracked in tools/, so a missing one is a broken checkout, not a skip.

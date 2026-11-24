@@ -123,18 +123,9 @@ powershell -File tools\check.ps1 -History   # 全历史复查（换机器、改 
 node --use-system-ca tools/get-tool.js gitleaks/gitleaks windows_x64 _local/bin
 ```
 
-## 4. 文档新鲜度（`_local/tools/build-docs.js --check`）
+## 4. 文档（已冻结）
 
-主站与每个模块的 `架构.md`、`访客流程图.md`（当前六份）由 `_local/tools/docgen.js` 从源码生成，
-模块清单在 `_local/tools/docgen.config.js`；新增模块只加一条配置。
-`--check` 只在内存里生成一遍，与磁盘上的文件逐字比对，不写盘、不渲染 PNG；不一致就退出 1，并报出文件名和第一个不同的行号。
-
-```powershell
-node _local\tools\build-docs.js --check
-```
-
-`_local/` 被 gitignore，所以 `check.ps1` 找不到这个脚本时跳过并打一行提示。
-生成前还会自检：有页面的目录都登记过模块、每个 `.html` 都登记了访问级别、标为需要验证的页面确实加载了 `gui-gate.js`、跨模块引用的文件存在、流程图覆盖全部页面且边的端点存在。
+2026-11-24 起不再生成 `架构.md`/`访客流程图.md`，`check.ps1` 也不再比对。`docgen` 仍留在 `_local/tools/`，要恢复见 `范围收敛计划.md` §5。
 
 ## 5. 回合制 6.0：技能库 lint 与文档数字
 
@@ -206,11 +197,11 @@ node tools/design-audit.js D:\别处    # 指向别的目录
 | 颜色 | `:root` 之外硬编码的 hex、已定义变量数、`var()` 使用次数 |
 | emoji | HTML 正文里的 emoji 与箭头符号，带 `文件:行` |
 
-退出码恒为 0：它是报告不是门禁，不阻断 `check.ps1`。判断标准与目标取值在项目根 `DESIGN.md`，清单的可执行版在 skill `guitu-design`。
+退出码恒为 0：它是报告不是门禁，不阻断 `check.ps1`。判断标准与目标取值在项目根 `DESIGN.md`，清单已归档到 `_local/skills-archive/guitu-design/SKILL.md`。
 
 ## 已知边界
 
 - `_local/`、`lib/`（vendored）、`preview/`、`node_modules/`、`.pnpm-store/`、`.dsh/` 不参与扫描；`.dsh/skills/` 里的文件要单独确认编码。
 - `check.js` 自己不在密钥规则范围内（规则字面量会自我命中）。
-- HTML 只做结构检查，不校验 DOM 行为；页面行为需要跑 `guitu-browser-test`。
+- HTML 只做结构检查，不校验 DOM 行为；页面行为需要跑 `site-e2e-tests` 的浏览器组，或 `verify.ps1 -Browser`。
 - 本地引用检查不认运行时拼接出来的路径（如 `data/${name}.json`）。
