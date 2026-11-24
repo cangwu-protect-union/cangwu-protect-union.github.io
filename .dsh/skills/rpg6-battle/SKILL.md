@@ -25,12 +25,13 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `.../effect-ops.js` | 效果解释器框架、注册表与出口（opNames 从注册表推导）、群体目标 `sideUnits`、持续效果/周期计时、反射、打断、标记；op 实现按伤害/状态/流程拆在 `ops/`，helpers 在 `effect-ops-helpers.js` |
 | `.../timeline.js` | 标准回合、速度条、行动队列、跳过无法行动者；空回合会连续推进 |
 | `.../conditions.js` | 技能条件（蓝/力/冷却/封锁/一次性/标记门槛、`costFromLost` 动态费用） |
-| `.../skills.js` | 技能执行、蓄力、校验、动态费用、嘲讽、被动钩子、标记初始化 |
+| `.../skills.js` | 技能执行、蓄力、校验、动态费用、被动钩子、标记初始化 |
+| `.../skills-target.js` | 单体目标校验、嘲讽最高可选集、普攻模式与召唤物回血目标（`B.skills` 同一命名空间，跟 skills.js 之后加载） |
 | `.../summons.js` | 召唤物创建/移除/上限/计时/光环/到期自爆/按速度攒条的自动攻击 |
 | `.../actions.js` | 普攻/击溃/蓄蓝、普攻前改判、`afterAction` 行动后钩子 |
 | `.../battle.js` | 门面：create / apply / available / hash / replay |
 | `rpg6.0/data/skills/` | 角色技能、标记、`summons` 召唤物定义（唯一数据源；一个角色一个文件，`index.js` 聚合） |
-| `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放与界面细节拆在 battle-page-record.js / battle-page-ui.js） |
+| `rpg6.0/js/battle/*` | 渲染（五块 + 折叠 + 召唤物带）、选中状态、嘲讽目标、战报、页面装配（存档/回放、界面细节、事件绑定拆在 battle-page-record.js / battle-page-ui.js / battle-page-bind.js） |
 | `tests/engine/run.mjs` | 引擎单测入口 |
 | `tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |

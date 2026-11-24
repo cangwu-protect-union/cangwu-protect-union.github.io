@@ -71,6 +71,7 @@
 
   /* 解锁：支付 1 蓝、标记该属性已解锁、3 个标准回合后把原值写回。
      原值在开局由倪曼云被动记进对方的 counter。 */
+
   function executeUnlock(state, unit, action, events) {
     var stat = String(action.stat || "");
     if (UNLOCK_STATS.indexOf(stat) < 0) throw new Error("解锁目标非法：" + stat);
@@ -226,6 +227,7 @@
   }
 
   /* 被技能强制执行的一次普攻：不消耗行动、不检查普攻门槛、不跑 basicMod */
+
   function strike(state, unit, target, events, opts) {
     return basicAttack(state, unit, target, events, {
       forced: true,
@@ -286,6 +288,7 @@
 
   /* 额外动作（E5）：吃碎苹果、功德回血。不消耗行动，不吃「行动前掷骰跳过」。
      入口展开与可用性在 conditions.itemsOf/itemAvailable。 */
+
   function executeItem(state, unit, action, events) {
     var items = B.conditions.itemsOf(unit);
     var item = null;

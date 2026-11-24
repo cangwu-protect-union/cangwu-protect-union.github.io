@@ -11,6 +11,7 @@
   }
 
   /* 额外动作按钮：unlock（解锁属性）与 item（吃碎苹果/功德回血），接在三个基础按钮后面 */
+
   P.renderExtraActions = function (state, unit, pick, active) {
     var html = "";
     var extras = active && B.battle && B.battle.available ? B.battle.available(state) : [];
@@ -259,6 +260,7 @@
   }
 
   /* 召唤物脚本说明：有一段 op 认不出来就整段返回空串，由调用方写「见技能说明」 */
+
   P.summonActText = function (ops) {
     var parts = [];
     var unknown = false;
@@ -288,6 +290,7 @@
   }
 
   /* desc 优先（整段手写）；没有 desc 才按 aura / attack / onExpire 自己拼 */
+
   P.summonActions = function (def) {
     if (!def) return [];
     if (def.desc) return [{ label: "说明", text: def.desc }];

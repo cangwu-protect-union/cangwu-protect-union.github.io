@@ -119,6 +119,7 @@
   /* 桌面与手机都折成可点标题的 <details>（触发方式同手机端）。
      桌面折叠态在标题下预览上一个有效回合，展开态铺出完整日志；
      手机折叠态只留标题行、展开铺满视口，由 CSS 紧凑断点处理。 */
+
   P.renderLogPreview = function (state) {
     var list = state.log || [];
     var lastRound = null;

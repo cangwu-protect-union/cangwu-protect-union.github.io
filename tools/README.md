@@ -31,13 +31,13 @@ powershell -File tools\publish.ps1 -Message msg.txt -Url https://cangwu-protect-
 | 密钥 | `service_role`、`sb_secret_*`、带密码的连接串、硬编码凭据、私钥、AWS key、GitHub / GitLab 令牌、role 不是 `anon` 的 JWT |
 
 `check.js` 只做文件系统能覆盖的部分：它**不派生任何子进程**（DSH 沙箱里 `execFileSync` 会 EPERM，
-早期版本把 git 检查放在这里，结果是静默空过还打「全部通过」）。仓库卫生、体积闸、暂存区
-三项在 `check.ps1` 里用 PowerShell 调 git 完成：
+早期版本把 git 检查放在这里，结果是静默空过还打「全部通过」）。仓库卫生、代码行闸、暂存区
+三项在 `check.ps1` 里用 PowerShell 调 git 完成（代码行闸的度量在 `tools/size-report.js`）：
 
 | 检查 | 内容 |
 |---|---|
 | 仓库 | `git ls-files` 里有没有 `_local/`、`node_modules/`、`.pnpm-store/`、`*.sql`、`*.docx`、`*.zip` |
-| 体积 | 被跟踪的 `*.js` / `*.mjs` / `*.css` / `*.html` / `*.md` / `*.ps1` 不得超过 40960 字节；`guitu/js/lib/` 与 `quyu/vendor/` 豁免 |
+| 代码行 | `tools/size-report.js --check`：按代码行（非空、非注释）比额度，报超限、75% 预警与结构提醒；规则在 `size-budget.json`，`guitu/js/lib/` 与 `quyu/vendor/` 跳过 |
 | 暂存区 | 仅 `-Staged`：`git diff --cached` 里有没有 `_local/`、SQL、Office 文件 |
 
 也可以指向别的目录，用于检查构建产物：
@@ -46,7 +46,35 @@ powershell -File tools\publish.ps1 -Message msg.txt -Url https://cangwu-protect-
 node tools/check.js <目录>
 ```
 
-## 2. Biome（可选）
+## 2. 代码行额度（`size-report.js` + `size-budget.json`）
+
+`check.ps1` 会用 `git ls-files` 的清单调 `node tools/size-report.js --check --stdin`。规则全在 `size-budget.json`，脚本里没有硬编码阈值。
+
+| 指标 | 说明 |
+|---|---|
+| 代码行 | 非空、非注释行；注释与空行不占额度，所以想写注释不会被罚 |
+| 额度 | `js`/`mjs` 500、`css` 1000（一行一属性，密度约为 JS 的一半）、`html`/`md` 500、`ps1` 400；`tools/` 与 `.dsh/skills/` 800；硬顶 1000 |
+| 预警线 | `warnRatio` 0.75：到 75% 就安排拆分，别等撞线 |
+| 豁免 | `exempt[]`：`{path, class, cap, why}` 四样齐全才生效，`cap` 不得超过 `hardCap`；只给“拆了会产生新风险”的文件 |
+| 数据文件 | `dataFiles[]` / `dataPrefixes[]`：生成物与平铺数据不计额度，但要写明来源 |
+| 结构提醒 | 不阻断：单函数 >80 行、嵌套 >4、参数 >4、最长行 >200、空行率 <3% |
+
+日常用法：
+
+```powershell
+node tools/size-report.js                          # 总览：额度表、超限、接近预警、结构提醒、豁免清单
+node tools/size-report.js --near                   # 只列接近预警线的文件与余量
+node tools/size-report.js --file rpg6.0/js/engine/skills.js   # 单文件明细：余量、最长函数、长行
+node tools/size-report.js --check --stdin          # check.ps1 用：有超限退出 1
+```
+
+撞线时按这个顺序处理：**拆到新文件** → 确实拆不动就**上调额度并写理由** → 都不该做的是压缩代码。
+压缩在这里没有收益：额度按代码行算，把三行并成一行不会减少额度，只会让下一次读更难。
+
+`check.ps1` 与其它 `.ps1` 一样受 Windows PowerShell 5.1 的限制：**只写 ASCII**，中文会因读成 ANSI 变成乱码，
+甚至把后面的管道语句读坏（实测：`$sizeOut` 变成空数组，闸静默通过）。
+
+## 3. Biome（可选）
 
 `biome.json` 已按这个项目裁剪过规则，只留能抓真 bug 的，不跑格式化。
 没有装 Biome 时这一步自动跳过，只打印一行提示。

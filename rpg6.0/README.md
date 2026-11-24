@@ -63,7 +63,8 @@ js/
 │   ├── effect-ops.js  效果解释器框架、注册表与出口（opNames 从注册表推导；helpers 在 effect-ops-helpers.js，op 实现按伤害/状态/流程拆在 ops/）
 │   ├── timeline.js    标准回合、速度条、行动队列
 │   ├── conditions.js  技能条件
-│   ├── skills.js      技能执行与档案校验
+│   ├── skills.js      技能执行、校验与被动钩子
+│   ├── skills-target.js 单体目标校验、嘲讽最高的可选集合、普攻模式
 │   ├── summons.js     召唤物：创建、计时、光环、自动攻击
 │   ├── actions.js     普攻/击溃/蓄蓝
 │   └── battle.js      门面：create / apply / available / hash / replay
@@ -71,7 +72,8 @@ js/
     ├── battle-view.js 三板块渲染与速度条预测（事件行与效果文案在 battle-view-effects.js）
     ├── battle-pick.js 选中状态
     ├── battle-record.js 战报构建与回放
-    ├── battle-page.js 页面装配（存档/回放在 battle-page-record.js、界面细节在 battle-page-ui.js，两片先加载）
+    ├── battle-page-bind.js 事件绑定（DOM 事件接到 P 上的处理函数）
+    ├── battle-page.js 页面装配（存档/回放在 battle-page-record.js、界面细节在 battle-page-ui.js、事件在 battle-page-bind.js，三片先加载）
     └── battle-list.js 战报列表
 ```
 

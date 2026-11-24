@@ -119,25 +119,15 @@ try {
         if ($repoBad -gt 0) { $failed++ } else { Write-Host 'repo hygiene: ok' -ForegroundColor DarkGray }
 
         Write-Host '--- size gate ---' -ForegroundColor Cyan
-        $sizeLimit = 40960
-        # Engine test fixtures are allowed to be larger; cap them so it stays a gate.
-        $testSizeLimit = 163840
-        $sizeExt = @('.js', '.mjs', '.css', '.html', '.htm', '.md', '.ps1')
-        $overSize = 0
-        foreach ($p in $trackedFiles) {
-            if ($sizeExt -notcontains [System.IO.Path]::GetExtension($p).ToLowerInvariant()) { continue }
-            if ($p -like 'guitu/js/lib/*' -or $p -like 'quyu/vendor/*') { continue }
-            $limit = $sizeLimit
-            if ($p -like 'tests/*') { $limit = $testSizeLimit }
-            $full = Join-Path $root $p
-            if (-not (Test-Path -LiteralPath $full)) { continue }
-            $len = (Get-Item -LiteralPath $full).Length
-            if ($len -gt $limit) {
-                Write-Host "  over $limit bytes ($len): $p" -ForegroundColor Red
-                $overSize++
-            }
+        # Code-line budget and structure metrics live in tools/size-report.js,
+        # rules in tools/size-budget.json. Keep this file ASCII only.
+        $sizeOut = ($trackedFiles -join "`n") | & $node "$root\tools\size-report.js" --check --stdin
+        $sizeCode = $LASTEXITCODE
+        foreach ($line in $sizeOut) {
+            $color = if ($line -match '^\s*over') { 'Red' } elseif ($line -match '^\s*warn') { 'DarkYellow' } else { 'DarkGray' }
+            Write-Host $line -ForegroundColor $color
         }
-        if ($overSize -gt 0) { $failed++ } else { Write-Host 'size gate: ok' -ForegroundColor DarkGray }
+        if ($sizeCode -ne 0) { $failed++ }
     }
 
     if ($Staged) {
@@ -203,10 +193,14 @@ try {
         # Scan diffs only, never worktree files (_local/ holds real passwords).
         # Every commit was scanned when it landed; rescanning the whole history on
         # each run is pure repetition, so it is behind -History.
-        if ($Staged) { & $gitleaks git --pre-commit --staged --redact --no-banner }
-        elseif ($History) { & $gitleaks git --redact --no-banner }
-        else { & $gitleaks git --pre-commit --redact --no-banner }
-        if ($LASTEXITCODE -ne 0) { $failed++ }
+        # gitleaks logs to stderr; route it through the success stream so a caller
+        # running with $ErrorActionPreference = 'Stop' (verify.ps1) does not abort.
+        if ($Staged) { $leakOut = & $gitleaks git --pre-commit --staged --redact --no-banner 2>&1 }
+        elseif ($History) { $leakOut = & $gitleaks git --redact --no-banner 2>&1 }
+        else { $leakOut = & $gitleaks git --pre-commit --redact --no-banner 2>&1 }
+        $leakCode = $LASTEXITCODE
+        foreach ($line in $leakOut) { Write-Host ("  " + $line) -ForegroundColor DarkGray }
+        if ($leakCode -ne 0) { $failed++ }
     } else {
         Write-Host '--- gitleaks: not installed, skipped ---' -ForegroundColor DarkGray
     }

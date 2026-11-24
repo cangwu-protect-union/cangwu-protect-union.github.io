@@ -18,6 +18,8 @@
     return String(text == null ? "" : text).replace(/\s+/g, "");
   }
 
+  /* ---------------- 库索引与查询 ---------------- */
+
   function load(library) {
     byId = {};
     byOwner = {};
@@ -57,12 +59,16 @@
   }
 
   /* 动态普攻攻击值：返回数值表达式，没有就返回 null（用面板攻击） */
+
   function basicAtkOf(unit) {
     if (!unit || !unit.name) return null;
     return basicAtkDefs[unit.name] || null;
   }
 
   /* 动态费用：按「累计已损失血量」每 per 点降 1 蓝 1 力，最低 0 */
+
+  /* ---------------- 单位初始化与被动加成 ---------------- */
+
   function effectiveCost(unit, skill) {
     var mp = skill && skill.cost && skill.cost.mp ? Number(skill.cost.mp) : 0;
     var charge = skill && skill.charge ? Number(skill.charge) : 0;
@@ -80,6 +86,7 @@
 
   /* 建单位时把角色的标记声明挂上去；标记对所有人生效，双方都能看到与操作。
      on:"opponent" 的标记不挂自己，等双方都建好后由 initOpponentMarks 挂到对方身上。 */
+
   function initUnit(unit) {
     var defs = markDefs[unit.name] || [];
     if (!unit.marks) unit.marks = {};
@@ -96,6 +103,7 @@
   }
 
   /* 把对方声明为 on:"opponent" 的标记挂到本侧英雄身上 */
+
   function initOpponentMarks(state) {
     var units = state.units || [];
     for (var i = 0; i < units.length; i++) {
@@ -127,6 +135,7 @@
 
   /* 受击掷骰免疫：伤害结算前先掷骰，掷出 values 里的点数就整体免疫。
      不放在 beforeDamage 钩子里，因为那条路径对 noReaction 的二次伤害（反弹、被动强制普攻）会被跳过。 */
+
   function rollDodge(state, unit, events) {
     var list = byOwner[unit.name] || [];
     for (var i = 0; i < list.length; i++) {
@@ -152,6 +161,7 @@
   }
 
   /* 随身 Buff 免疫：技能上的 buffImmune 列表，加 Buff 时拦截、标准回合开始再清一次兜底 */
+
   function immuneBuffs(unit) {
     var list = byOwner[unit.name] || [];
     var out = [];
@@ -163,6 +173,8 @@
     }
     return out;
   }
+
+  /* ---------------- 释放流程 ---------------- */
 
   function walk(value, visit) {
     if (!value || typeof value !== "object") return;
@@ -192,79 +204,10 @@
     return copy;
   }
 
-  function maxTauntUids(state, side) {
-    var list = B.state.combatantsOf(state, side);
-    var max = -Infinity;
-    for (var i = 0; i < list.length; i++) max = Math.max(max, Number(list[i].taunt) || 0);
-    var out = [];
-    for (var j = 0; j < list.length; j++) {
-      if ((Number(list[j].taunt) || 0) === max) out.push(list[j].uid);
-    }
-    return out;
-  }
-
-  function checkTaunt(state, unit, targetUid) {
-    if (B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)) return;
-    var target = B.state.unitOf(state, targetUid);
-    var side = B.state.sideOf(state, target.uid);
-    var allowed = maxTauntUids(state, side);
-    if (allowed.indexOf(target.uid) < 0) {
-      throw new Error("必须选择嘲讽最高的目标");
-    }
-  }
-
-  function resolveTarget(state, unit, skill, requested) {
-    var mySide = B.state.sideOf(state, unit.uid);
-    var enemySide = B.state.otherSide(state, mySide);
-    var enemyHero = B.state.heroOf(state, enemySide);
-    var kind = skill.target || "enemy";
-    if (kind === "self") {
-      if (requested && requested !== unit.uid) throw new Error("这个技能只能对自己使用");
-      return unit.uid;
-    }
-    if (kind === "ally") {
-      if (requested && requested !== unit.uid) throw new Error("1v1 没有其他队友");
-      return unit.uid;
-    }
-    if (kind === "allAllies") return unit.uid;
-    if (kind === "allEnemies") return enemyHero ? enemyHero.uid : "";
-    if (kind === "any") {
-      if (!requested) throw new Error("没有选目标");
-      B.state.unitOf(state, requested);
-      if (requested === unit.uid) return requested;
-      if (B.state.sideOf(state, requested) === enemySide) checkTaunt(state, unit, requested);
-      return requested;
-    }
-    if (!requested) throw new Error("没有选目标");
-    B.state.unitOf(state, requested);
-    if (requested === unit.uid) throw new Error("这个技能不能对自己使用");
-    if (B.state.sideOf(state, requested) !== enemySide) throw new Error("目标不是敌方单位");
-    checkTaunt(state, unit, requested);
-    return requested;
-  }
 
   /* 额外动作（E5）的库存与可用性在 actions.js（itemsOf/itemAvailable）：
      技能库只负责按单位给技能清单，items 字段由动作层展开。 */
 
-  function basicMode(state, unit, target, events) {
-    var ctx = {
-      sourceUid: unit.uid,
-      targetUid: target ? target.uid : "",
-      skillId: "passive.basicMode",
-      label: "普攻模式",
-      mode: {}
-    };
-    runHooks(state, unit, "basicMode", ctx, events || []);
-    return ctx.mode;
-  }
-
-  function basicHealTarget(state, unit) {
-    var mode = basicMode(state, unit, null, []);
-    if (!mode || !mode.healSummonKey) return null;
-    var side = B.state.sideOf(state, unit.uid);
-    var summon = B.summons && B.summons.findKey ? B.summons.findKey(state, side, mode.healSummonKey) : null;
-    return summon ? summon.uid : null;
-  }
 
   function chargeSkill(state, unit, skill, action, events, actionId) {
     if (unit.charge && unit.charge.skillId !== skill.id) {
@@ -308,7 +251,7 @@
   }
 
   function releaseSkill(state, unit, skill, action, events, actionId) {
-    var targetUid = resolveTarget(state, unit, skill, action.target);
+    var targetUid = api.resolveTarget(state, unit, skill, action.target);
     var ctx = {
       sourceUid: unit.uid,
       targetUid: targetUid,
@@ -446,6 +389,7 @@
   }
 
   /* 释放蓄力型技能时，把蓄力期间挂的防护层一起清掉（顾文达硕哥过肩摔） */
+
   function clearGuardsOfSkill(unit, skillId) {
     if (!unit.effects || !unit.effects.length) return;
     var kept = [];
@@ -456,6 +400,8 @@
     }
     unit.effects = kept;
   }
+
+  /* ---------------- 被动钩子与普攻前置 ---------------- */
 
   function runHooks(state, unit, kind, ctx, events) {
     ctx.ownerUid = unit.uid;
@@ -483,6 +429,7 @@
   }
 
   /* 普攻前的被动修正：返回 {type, factor, healInstead, hits, noBreak, misfire} */
+
   function basicMod(state, unit, target, events) {
     var ctx = {
       sourceUid: unit.uid,
@@ -496,6 +443,7 @@
   }
 
   /* 普攻门槛：返回 {allow, reason}，由角色的 basicGate 被动决定 */
+
   function basicGate(state, unit, targetUid, events) {
     var ctx = {
       sourceUid: unit.uid,
@@ -508,6 +456,8 @@
     runHooks(state, unit, "basicGate", ctx, events || []);
     return { allow: !ctx.denied, reason: ctx.reason || "" };
   }
+
+  /* ---------------- 技能库校验 ---------------- */
 
   function validate(characters) {
     var problems = [];
@@ -566,16 +516,11 @@
   api.initUnit = initUnit;
   api.initOpponentMarks = initOpponentMarks;
   api.execute = execute;
-  api.resolveTarget = resolveTarget;
-  api.maxTauntUids = maxTauntUids;
-  api.checkTaunt = checkTaunt;
   api.prepareOps = prepareOps;
   api.runHooks = runHooks;
   api.runBattleStart = runBattleStart;
   api.basicMod = basicMod;
   api.basicGate = basicGate;
-  api.basicMode = basicMode;
-  api.basicHealTarget = basicHealTarget;
   api.validate = validate;
   api.statusOf = statusOf;
   api.all = function () { return all.slice(); };

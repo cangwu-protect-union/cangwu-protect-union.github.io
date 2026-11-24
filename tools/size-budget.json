@@ -1,0 +1,55 @@
+{
+  "warnRatio": 0.75,
+  "budgets": {
+    "js": 500,
+    "mjs": 500,
+    "css": 1000,
+    "html": 500,
+    "htm": 500,
+    "md": 500,
+    "ps1": 400
+  },
+  "toolBudget": 800,
+  "hardCap": 1000,
+  "blobLimitBytes": 262144,
+  "skip": [
+    "guitu/js/lib/",
+    "quyu/vendor/"
+  ],
+  "toolPaths": [
+    "tools/",
+    ".dsh/skills/"
+  ],
+  "structureWarn": {
+    "maxFunctionLines": 80,
+    "maxNesting": 4,
+    "maxParams": 4,
+    "maxLineLength": 200,
+    "minBlankRatio": 0.03
+  },
+  "dataPrefixes": [
+    "rpg6.0/data/skills/",
+    "rpg6.0/data/seeds/"
+  ],
+  "dataFiles": [
+    { "path": "rpg6.0/data/seeds/characters.js", "why": "_local/tools/gen-rpg-seed.js 生成，勿手改" },
+    { "path": "rpg6.0/data/seeds/characters-2.js", "why": "_local/tools/gen-rpg-seed.js 生成，勿手改" },
+    { "path": "rpg6.0/data/seeds/characters-3.js", "why": "_local/tools/gen-rpg-seed.js 生成，勿手改" },
+    { "path": "rpg6.0/data/seeds/characters-4.js", "why": "_local/tools/gen-rpg-seed.js 生成，勿手改" },
+    { "path": "tests/engine/skills.test.mjs", "why": "数据驱动用例，条目平铺，按 id 检索，不含分支逻辑" }
+  ],
+  "exempt": [
+    {
+      "path": "rpg6.0/js/engine/state.js",
+      "class": "C",
+      "cap": 520,
+      "why": "clone/hash 手写枚举单位字段，拆开漏字段时回放比对测不出"
+    },
+    {
+      "path": "tools/rpg6-lint.js",
+      "class": "C",
+      "cap": 800,
+      "why": "单遍检查共享同一份加载上下文，不随包发布"
+    }
+  ]
+}

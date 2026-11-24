@@ -60,7 +60,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1
 ```
 
-覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生，以及文档是否过期（`build-docs.js --check`）。退出码 0 才算过，细节见 `tools/README.md`。提交前用 `-Staged`（多查暂存区与引擎版本闸），提交后用 `-Last`（只扫这一条提交的密钥）。
+覆盖编码、JS 语法、HTML 标签栈、本地引用、CSS 配平、密钥、git 卫生、代码行额度，以及文档是否过期（`build-docs.js --check`）。退出码 0 才算过，细节见 `tools/README.md`。提交前用 `-Staged`（多查暂存区与引擎版本闸），提交后用 `-Last`（只扫这一条提交的密钥）。
 
 动了数据层（`list()` 的兜底合并）或导航，再跑对应测试，两组都不需要令牌：
 
@@ -83,6 +83,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 
 **眩晕值口径（6.0-engine.9 起）**：一般伤害默认不加眩晕值，只有伤害 op 标 `addStun: true` 才加；击溃值仍按默认 +1。其余口径（法伤、取整、击溃、召唤物）只看 `rpg6-battle` 的「已经定死的口径」一张表，别在别处再抄一份。
 
+## 文件长度与拆分
+
+额度按**代码行**（非空、非注释）算，注释和空行不占额度；规则在 `tools/size-budget.json`，`check.ps1` 每次都会报超限与接近 75% 的文件。
+
+- 默认 500 行（CSS 1000、工具 800、硬顶 1000）。**到 75% 就安排拆分**，不要等撞线。
+- 拆分的时机是功能做完、测试绿的时候；功能做到一半撞线，就上调额度并在 `改动索引.md` 记一条待拆，**不要压缩代码过关**（额度按代码行算，压缩没有收益）。
+- 拆完要同步 `js/engine/index.js` / `js/battle/entry.js` 的加载顺序，以及 `tools/rpg6-lint.js` 的 `LOAD_ORDER`；`.ps1` 只写 ASCII（5.1 读 UTF-8 无 BOM 会乱码，会静默读坏管道）。
+- 豁免只给“拆了会出事”的文件（现为 `state.js` 的字段↔指纹、`rpg6-lint.js` 的单遍上下文），四样齐全才生效：`{path, class, cap, why}`。数据文件（`rpg6.0/data/`、`tests/engine/skills.test.mjs`）不计额度。
+- 改额度或加豁免只动 `tools/size-budget.json`；单文件明细用 `node tools/size-report.js --file <路径>`。
+
 ## 文档与配图
 
 项目较大推进时跑一次：`node _local/tools/build-docs.js`，生成每个模块（含主站）的 `架构.md`、`访客流程图.md` 与 `preview/` 的 PNG 索引。`check.ps1` 会调 `build-docs.js --check` 比对文档与源码，过期即失败。
@@ -101,7 +111,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message <
 
 `git status --short` 仍要逐行看；先 `git log --oneline -3`，同一工作区可能有别的会话已提交或已推送。不要把别人的改动混进本次提交或提交信息；`_local/`、`*.sql`、`*.docx` 不进提交。gitleaks 只扫 commit（`-Last`/`-History`）；数据里的 `key: "..."` 可能被 `generic-api-key` 误报，在 `.gitleaks.toml` 按路径 + 行正则放行，不要放行整个文件。
 
-**DSH 沙箱**：`.git/` 不可写、node 派生不了子进程（`execFileSync` 报 EPERM）。所以 `git add`/`commit` 要一次 full-access；`tools/archive-check.mjs` 也只能在普通终端或 full-access 下跑（git 不可用时它直接退出 2，不再产出空白交接）。仓库卫生、体积闸、暂存区检查已经挪到 `check.ps1` 里用 PowerShell 调 git，`node tools/check.js` 里没有这三项。
+**DSH 沙箱**：`.git/` 不可写、node 派生不了子进程（`execFileSync` 报 EPERM）。所以 `git add`/`commit` 要一次 full-access；`tools/archive-check.mjs` 也只能在普通终端或 full-access 下跑（git 不可用时它直接退出 2，不再产出空白交接）。仓库卫生、代码行闸、暂存区检查已经挪到 `check.ps1` 里用 PowerShell 调 git，`node tools/check.js` 里没有这三项。
 
 ## 归档或交接前
 

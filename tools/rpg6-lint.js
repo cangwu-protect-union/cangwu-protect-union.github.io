@@ -31,7 +31,7 @@ const PAGE_FILE = path.join(ROOT, "rpg6.0", "test.html");
 const MECHANISM_DOC = path.join(ROOT, "_local", "docs", "回合制6.0测试功能-角色机制.md");
 
 /* 引擎加载顺序（唯一权威在 js/engine/index.js 的 import 顺序，这里只是校验基准） */
-const LOAD_ORDER = ["version", "rng", "rules", "traits", "state", "damage", "effect-ops", "effect-ops-helpers", "ops/ops-damage", "ops/ops-flow", "ops/ops-state", "timeline", "conditions", "skills", "summons", "actions", "battle"];
+const LOAD_ORDER = ["version", "rng", "rules", "traits", "state", "damage", "effect-ops", "effect-ops-helpers", "ops/ops-damage", "ops/ops-flow", "ops/ops-state", "timeline", "conditions", "skills", "skills-target", "summons", "actions", "battle"];
 
 /* ---------------- 读数据 ---------------- */
 

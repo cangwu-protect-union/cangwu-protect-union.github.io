@@ -12,4 +12,5 @@ await import("./battle-pick.js");
 await import("./battle-record.js");
 await import("./battle-page-record.js");
 await import("./battle-page-ui.js");
+await import("./battle-page-bind.js");
 await import("./battle-page.js");
