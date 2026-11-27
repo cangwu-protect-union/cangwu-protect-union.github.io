@@ -15,5 +15,6 @@ await import("./battle-page-ui.js");
 await import("./battle-page-bind.js");
 await import("./battle-remote.js");
 await import("./battle-windows.js");
+await import("./scene3d.js");
 await import("./stage-live.js");
 await import("./battle-page.js");

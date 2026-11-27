@@ -105,9 +105,9 @@
 
 ## battle-09 three.js 场景与标签层
 
-- 状态：待做
+- 状态：已验
 - 对应规划：UI-03
-- 允许改的路径：`rpg6.0/js/lib/`（新建：`three.module.min.js` 与许可文件）、`rpg6.0/js/battle/scene3d.js`（新建）、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/entry.js`、`tools/size-budget.json`
+- 允许改的路径：`rpg6.0/js/lib/`（新建：`three.module.min.js` 与许可文件）、`rpg6.0/js/battle/scene3d.js`（新建）、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/entry.js`、`rpg6.0/css/battle-live.css`、`tools/size-budget.json`
 - 共享文件：`tools/size-budget.json`（改前看 `git status --short`）
 - 做什么：
   - 固定版本 three.js 放到 `rpg6.0/js/lib/`，保留 MIT 许可；文件 UTF-8 无 BOM、LF。
@@ -118,6 +118,7 @@
 - 不做什么：不做召唤物详情卡完整交互与选目标细化（battle-10）；不改引擎、数据、联机协议；不动 `battle-remote.js`。
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
 - 验收标准：两条命令全绿；联机对局能看到地面与双方小人，窗口在画布之上且可操作；禁用 WebGL 后仍能完成操作；`rpg6.0/js/lib/` 被体积闸跳过。
+- 验证记录：`check.ps1` 全绿；`verify.ps1 -Browser` 全绿（引擎 214、冒烟 29 局、浏览器 14/14）。three.js 0.160.1（670KB）+ MIT 许可，`size-budget.json` 的 skip 已加 `rpg6.0/js/lib/`。`scene3d.js` 550 行（非空 512，额度 700）。双窗口 1280×900 实测：`is-3d` 生效，双方剪影、标签、亮圈与热区正常，点标签中心可完成普攻；禁用 WebGL 后 `is-flat` 生效、标签百分比定位、动作照常，控制台无报错。adversary 第一轮发现近景热区被截断、`forceContextLoss` 缺失、不可选中召唤物会露出空血条、贴图色域不一致，已全部修掉并复验 PASS；≤900px 热区与默认窗口重叠留到 battle-12。`rpg6.0/css/battle-live.css` 为场景与标签样式必需，开工前由主工程补进允许路径。
 
 ## battle-10 召唤物地图层与选目标
 
@@ -147,7 +148,7 @@
 - 对应规划：UI-06
 - 允许改的路径：`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-page-ui.js`、`rpg6.0/test.html`、`_local/tests/cases/rpg-room.mjs`（不提交）
 - 共享文件：无
-- 做什么：≤900px 默认只展开己方面板与己方查询；窗口全宽、最高 46vh、内部滚动；触摸拖动只认标题栏并吸附边缘；折叠条横向滚动；字号与画布 DPR 收紧；页面隐藏暂停渲染；沿用现有横屏遮罩；补齐全量回归。
+- 做什么：≤900px 默认只展开己方面板与己方查询；窗口全宽、最高 46vh、内部滚动；触摸拖动只认标题栏并吸附边缘；折叠条横向滚动；字号与画布 DPR 收紧；页面隐藏暂停渲染；沿用现有横屏遮罩；场景标签与热区不得被默认展开的窗口完全盖住（必要时下移小人/热区或调整窗口）；补齐全量回归。
 - 不做什么：不做窗口缩放；不改引擎、联机协议、建房与结算。
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`node _local/tests/run-all.mjs --group=回合制`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
 - 验收标准：三条命令全绿；844×390 一屏能完成进入、出招、折叠、刷新恢复；桌面两窗口完整一局；热座与回放不回归。

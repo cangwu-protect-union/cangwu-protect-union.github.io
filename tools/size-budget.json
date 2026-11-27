@@ -14,7 +14,8 @@
   "blobLimitBytes": 262144,
   "skip": [
     "guitu/js/lib/",
-    "quyu/vendor/"
+    "quyu/vendor/",
+    "rpg6.0/js/lib/"
   ],
   "toolPaths": [
     "tools/",

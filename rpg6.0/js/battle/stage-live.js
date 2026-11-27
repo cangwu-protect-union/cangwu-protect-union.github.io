@@ -3,12 +3,14 @@
    组件自身不保存游戏状态，所有展示数据都来自 render(state, meta, pick, hint, opts)。 */
 
 import { createWindowManager } from "./battle-windows.js";
+import { createScene3d } from "./scene3d.js";
 
 const root = globalThis;
 const SIDE_INDEX = { a: 0, b: 1 };
 
 function create() {
   let manager = null;
+  let scene = null;
   let liveRoot = null;
   let winRoot = null;
   let dockRoot = null;
@@ -84,6 +86,7 @@ function create() {
 
     manager = createWindowManager({ getBarHeight: barHeight });
     manager.mount(winRoot, dockRoot);
+    if (liveRoot.querySelector("[data-scene]")) scene = createScene3d(liveRoot);
     addResetButton();
     liveRoot.addEventListener("click", onLiveClick);
 
@@ -150,6 +153,8 @@ function create() {
     liveRoot.classList.toggle("is-picking", !!(root.BattlePick && root.BattlePick.isActive(pick)));
     restoreOpenSkills();
 
+    if (scene) scene.update(state, { side: sideKey, pick: pick, readOnly: readOnly });
+
     if (manager) manager.syncContent();
   }
 
@@ -162,6 +167,10 @@ function create() {
     if (manager) {
       manager.destroy();
       manager = null;
+    }
+    if (scene) {
+      scene.destroy();
+      scene = null;
     }
     if (resetBtn) {
       resetBtn.removeEventListener("click", onReset);

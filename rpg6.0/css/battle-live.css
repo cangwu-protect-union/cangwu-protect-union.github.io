@@ -448,3 +448,123 @@ html.is-live .battle-result {
     font-size: 12px;
   }
 }
+
+/* ---------- 三维场景与标签层 ---------- */
+
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+}
+
+[data-live].is-3d .live-scene::after {
+  display: none;
+}
+
+[data-live].is-flat .scene-canvas {
+  display: none;
+}
+
+.scene-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.scene-tag {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 7px 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.scene-tag-name {
+  font-weight: 600;
+}
+
+.scene-tag-hp {
+  position: relative;
+  display: block;
+  width: 90px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.scene-tag-hp[hidden] {
+  display: none;
+}
+
+.scene-tag-hp i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.scene-tag-hp i.is-low {
+  background: #d64545;
+}
+
+.scene-tag-hp i.is-mid {
+  background: #e8a33d;
+}
+
+.scene-tag-sub {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.scene-tag.is-dead {
+  opacity: 0.5;
+}
+
+.scene-hit {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: default;
+}
+
+[data-live].is-picking .scene-hit {
+  cursor: pointer;
+}
+
+.scene-hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .scene-tag {
+    font-size: 11px;
+  }
+
+  .scene-tag-hp {
+    width: 72px;
+  }
+}
