@@ -84,7 +84,7 @@
   }
 
   P.showResult = function () {
-    if (P.mode !== "play") return;
+    if (P.mode !== "play" || !P.state) return;
     var winnerUid = P.state.result;
     var winner = winnerUid === "a" ? P.meta.a : P.meta.b;
     var saveLine = "";

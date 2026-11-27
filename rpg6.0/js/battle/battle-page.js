@@ -67,6 +67,7 @@
     P.actions = [];
     P.saved = false;
     P.saving = false;
+    P.saveTried = false;
     P.recordId = "";
     P.saveError = "";
     P.mode = "play";
