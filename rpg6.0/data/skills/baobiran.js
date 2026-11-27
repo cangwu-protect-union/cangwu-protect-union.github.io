@@ -11,10 +11,13 @@ export default [
         ops: [
           {
             op: "tick",
-            duration: { unit: "standard", count: 5 },
+            who: "self",
+            when: "turnStart",
+            duration: { unit: "selfTurnStart", count: 5 },
             label: "无能狂怒",
+            desc: "自身回合开始时自动对敌方普攻一次，共 5 个自身回合",
             ops: [
-              { op: "damage", type: "basic", value: { stat: "self.atk" } }
+              { op: "damage", type: "basic", who: "enemyHero", value: { stat: "self.atk" } }
             ]
           }
         ]

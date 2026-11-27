@@ -339,6 +339,7 @@
         tag: op.tag || "",
         key: op.key || "",
         gate: op.gate || null,
+        when: op.when || "",
         period: Number(op.period) || 0,
         breakOnSourceStatus: op.breakOnSourceStatus || null,
         breakOnHolderStatus: op.breakOnHolderStatus || null,

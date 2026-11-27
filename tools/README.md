@@ -153,7 +153,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 文档里的数字写在带名字的标记区间里，区间内容由脚本整段重写，区间外的句子仍是手写：
 
 ```markdown
-- 引擎版本：`<!-- RPG6-STATS:START version -->6.0-engine.11<!-- RPG6-STATS:END version -->`
+- 引擎版本：`<!-- RPG6-STATS:START version -->6.0-engine.12<!-- RPG6-STATS:END version -->`
 ```
 
 区间名就是生成器名，见 `rpg6-stats.js` 的 `RENDERERS`。参与生成的文档有六处：`rpg6.0/游戏说明.md`（玩家看的数与 unsupported 表）、`rpg6.0/README.md`（op 表）、`rpg6.0/架构.md`（op 数）、`tools/README.md`（本节版本号）、`.dsh/skills/rpg6-battle/SKILL.md`、`.dsh/skills/rpg6-character-batch/引擎能力表.md`（被动钩子）。**不要手改这些数字**，`--check` 会抓住。其它文档不再复制这些数字，需要时指向《游戏说明》。

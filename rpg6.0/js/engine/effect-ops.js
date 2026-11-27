@@ -166,6 +166,8 @@
       var active = unit.effects.slice();
       for (var e = 0; e < active.length; e++) {
         if (state.phase === "finished") break;
+        /* 回合开始时结算的效果（无能狂怒）只在持有者回合开始跑，不在标准回合末重复跑 */
+        if (active[e].when === "turnStart") continue;
         if (!effectDue(active[e], state)) continue;
         H.runOps(state, ctxOfEffect(active[e]), active[e].ops, events);
       }
@@ -277,7 +279,8 @@
     }
   }
 
-  /* 按「持有者回合开始」计时的状态：在该单位回合开始时先走一格（彻底疯狂的眩晕余波） */
+  /* 按「持有者回合开始」计时的状态/效果：在该单位回合开始时先走一格（彻底疯狂的眩晕余波）。
+     when:"turnStart" 的 tick 效果在这里结算：能行动才执行 ops，按时长在回合开始时扣层。 */
   function turnStart(state, unit, events) {
     var statuses = unit.statuses || [];
     var kept = [];
@@ -295,6 +298,30 @@
       H.pushEvent(state, events, { type: "statusExpire", uid: unit.uid, kind: st.kind, label: st.label || "" });
     }
     unit.statuses = kept;
+
+    var effects = unit.effects || [];
+    var keptEffects = [];
+    for (var e = 0; e < effects.length; e++) {
+      var effect = effects[e];
+      if (effect.when !== "turnStart") {
+        keptEffects.push(effect);
+        continue;
+      }
+      if (state.phase !== "finished" && B.state.canAct(unit)) {
+        H.runOps(state, ctxOfEffect(effect), effect.ops, events);
+      }
+      if (effect.remain === B.state.PERMANENT) {
+        keptEffects.push(effect);
+        continue;
+      }
+      effect.remain -= 1;
+      if (effect.remain > 0) {
+        keptEffects.push(effect);
+        continue;
+      }
+      H.pushEvent(state, events, { type: "effectExpire", uid: unit.uid, kind: "effect", label: effect.label || "" });
+    }
+    unit.effects = keptEffects;
   }
 
   function tickTurnList(list, state, unit, events, kind) {

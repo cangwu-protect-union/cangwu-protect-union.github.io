@@ -140,9 +140,10 @@ const OPS = {
     enums: { scope: ["debuff", "all", "status", "marked", "breakValue", "marks"] }
   },
   tick: {
-    desc: "逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明",
+    desc: "逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:\"turnStart\"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明",
     fields: {
       ops: "必填", duration: "", period: "每 N 回合", permanent: "", unstoppable: "", desc: "chip 说明",
+      when: "turnStart 时在持有者回合开始时结算",
       tag: "给 interrupt 用", key: "给 if.cond.effect 用", gate: "{sides,cancel}",
       breakOnSourceStatus: "", breakOnHolderStatus: "", fromBuff: "", debuff: "负面标记，dispel marked 清除",
       guard: "{remaining,onBreak,ops}", immune: "{buffs,statuses}", breakImmune: "",

@@ -312,7 +312,7 @@
       source: buff.source || "",
       label: buff.label || "",
       stacking: buff.stacking !== false,
-      /* 「按目标回合」计时用；王泺然认大哥、江雨轩泰山压顶曾经因为没有这个字段而永不结束 */
+      /* 「按目标回合」计时用；王泺然认大哥按目标回合计时，缺这个字段会永不结束 */
       targetUid: buff.targetUid || unit.uid,
       /* 「按己方回合」计时用（selfRound） */
       sourceUid: buff.sourceUid || ""
@@ -452,7 +452,8 @@
       var eff = [];
       for (var e = 0; e < u.effects.length; e++) {
         eff.push(u.effects[e].id + u.effects[e].remain +
-          (u.effects[e].guard ? ":g" + u.effects[e].guard.remaining : ""));
+          (u.effects[e].guard ? ":g" + u.effects[e].guard.remaining : "") +
+          (u.effects[e].when ? ":w" + u.effects[e].when : ""));
       }
       var marks = [];
       var markKeys = Object.keys(u.marks || {});

@@ -276,7 +276,7 @@ export const cases = [
     }
   },
   {
-    name: "泰山压顶：200 普伤、速度设为 25、100% 脆弱",
+    name: "泰山压顶：200 普伤、速度设为 25、100% 脆弱，10 标准回合后恢复",
     run() {
       const state = mk(CHAR.jiangyuxuan, CHAR.dummy);
       state.units[0].charge = { skillId: "jiangyuxuan.taishan", amount: 1 };
@@ -284,6 +284,14 @@ export const cases = [
       assert.equal(state.units[1].hp, 9999 - 160);
       assert.equal(B.state.statOf(state.units[1], "spd"), 25);
       assert.equal(B.rules.buffTotal(state.units[1], "fragile", "sum"), 100);
+      const mod = state.units[1].mods.find((m) => m.stat === "spd");
+      assert.equal(mod.unit, "standard");
+      assert.equal(mod.remain, 10);
+      for (let i = 0; i < 9; i++) B.effectOps.roundEnd(state, []);
+      assert.equal(B.state.statOf(state.units[1], "spd"), 25, "第 9 个标准回合末仍是 25");
+      B.effectOps.roundEnd(state, []);
+      assert.equal(B.state.statOf(state.units[1], "spd"), 80, "第 10 个标准回合末回到原速度");
+      assert.equal(B.rules.buffTotal(state.units[1], "fragile", "sum"), 0, "脆弱同时到期");
     }
   },
   {
@@ -501,24 +509,33 @@ export const cases = [
     }
   },
   {
-    name: "包必冉·无能狂怒：连续 5 个回合各打一次普攻（粉碎者走法伤）",
+    name: "包必冉·无能狂怒：挂在自己身上，每个自身回合开始时自动普攻一次，共 5 次",
     run() {
       const state = mk(CHAR.baobiran, CHAR.dummy);
       state.units[0].mp = 5;
       cast(state, "a", "baobiran.wuneng", "b");
-      const start = state.round;
+      const self = state.units[0];
+      const effect = self.effects.find((e) => e.label === "无能狂怒");
+      assert.ok(effect, "持续效果应挂在包必冉自己身上");
+      assert.equal(effect.when, "turnStart");
+      assert.equal(effect.remain, 5);
+      assert.equal(state.units[1].effects.length, 0, "不应挂到敌方身上");
+
       let total = 0;
-      for (let round = start; round < start + 5; round++) {
-        state.round = round;
+      for (let turn = 0; turn < 5; turn++) {
         const events = [];
-        B.effectOps.roundEnd(state, events);
+        B.effectOps.turnStart(state, self, events);
         events.filter((e) => e.type === "damage").forEach((e) => {
           assert.equal(e.damageType, "magic");
           total += e.amount;
         });
+        const roundEvents = [];
+        B.effectOps.roundEnd(state, roundEvents);
+        assert.ok(!roundEvents.some((e) => e.type === "damage"), "标准回合末不应重复结算");
       }
       assert.equal(total, 5 * 35);
       assert.equal(9999 - state.units[1].hp, 175);
+      assert.equal(self.effects.length, 0, "5 个自身回合后到期");
     }
   },
   {

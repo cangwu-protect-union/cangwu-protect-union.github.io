@@ -10,8 +10,8 @@ export default [
         target: "enemy",
         ops: [
           { op: "damage", type: "phys", value: 200 },
-          { op: "stat", stat: "spd", who: "target", mode: "set", value: 25, duration: { unit: "targetRound", count: 10 } },
-          { op: "buff", kind: "fragile", who: "target", percent: 100, duration: { unit: "targetRound", count: 10 } }
+          { op: "stat", stat: "spd", who: "target", mode: "set", value: 25, duration: { unit: "standard", count: 10 } },
+          { op: "buff", kind: "fragile", who: "target", percent: 100, duration: { unit: "standard", count: 10 } }
         ]
       },
       {
