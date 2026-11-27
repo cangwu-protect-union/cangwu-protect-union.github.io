@@ -31,6 +31,24 @@
 - 想加回冻结面：从活跃列表划掉等量的面，记进 `backlog.md`；一个窗口最多改 1 次。
 - 改动尽量只碰 `rpg6.0/`；必须碰 `css/style*.css`、`guitu/data/config.js`、导航时单独提交，并跑对应测试。
 
+## Trae SOLO 协作（三角色 + 双线并行，2026-11-27 起）
+
+细则在 `.trae/team-plan.md`。三条硬线：
+
+- 角色三个：主 Agent 就是总工程；程序、测试是 `.trae/agents/` 下的 `implementer` 与 `adversary`，由主 Agent 调用，不问你、不提交。
+- 每个任务先有 `.trae/specs/<线>/tasks.md` 任务卡，写清「允许改的路径 + 验收命令」；未确认不动手。
+- 写串行、读并行。对局线与角色线可同时活跃，但两个任务的路径前缀不得相交；共享文件（`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`tests/engine/`、`tools/size-budget.json`）一次只一条线改，改前看 `git status --short`。
+
+并行时不要用 `publish.ps1`（它 `git add -A`，会带走另一条线的半成品），改用它内部那五步、路径限定到本线：
+
+```
+git add <本线路径>
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Staged
+git commit -F <消息文件>
+git push origin main
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1 -Last
+```
+
 ## 改代码前先加载对应 skill
 
 | 场景 | skill |
@@ -101,7 +119,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1 -Message <提交信息文件> [-Url <页面> -Expect <特征串>]
 ```
 
-它跑 `check.ps1 -Staged`、`git add -A`、commit、push、`check.ps1 -Last`。`git status --short` 仍要逐行看；`_local/`、`*.sql`、`*.docx` 不进提交。
+它跑 `check.ps1 -Staged`、`git add -A`、commit、push、`check.ps1 -Last`。`git status --short` 仍要逐行看；`_local/`、`*.sql`、`*.docx` 不进提交。两条线同时有未提交改动时按上节「Trae SOLO 协作」的路径提交，不走 `publish.ps1`。
 
 DSH 沙箱：`.git/` 不可写，`git add`/`commit` 要一次 full-access。
 
