@@ -68,6 +68,89 @@
 - 验收标准：`rules.html` 能看到「远程联机」条目；文档描述与代码一致；`check.ps1` 绿。
 - 验证记录：规则页新增 4 节「远程联机」；README 补两张表、6 个 RPC、数据流与 4 条联机坑；游戏说明补玩家向/数据向两处与已知问题；backlog 记边界变更并把「进行中」加入状态词表；范围收敛计划第 4 项加注记。`check.ps1` 全绿。
 
+## battle-07 联机舞台骨架与窗口系统
+
+- 状态：已验
+- 对应规划：`_local/docs/联机对局界面设计/实现规划.md` 的 UI-01
+- 允许改的路径：`rpg6.0/test.html`、`rpg6.0/css/battle-live.css`（新建）、`rpg6.0/js/battle/battle-windows.js`（新建）、`rpg6.0/js/battle/stage-live.js`（新建）、`rpg6.0/js/battle/entry.js`、`rpg6.0/js/battle/battle-page.js`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无（不动 `tools/size-budget.json`）
+- 做什么：
+  - `test.html`：`[data-stage]` 内加 `[data-live]` 骨架（`[data-scene]` 占位、`[data-dock]`、`[data-windows]`）；引入 `css/battle-live.css`；旧 `[data-grid]` 保留。
+  - `battle-windows.js`：ESM，导出窗口管理器；7 个窗口（speed、panel-own、panel-enemy、query-own、query-enemy、hp-record、battle-log）的壳、拖动、折叠进 dock、置顶、位置记忆 `localStorage["rpg6-live-windows-v1"]`、复位、resize 夹回；≤900px 默认只展开己方面板与己方查询，窗口宽 `calc(100vw - 12px)`、单窗高 ≤46vh。
+  - `stage-live.js`：ESM，挂 `root.RPG6LiveStage`；mount 显示 `[data-live]`、加 `html.is-live`、创建窗口与 `[data-reset-windows]` 按钮（live 时插入 `[data-bar]`，unmount 移除）；render 调 `root.BattleView.render(...)`，用 `<template>` 解析旧片段，把速度条、两个角色卡、两个查询、战斗日志分进对应窗口，两个 `.bu-log` 进扣血记录窗（左右两栏占位），丢弃 `.battle-buff`；按 `opts.side` 映射己方/敌方；节点上的 `data-unit` / `data-query` 与所有 `data-*` 钩子原样保留；live 根同步 `is-picking`；unmount 移除事件与 `html.is-live`。
+  - `battle-page.js`：`P.render()` 加联机分支（`P.remote && P.mode === "play"`）调用 `P.live.render`，不再重建隐藏 grid；非联机恢复旧路径，必要时 unmount；bar、结算、保存、`syncStatus` 逻辑不变；回设置区或离开房间时 unmount。
+  - `entry.js`：导入 `battle-windows.js` 与 `stage-live.js`。
+  - `battle-live.css`：live 铺满视口、隐藏 `.battle-page > p`、窗口外壳、折叠条、底部状态条固定 38px、结算覆盖整屏、窗口内旧片段去边框与内边距、3D 占位用中性渐变网格、≤900px 基础规则。
+  - `rpg-room.mjs`：等待选择器从 `.battle-grid .battle-unit` 改为 `[data-live] .battle-unit`。
+- 不做什么：不做血条、扣血记录正式结构、战报重构（battle-08）；不引入 three.js（battle-09）；不做召唤物地图层（battle-10）；不改引擎、数据、联机协议、结算与战报；不升版本。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
+- 验收标准：命令全绿；桌面两窗口联机进入对局后四个展开窗可拖、可折、可置顶、可复位，刷新后位置记忆生效；扣血/战报/敌方查询默认在折叠条；热座与回放仍是旧网格；控制台无报错。
+- 验证记录：`verify.ps1 -Browser` 全绿（引擎 214、冒烟 29 局、浏览器 14/14，含联机 3 例）；adversary 复核 PASS；另用临时双上下文脚本验 23 项窗口交互（拖动/置顶/折叠/刷新记忆/复位/无报错）后删除；已修紧凑态把窗口尺寸永久写小、复位按钮误取消选目标。遗留到 battle-08：live 下 `P.speedOpen` / `P.battleLogOpen` 被固定展开，旧 grid 仍留上一局 DOM（页面自身查询都限定作用域）。
+
+## battle-08 窗口内容迁移与渲染解耦
+
+- 状态：待做
+- 对应规划：UI-02
+- 允许改的路径：`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/css/battle-live.css`
+- 共享文件：无
+- 做什么：
+  - `battle-view.js`：`renderUnit` 加可选参数（去召唤物栏、去伤害记录、显示可视化血条）；`renderQuery` 加 `hideStats`；新增 `renderHpRecord(state)`（左右两栏、按标准回合合并、底部合计、空状态）与 `renderLogWindow(state)`（最近 160 行，滚到最新）；旧调用默认行为保持不变。
+  - `battle-view-effects.js`：额外动作收成独立 `.bq-extras` 一行，只在存在额外动作时出现；固定三个按钮严格三个。
+  - `stage-live.js`：改为直接按窗口生成内容，不再解析旧网格片段；己方/敌方按 `opts.side` 映射；敌方查询 `readOnly`；扣血记录与战报使用新函数；技能展开状态恢复到 live 容器。
+  - `battle-live.css`：血条、扣血记录两栏、战报行、查询列表滚动、按钮行在窗口内的排版。
+- 不做什么：不做 three.js 场景、召唤物地图层、状态条改版、手机细化；不改热座与回放。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
+- 验收标准：联机两窗口出招正常；角色面板有血条且无召唤物/伤害记录；查询无六维；扣血记录两栏与合计正确；战报窗可折叠、内容滚动到最新；热座不回归。
+
+## battle-09 three.js 场景与标签层
+
+- 状态：待做
+- 对应规划：UI-03
+- 允许改的路径：`rpg6.0/js/lib/`（新建：`three.module.min.js` 与许可文件）、`rpg6.0/js/battle/scene3d.js`（新建）、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/entry.js`、`tools/size-budget.json`
+- 共享文件：`tools/size-budget.json`（改前看 `git status --short`）
+- 做什么：
+  - 固定版本 three.js 放到 `rpg6.0/js/lib/`，保留 MIT 许可；文件 UTF-8 无 BOM、LF。
+  - `size-budget.json` 的 `skip` 加 `rpg6.0/js/lib/`，否则 256KB 体积闸报红。
+  - `scene3d.js`：固定透视机位；地面与网格；己方近景背对、敌方远景正对；小人用运行时 canvas 剪影纹理的 billboard；召唤物同方案小号；当前行动者/合法目标/已选目标亮圈；世界坐标投影到 DOM `.scene-tag`（名字、血条、TTL）与透明 `.scene-hit`（`data-unit` / `data-summon`）；WebGL 失败时 `is-flat` 降级；DPR ≤2；页面隐藏暂停；`dispose()` 释放资源。
+  - `stage-live.js`：接场景并随状态更新；点击热区回调页面层。
+  - `entry.js`：导入 `scene3d.js`。
+- 不做什么：不做召唤物详情卡完整交互与选目标细化（battle-10）；不改引擎、数据、联机协议；不动 `battle-remote.js`。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
+- 验收标准：两条命令全绿；联机对局能看到地面与双方小人，窗口在画布之上且可操作；禁用 WebGL 后仍能完成操作；`rpg6.0/js/lib/` 被体积闸跳过。
+
+## battle-10 召唤物地图层与选目标
+
+- 状态：待做
+- 对应规划：UI-04
+- 允许改的路径：`rpg6.0/js/battle/scene3d.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-page.js`、`rpg6.0/css/battle-live.css`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无
+- 做什么：召唤物出现在所有者前方一排，带名字、血条、剩余回合；单击弹详情卡（名称、所有者、血、剩余回合、速度与攻击间隔、光环简述；合法时「选为目标」，另有「关闭」）；角色热区直接选目标；`P.pick.targets` 驱动亮圈；Esc 与取消沿用现有逻辑；双端用例的选目标点击改到新热区。
+- 不做什么：不改召唤物规则与引擎；不做状态条最终样式与手机适配。
+- 验收命令：`node _local/tests/run-all.mjs --group=回合制`
+- 验收标准：用例全绿；双窗口能选中敌方角色/召唤物并结算；详情卡只在可选中时出现「选为目标」；取消与 Esc 正常。
+
+## battle-11 底部状态条与联机状态
+
+- 状态：待做
+- 对应规划：UI-05
+- 允许改的路径：`rpg6.0/test.html`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/battle-page.js`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无
+- 做什么：live 状态下状态条固定底部三段（回合/提示/联机状态 + 按钮）；轮到你、等待、对手离线、同步中断、房间结束用圆点与颜色区分；选目标时中段提示并可取消；认输、离开房间、复位窗口常显且按 `canAct()` 控制认输；撤销与回放控件隐藏；保留 `[data-room-status]` 与 `[data-stage][data-my-side]` 契约。
+- 不做什么：不改联机协议与 `battle-remote.js`；不加新功能按钮。
+- 验收命令：`node _local/tests/run-all.mjs --group=回合制`
+- 验收标准：用例全绿；两窗口交替出招时状态文字一致；等待/离线/同步中断显示正确；认输与离开行为不变。
+
+## battle-12 手机窄屏与全量回归
+
+- 状态：待做
+- 对应规划：UI-06
+- 允许改的路径：`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-page-ui.js`、`rpg6.0/test.html`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无
+- 做什么：≤900px 默认只展开己方面板与己方查询；窗口全宽、最高 46vh、内部滚动；触摸拖动只认标题栏并吸附边缘；折叠条横向滚动；字号与画布 DPR 收紧；页面隐藏暂停渲染；沿用现有横屏遮罩；补齐全量回归。
+- 不做什么：不做窗口缩放；不改引擎、联机协议、建房与结算。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`node _local/tests/run-all.mjs --group=回合制`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
+- 验收标准：三条命令全绿；844×390 一屏能完成进入、出招、折叠、刷新恢复；桌面两窗口完整一局；热座与回放不回归。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

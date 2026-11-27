@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="../css/style-3.css">
   <link rel="stylesheet" href="css/battle.css">
   <link rel="stylesheet" href="css/battle-detail.css">
+  <link rel="stylesheet" href="css/battle-live.css">
 </head>
 <body>
 
@@ -95,6 +96,11 @@
     </section>
 
     <section class="battle-stage" data-stage hidden>
+      <div class="battle-live" data-live hidden>
+        <div class="live-scene" data-scene aria-hidden="true"></div>
+        <div class="live-dock" data-dock></div>
+        <div class="live-windows" data-windows></div>
+      </div>
       <div class="battle-grid" data-grid></div>
       <div class="battle-bar" data-bar>
         <span class="bb-turn" data-turn></span>

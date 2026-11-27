@@ -1,0 +1,434 @@
+/* 回合制正传 6.0 · 联机舞台浮窗管理
+   只负责窗口壳、拖动、折叠、置顶与位置记忆；窗口内容由 stage-live 写入 [data-body]。 */
+
+const STORAGE_KEY = "rpg6-live-windows-v1";
+const COMPACT_QUERY = "(max-width: 900px)";
+
+const WINDOW_DEFS = [
+  { id: "speed", title: "速度条预期" },
+  { id: "panel-own", title: "角色 · 己方" },
+  { id: "panel-enemy", title: "角色 · 敌方" },
+  { id: "query-own", title: "操作 · 己方" },
+  { id: "query-enemy", title: "操作 · 敌方" },
+  { id: "hp-record", title: "扣血记录" },
+  { id: "battle-log", title: "详细战报" }
+];
+
+const DESKTOP_EXPANDED = ["speed", "panel-own", "panel-enemy", "query-own"];
+const COMPACT_EXPANDED = ["panel-own", "query-own"];
+const DOCK_ORDER = ["hp-record", "battle-log", "query-enemy"];
+
+export function createWindowManager(options) {
+  const opts = options || {};
+  const getBarHeight = typeof opts.getBarHeight === "function" ? opts.getBarHeight : function () { return 38; };
+  const onChange = typeof opts.onChange === "function" ? opts.onChange : null;
+
+  const rootWin = typeof window !== "undefined" ? window : globalThis;
+
+  let winRoot = null;
+  let dockRoot = null;
+  let wins = [];
+  let byId = {};
+  let drag = null;
+  let zTop = 10;
+  let mq = null;
+  let mounted = false;
+
+  function isCompact() {
+    return !!(rootWin.matchMedia && rootWin.matchMedia(COMPACT_QUERY).matches);
+  }
+
+  function expandedIds(compact) {
+    return compact ? COMPACT_EXPANDED : DESKTOP_EXPANDED;
+  }
+
+  function bounds() {
+    var barH = Number(getBarHeight()) || 38;
+    var cw = winRoot ? winRoot.clientWidth : 0;
+    var ch = winRoot ? winRoot.clientHeight : 0;
+    var vw = cw > 0 ? cw : (rootWin.innerWidth || 1024);
+    var vh = ch > 0 ? ch : Math.max(200, (rootWin.innerHeight || 768) - barH);
+    return { vw: vw, vh: vh };
+  }
+
+  function defaultLayout() {
+    var b = bounds();
+    var vw = b.vw;
+    var vh = b.vh;
+    var compact = isCompact();
+    var out = {
+      speed: { left: 8, top: 8, w: 222, h: 519 },
+      "panel-own": { left: 8, top: Math.max(0, vh - 156 - 8), w: 375, h: 156 },
+      "panel-enemy": { left: Math.max(0, vw - 372 - 8), top: 8, w: 372, h: 156 },
+      "query-own": { left: Math.max(0, vw - 468 - 8), top: Math.max(0, vh - 261 - 8), w: 468, h: 261 },
+      "query-enemy": { left: Math.max(0, vw - 468 - 8), top: Math.max(0, vh - 261 - 8), w: 468, h: 261 },
+      "hp-record": { left: Math.max(0, Math.round((vw - 390) / 2)), top: Math.max(0, Math.round(vh * 0.12)), w: 390, h: 225 },
+      "battle-log": { left: Math.max(0, Math.round((vw - 375) / 2)), top: Math.max(0, Math.round((vh - 285) / 2)), w: 375, h: 285 }
+    };
+    if (compact) {
+      var mid = Math.round(vh * 0.48);
+      out.speed = { left: 6, top: 8, w: out.speed.w, h: out.speed.h };
+      out["panel-enemy"] = { left: 6, top: 8, w: out["panel-enemy"].w, h: out["panel-enemy"].h };
+      out["query-enemy"] = { left: 6, top: mid, w: out["query-enemy"].w, h: out["query-enemy"].h };
+      out["hp-record"] = { left: 6, top: 8, w: out["hp-record"].w, h: out["hp-record"].h };
+      out["battle-log"] = { left: 6, top: 8, w: out["battle-log"].w, h: out["battle-log"].h };
+      out["panel-own"] = { left: 6, top: 8, w: out["panel-own"].w, h: out["panel-own"].h };
+      out["query-own"] = { left: 6, top: mid, w: out["query-own"].w, h: out["query-own"].h };
+    }
+    return out;
+  }
+
+  function effectiveSize(w) {
+    var b = bounds();
+    var compact = isCompact();
+    var ew = compact ? Math.max(120, b.vw - 12) : w.w;
+    var eh = compact ? Math.min(w.h, Math.max(80, Math.round(b.vh * 0.46))) : w.h;
+    ew = Math.min(ew, b.vw);
+    eh = Math.min(eh, Math.max(80, b.vh - 6));
+    return { w: ew, h: eh };
+  }
+
+  function clampWin(w) {
+    var b = bounds();
+    var size = effectiveSize(w);
+    var maxLeft = Math.max(0, b.vw - size.w);
+    var maxTop = Math.max(0, b.vh - size.h - 6);
+    w.left = Math.max(0, Math.min(w.left, maxLeft));
+    w.top = Math.max(0, Math.min(w.top, maxTop));
+  }
+
+  function applyWin(w) {
+    var compact = isCompact();
+    var size = effectiveSize(w);
+    var el = w.el;
+    el.style.left = Math.round(w.left) + "px";
+    el.style.top = Math.round(w.top) + "px";
+    el.style.width = compact ? "calc(100vw - 12px)" : Math.round(w.w) + "px";
+    el.style.height = Math.round(size.h) + "px";
+    el.style.zIndex = String(w.z);
+    el.classList.toggle("is-compact", compact);
+    el.classList.toggle("is-folded", !!w.collapsed);
+  }
+
+  function buildShell(def) {
+    var section = rootWin.document.createElement("section");
+    section.className = "lw-window";
+    section.setAttribute("data-win", def.id);
+
+    var header = rootWin.document.createElement("header");
+    header.className = "lw-bar";
+
+    var grip = rootWin.document.createElement("span");
+    grip.className = "lw-grip";
+    grip.setAttribute("aria-hidden", "true");
+    grip.textContent = "⋮⋮";
+
+    var title = rootWin.document.createElement("span");
+    title.className = "lw-title";
+    title.textContent = def.title;
+
+    var fold = rootWin.document.createElement("button");
+    fold.type = "button";
+    fold.className = "lw-fold";
+    fold.setAttribute("data-fold", "");
+    fold.setAttribute("aria-label", "折叠");
+    fold.textContent = "–";
+
+    header.appendChild(grip);
+    header.appendChild(title);
+    header.appendChild(fold);
+
+    var body = rootWin.document.createElement("div");
+    body.className = "lw-body";
+    body.setAttribute("data-body", "");
+
+    section.appendChild(header);
+    section.appendChild(body);
+    return { el: section, bodyEl: body };
+  }
+
+  function readSaved() {
+    try {
+      var raw = rootWin.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      var obj = JSON.parse(raw);
+      return obj && typeof obj === "object" ? obj : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeSaved() {
+    try {
+      var out = {};
+      wins.forEach(function (w) {
+        out[w.id] = { left: Math.round(w.left), top: Math.round(w.top), collapsed: !!w.collapsed, z: w.z };
+      });
+      rootWin.localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+    } catch (e) {
+      /* 隐私模式或配额满，忽略即可 */
+    }
+  }
+
+  function findWin(node) {
+    var el = node && node.closest ? node.closest(".lw-window") : null;
+    if (!el) return null;
+    return byId[el.getAttribute("data-win")] || null;
+  }
+
+  function lift(w) {
+    if (!w) return;
+    zTop += 1;
+    if (zTop > 29) {
+      var sorted = wins.slice().sort(function (a, b) { return a.z - b.z; });
+      zTop = 9;
+      sorted.forEach(function (item) {
+        zTop += 1;
+        item.z = zTop;
+        item.el.style.zIndex = String(item.z);
+      });
+      zTop += 1;
+    }
+    w.z = zTop;
+    w.el.style.zIndex = String(w.z);
+  }
+
+  function renderDock() {
+    if (!dockRoot) return;
+    dockRoot.innerHTML = "";
+    var folded = wins.filter(function (w) { return w.collapsed; });
+    folded.sort(function (a, b) {
+      var ai = DOCK_ORDER.indexOf(a.id);
+      var bi = DOCK_ORDER.indexOf(b.id);
+      if (ai < 0) ai = 100 + wins.indexOf(a);
+      if (bi < 0) bi = 100 + wins.indexOf(b);
+      return ai - bi;
+    });
+    folded.forEach(function (w) {
+      var chip = rootWin.document.createElement("button");
+      chip.type = "button";
+      chip.className = "lw-dock-chip";
+      chip.setAttribute("data-dock-win", w.id);
+      chip.setAttribute("aria-label", "展开" + w.title);
+      chip.textContent = w.title;
+      dockRoot.appendChild(chip);
+    });
+  }
+
+  function toggleFold(w) {
+    w.collapsed = !w.collapsed;
+    if (!w.collapsed) {
+      clampWin(w);
+      lift(w);
+    }
+    applyWin(w);
+    renderDock();
+    writeSaved();
+  }
+
+  function onPointerDown(e) {
+    var w = findWin(e.target);
+    if (!w) return;
+    lift(w);
+    if (e.target.closest && e.target.closest("[data-fold]")) return;
+    var bar = e.target.closest ? e.target.closest(".lw-bar") : null;
+    if (!bar) return;
+    drag = { id: w.id, startX: e.clientX, startY: e.clientY, baseLeft: w.left, baseTop: w.top };
+    w.el.classList.add("is-dragging");
+    rootWin.document.body.classList.add("is-lw-dragging");
+    if (e.cancelable) e.preventDefault();
+    if (w.el.setPointerCapture && e.pointerId != null) {
+      try { w.el.setPointerCapture(e.pointerId); } catch (err) { /* 老浏览器忽略 */ }
+    }
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+    var w = byId[drag.id];
+    if (!w) { drag = null; return; }
+    w.left = drag.baseLeft + (e.clientX - drag.startX);
+    w.top = drag.baseTop + (e.clientY - drag.startY);
+    clampWin(w);
+    w.el.style.left = Math.round(w.left) + "px";
+    w.el.style.top = Math.round(w.top) + "px";
+  }
+
+  function onPointerUp() {
+    if (!drag) return;
+    var w = byId[drag.id];
+    drag = null;
+    if (w) {
+      w.el.classList.remove("is-dragging");
+      clampWin(w);
+      applyWin(w);
+    }
+    rootWin.document.body.classList.remove("is-lw-dragging");
+    writeSaved();
+  }
+
+  function onWinClick(e) {
+    var fold = e.target.closest ? e.target.closest("[data-fold]") : null;
+    if (!fold) return;
+    var w = findWin(fold);
+    if (!w) return;
+    e.preventDefault();
+    toggleFold(w);
+  }
+
+  function onDockClick(e) {
+    var chip = e.target.closest ? e.target.closest("[data-dock-win]") : null;
+    if (!chip) return;
+    e.preventDefault();
+    var w = byId[chip.getAttribute("data-dock-win")];
+    if (!w || !w.collapsed) return;
+    w.collapsed = false;
+    clampWin(w);
+    lift(w);
+    applyWin(w);
+    renderDock();
+    writeSaved();
+  }
+
+  function onResize() {
+    if (!mounted) return;
+    var compact = isCompact();
+    wins.forEach(function (w) {
+      if (compact && COMPACT_EXPANDED.indexOf(w.id) < 0) w.collapsed = true;
+      clampWin(w);
+      applyWin(w);
+    });
+    renderDock();
+  }
+
+  function mount(wRoot, dRoot) {
+    if (mounted) destroy();
+    winRoot = wRoot;
+    dockRoot = dRoot;
+    if (!winRoot) return;
+    winRoot.innerHTML = "";
+    if (dockRoot) dockRoot.innerHTML = "";
+
+    var saved = readSaved();
+    var layout = defaultLayout();
+    var compact = isCompact();
+    var expanded = expandedIds(compact);
+
+    wins = [];
+    byId = {};
+    zTop = 10;
+
+    WINDOW_DEFS.forEach(function (def, idx) {
+      var shell = buildShell(def);
+      var base = layout[def.id] || { left: 8, top: 8, w: 260, h: 200 };
+      var prev = saved[def.id] || null;
+      var w = {
+        id: def.id,
+        title: def.title,
+        el: shell.el,
+        bodyEl: shell.bodyEl,
+        left: prev && isFinite(prev.left) ? Number(prev.left) : base.left,
+        top: prev && isFinite(prev.top) ? Number(prev.top) : base.top,
+        w: base.w,
+        h: base.h,
+        collapsed: prev ? !!prev.collapsed : expanded.indexOf(def.id) < 0,
+        z: prev && isFinite(prev.z) ? Math.max(10, Math.min(29, Number(prev.z))) : (10 + idx)
+      };
+      if (compact && COMPACT_EXPANDED.indexOf(def.id) < 0) w.collapsed = true;
+      clampWin(w);
+      applyWin(w);
+      winRoot.appendChild(shell.el);
+      wins.push(w);
+      byId[def.id] = w;
+    });
+
+    zTop = 10;
+    wins.forEach(function (w) { zTop = Math.max(zTop, w.z); });
+
+    winRoot.addEventListener("pointerdown", onPointerDown);
+    winRoot.addEventListener("click", onWinClick);
+    if (dockRoot) dockRoot.addEventListener("click", onDockClick);
+    rootWin.addEventListener("pointermove", onPointerMove);
+    rootWin.addEventListener("pointerup", onPointerUp);
+    rootWin.addEventListener("pointercancel", onPointerUp);
+    rootWin.addEventListener("resize", onResize);
+    if (rootWin.matchMedia) {
+      mq = rootWin.matchMedia(COMPACT_QUERY);
+      if (mq.addEventListener) mq.addEventListener("change", onResize);
+      else if (mq.addListener) mq.addListener(onResize);
+    }
+
+    mounted = true;
+    renderDock();
+    if (onChange) onChange();
+  }
+
+  function destroy() {
+    if (winRoot) {
+      winRoot.removeEventListener("pointerdown", onPointerDown);
+      winRoot.removeEventListener("click", onWinClick);
+    }
+    if (dockRoot) {
+      dockRoot.removeEventListener("click", onDockClick);
+      dockRoot.innerHTML = "";
+    }
+    rootWin.removeEventListener("pointermove", onPointerMove);
+    rootWin.removeEventListener("pointerup", onPointerUp);
+    rootWin.removeEventListener("pointercancel", onPointerUp);
+    rootWin.removeEventListener("resize", onResize);
+    if (mq) {
+      if (mq.removeEventListener) mq.removeEventListener("change", onResize);
+      else if (mq.removeListener) mq.removeListener(onResize);
+      mq = null;
+    }
+    if (rootWin.document && rootWin.document.body) rootWin.document.body.classList.remove("is-lw-dragging");
+    if (winRoot) winRoot.innerHTML = "";
+    drag = null;
+    wins = [];
+    byId = {};
+    zTop = 10;
+    mounted = false;
+  }
+
+  function reset() {
+    try { rootWin.localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 忽略 */ }
+    var layout = defaultLayout();
+    var compact = isCompact();
+    var expanded = expandedIds(compact);
+    wins.forEach(function (w) {
+      var base = layout[w.id] || { left: 8, top: 8, w: w.w, h: w.h };
+      w.left = base.left;
+      w.top = base.top;
+      w.w = base.w;
+      w.h = base.h;
+      w.collapsed = expanded.indexOf(w.id) < 0;
+      if (compact && COMPACT_EXPANDED.indexOf(w.id) < 0) w.collapsed = true;
+      clampWin(w);
+      applyWin(w);
+    });
+    renderDock();
+    if (onChange) onChange();
+  }
+
+  function syncContent() {
+    wins.forEach(function (w) {
+      if (!w.bodyEl) return;
+      w.bodyEl.classList.toggle("is-empty", !w.bodyEl.firstElementChild);
+    });
+    renderDock();
+    if (onChange) onChange();
+  }
+
+  function bodyOf(id) {
+    var w = byId[id];
+    return w ? w.bodyEl : null;
+  }
+
+  return {
+    mount: mount,
+    destroy: destroy,
+    reset: reset,
+    isCompact: isCompact,
+    syncContent: syncContent,
+    bodyOf: bodyOf
+  };
+}

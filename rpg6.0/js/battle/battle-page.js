@@ -34,6 +34,7 @@
   P.openSkills = {};
   P.logUid = "";
   P.battleLogOpen = null;
+  P.live = null;
 
 
 
@@ -110,21 +111,35 @@
 
   P.render = function () {
     if (!P.state) return;
-    var compact = P.isCompact();
-    P.dom.grid.innerHTML = root.BattleView.render(P.state, P.meta, P.pick, P.hint, {
-      readOnly: P.mode !== "play" || (!!P.remote && !P.remote.canAct()),
-      speedOpen: P.speedOpen === null ? !compact : P.speedOpen,
-      battleLogOpen: P.battleLogOpen === null ? !compact : P.battleLogOpen,
-      battleLogPreview: !compact,
-      logUid: P.logUid
-    });
-    P.dom.grid.classList.toggle("is-picking", root.BattlePick.isActive(P.pick));
-    P.dom.grid.classList.toggle("is-replay", P.mode !== "play");
-    P.restoreOpenSkills();
-    P.applyLogPanel();
-    P.matchLogHeight();
-    var logBox = P.dom.grid.querySelector("[data-log]");
-    if (logBox && logBox.open) logBox.scrollTop = logBox.scrollHeight;
+    var live = !!P.remote && P.mode === "play" && !!root.RPG6LiveStage;
+    if (live) {
+      if (!P.live) P.live = root.RPG6LiveStage.create();
+      P.live.mount(P.dom.stage);
+      P.live.render(P.state, P.meta, P.pick, P.hint, {
+        side: P.remote.side || "a",
+        readOnly: !P.remote.canAct()
+      });
+    } else {
+      if (P.live) {
+        P.live.unmount();
+        P.live = null;
+      }
+      var compact = P.isCompact();
+      P.dom.grid.innerHTML = root.BattleView.render(P.state, P.meta, P.pick, P.hint, {
+        readOnly: P.mode !== "play" || (!!P.remote && !P.remote.canAct()),
+        speedOpen: P.speedOpen === null ? !compact : P.speedOpen,
+        battleLogOpen: P.battleLogOpen === null ? !compact : P.battleLogOpen,
+        battleLogPreview: !compact,
+        logUid: P.logUid
+      });
+      P.dom.grid.classList.toggle("is-picking", root.BattlePick.isActive(P.pick));
+      P.dom.grid.classList.toggle("is-replay", P.mode !== "play");
+      P.restoreOpenSkills();
+      P.applyLogPanel();
+      P.matchLogHeight();
+      var logBox = P.dom.grid.querySelector("[data-log]");
+      if (logBox && logBox.open) logBox.scrollTop = logBox.scrollHeight;
+    }
     if (P.dom.turnEl) P.dom.turnEl.textContent = P.turnText();
     if (P.dom.hintEl) P.dom.hintEl.textContent = P.hint;
     if (P.dom.replayBox) {
