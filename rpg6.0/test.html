@@ -57,6 +57,38 @@
         </label>
         <button type="button" class="btn" data-start>开始对局</button>
       </div>
+      <details class="battle-room" data-room-box>
+        <summary>远程联机 · 建房 / 加入</summary>
+        <p class="room-note">建房后把链接发给对手；只在自己回合操作；约 2 秒同步；刷新可恢复；联机下不能撤销。</p>
+        <div class="room-form">
+          <div class="room-row">
+            <label>昵称
+              <input data-room-nick type="text" maxlength="16" placeholder="最多 16 字" autocomplete="nickname">
+            </label>
+            <label>我的角色
+              <select data-room-char></select>
+            </label>
+            <button type="button" class="btn" data-room-create>创建房间</button>
+          </div>
+          <div class="room-row">
+            <label>房间码
+              <input data-room-code type="text" maxlength="16" placeholder="8 位房间码" autocomplete="off" autocapitalize="characters">
+            </label>
+            <button type="button" class="btn" data-room-join>加入房间</button>
+          </div>
+        </div>
+        <p class="room-note" data-room-note></p>
+        <div class="room-wait" data-room-wait hidden>
+          <div class="room-row">
+            <label>房间链接
+              <input data-room-link type="text" readonly>
+            </label>
+            <button type="button" class="btn btn-ghost" data-room-copy>复制链接</button>
+            <button type="button" class="btn btn-ghost" data-room-cancel>取消房间</button>
+          </div>
+          <p class="room-note" data-room-wait-note>等待对手加入…</p>
+        </div>
+      </details>
       <p class="setup-note" data-source>正在读取角色…</p>
       <p><button type="button" class="btn btn-ghost" data-resume hidden></button></p>
       <p class="setup-note" data-coverage>正在读取技能库…</p>
@@ -67,6 +99,7 @@
       <div class="battle-bar" data-bar>
         <span class="bb-turn" data-turn></span>
         <span class="bb-hint" data-hint></span>
+        <span class="bb-room" data-room-status hidden></span>
         <span class="bb-replay" data-replay hidden>
           <button type="button" class="btn btn-ghost" data-step-start>开局</button>
           <button type="button" class="btn btn-ghost" data-step-prev>上一步</button>
@@ -77,6 +110,7 @@
         </span>
         <button type="button" class="btn btn-ghost" data-undo>撤销一步</button>
         <button type="button" class="btn btn-ghost" data-restart>认输</button>
+        <button type="button" class="btn btn-ghost" data-room-leave-bar hidden>离开房间</button>
       </div>
       <section class="battle-result" data-result hidden></section>
     </section>

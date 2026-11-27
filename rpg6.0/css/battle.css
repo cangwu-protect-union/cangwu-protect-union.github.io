@@ -1184,3 +1184,120 @@ html.is-battle .site-footer {
   }
 }
 
+/* ---------- 远程联机 ---------- */
+
+.battle-room {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 0 12px 10px;
+  margin: 16px 0 12px;
+}
+
+.battle-room > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.room-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 8px 0;
+}
+
+.room-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.room-row select,
+.room-row input {
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  min-width: 180px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.room-row input[data-room-code],
+.room-row input[data-room-link] {
+  font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  letter-spacing: .04em;
+}
+
+.room-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+
+.room-wait {
+  border-top: 1px dashed var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.bb-room {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .battle-setup h1 {
+    font-size: 1.4rem;
+    margin: 12px 0 4px;
+  }
+
+  .setup-row {
+    gap: 8px;
+    margin: 10px 0 6px;
+  }
+
+  .battle-room {
+    margin: 8px 0;
+    padding: 0 8px 8px;
+    max-height: 48vh;
+    overflow-y: auto;
+  }
+
+  .battle-room > summary {
+    padding: 6px 0;
+    font-size: 14px;
+  }
+
+  .room-row {
+    gap: 8px;
+    margin: 6px 0;
+  }
+
+  .room-row select,
+  .room-row input {
+    min-width: 130px;
+    padding: 4px 6px;
+    font-size: 13px;
+  }
+
+  .room-note {
+    font-size: 12px;
+    margin: 4px 0;
+  }
+
+  .bb-room {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+

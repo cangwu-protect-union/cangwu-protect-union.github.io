@@ -4,6 +4,7 @@
    本文件再补核心函数并组装对外对象；页面只 import 本文件。 */
 import "./rpg-data-write.js";
 import "./rpg-data-battles.js";
+import "./rpg-data-rooms.js";
 
 (function () {
   "use strict";
@@ -544,6 +545,13 @@ import "./rpg-data-battles.js";
     getBattle: P.getBattle,
     createBattle: P.createBattle,
     purgeBattles: P.purgeBattles,
+
+    createRoom: P.createRoom,
+    joinRoom: P.joinRoom,
+    getRoom: P.getRoom,
+    appendRoomAction: P.appendRoomAction,
+    abandonRoom: P.abandonRoom,
+    purgeRooms: P.purgeRooms,
 
     addSubmission: P.addSubmission,
     rejectSubmission: P.rejectSubmission,

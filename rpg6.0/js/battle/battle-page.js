@@ -112,7 +112,7 @@
     if (!P.state) return;
     var compact = P.isCompact();
     P.dom.grid.innerHTML = root.BattleView.render(P.state, P.meta, P.pick, P.hint, {
-      readOnly: P.mode !== "play",
+      readOnly: P.mode !== "play" || (!!P.remote && !P.remote.canAct()),
       speedOpen: P.speedOpen === null ? !compact : P.speedOpen,
       battleLogOpen: P.battleLogOpen === null ? !compact : P.battleLogOpen,
       battleLogPreview: !compact,
@@ -139,16 +139,19 @@
             : "");
       }
     }
-    if (P.dom.undo) P.dom.undo.hidden = P.mode !== "play";
+    if (P.dom.undo) P.dom.undo.hidden = P.mode !== "play" || !!P.remote;
     if (P.dom.restart) {
       P.dom.restart.textContent = P.mode === "replay" ? "退出回放" : "认输";
-      P.dom.restart.hidden = P.mode !== "replay" && P.state.phase === "finished";
+      P.dom.restart.hidden = P.mode !== "replay" &&
+        (P.remote ? (!P.remote.canAct() || P.state.phase === "finished") : P.state.phase === "finished");
     }
+    if (P.dom.roomLeaveBar) P.dom.roomLeaveBar.hidden = !P.remote;
     document.title = P.state.phase === "finished" && P.mode === "play" ? "对局结束 · " + P.BASE_TITLE : P.BASE_TITLE;
     if (P.mode === "play" && P.state.phase === "finished") {
       P.maybeSave();
       P.showResult();
     }
+    if (P.remote && P.remote.syncStatus) P.remote.syncStatus();
   }
 
   P.hashMatched = true;
@@ -166,6 +169,7 @@
   /* ---------------- 交互 ---------------- */
 
   P.applyAction = function (action) {
+    if (P.remote) return P.remote.act ? P.remote.act(action) : false;
     var before = B.state.clone(P.state);
     var result;
     try {
@@ -310,6 +314,10 @@
 
 
   P.undo = function () {
+    if (P.remote) {
+      P.setHint("联机对局不能撤销");
+      return;
+    }
     if (P.mode !== "play") return;
     if (!P.history.length) {
       P.setHint("没有可撤销的步骤");
@@ -326,6 +334,10 @@
 
   /* 认输：当前行动方判负，对方获胜；确认后作为动作写入战报，回放照常重算 */
   P.surrender = function () {
+    if (P.remote && !P.remote.canAct()) {
+      P.setHint("只能在自己回合认输");
+      return;
+    }
     var unit = P.currentUnit();
     if (!unit) return;
     if (!root.confirm("确定由「" + unit.name + "」认输吗？对方获胜。")) return;
@@ -362,6 +374,7 @@
     P.dom.start = P.$("[data-start]");
     P.dom.undo = P.$("[data-undo]");
     P.dom.restart = P.$("[data-restart]");
+    P.dom.roomLeaveBar = P.$("[data-room-leave-bar]");
     P.dom.source = P.$("[data-source]");
     P.dom.coverage = P.$("[data-coverage]");
     P.dom.turnEl = P.$("[data-turn]");
@@ -389,16 +402,19 @@
 
     var params = new URLSearchParams(root.location.search);
     var recordIdParam = params.get("record");
+    var roomParam = recordIdParam ? "" : (params.get("room") || "");
 
     var load = P.loadCharacters();
     load.now.then(function (result) {
       P.applyRoster(result);
+      if (P.remoteRefreshRoster) P.remoteRefreshRoster();
 
       /* 4 秒没等到数据库就先给兜底数据；真正的结果晚到时，只要还没开打就换过来 */
       load.remote.then(function (late) {
-        if (P.state || recordIdParam) return;
+        if (P.state || recordIdParam || roomParam) return;
         if (!late || !late.list || late.list === P.roster) return;
         P.applyRoster(late);
+        if (P.remoteRefreshRoster) P.remoteRefreshRoster();
         P.offerResume();
       }).catch(function () {});
 
@@ -406,11 +422,13 @@
         P.loadRecord(recordIdParam);
         return;
       }
+      if (P.remoteInit) P.remoteInit(roomParam);
       if (!P.roster.length) {
         P.dom.source.textContent = "技能库里没有任何能上场的角色。";
         P.dom.start.disabled = true;
         return;
       }
+      if (roomParam) return;
       P.offerResume();
     }).catch(function (err) {
       P.dom.source.textContent = "读取角色失败：" + err.message;

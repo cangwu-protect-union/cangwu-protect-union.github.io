@@ -82,7 +82,7 @@ js/
 
 ## 数据
 
-数据在腾讯云 CloudBase（PostgreSQL），三张表：
+数据在腾讯云 CloudBase（PostgreSQL），六张表：
 
 | 表 | 说明 |
 |---|---|
@@ -90,9 +90,12 @@ js/
 | `rpg_character_versions` | 旧档案，只增不改，`applied` 标记已应用 |
 | `rpg_submissions` | 投稿，`status` ∈ pending / approved / rejected |
 | `rpg_battles` | 战报：种子 + 双方角色 id + 归一化动作序列 + 最终指纹；匿名只读、只插，不可改删；30 天前的记录由 `rpg_battles_purge()` 删除 |
+| `rpg_rooms` | 联机房间：8 位房间码、状态、引擎版本、种子、双方角色与昵称、座位密钥 md5、结局与计数；匿名不可直读，只走 `rpc/rpg_room_*` |
+| `rpg_room_actions` | 联机动作日志：房间码 + 递增序号、座位、`committed` 动作、该步状态指纹；同样只走 RPC |
 
 两个只读函数：`rpg_search`（筛选 + 分页 + 总数）、`rpg_facets`（筛选下拉的选项）。
 迁移脚本在 `_local/sql/rpg-setup.sql`，旧档案导入在 `_local/sql/rpg-seed-characters.sql`。
+联机两张表的迁移在 `_local/sql/rpg-room-setup.sql`（不提交），须在 CloudBase 控制台执行；没执行时 `rpc/rpg_room_*` 返回 `PGRST202`，页面只提示「联机服务未部署」，热座不受影响。
 
 `data/seeds/characters.js` 是 33 条内置副本，**只在云端不可用时兜底**；正常页面只读数据库。副本由 `_local/tools/gen-rpg-seed.js` 生成，拆成 4 个文件（characters-2/3/4.js 只做 push）。
 
@@ -189,6 +192,44 @@ battles.html → rpg-data.listBattles → 列表
 test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步回放
 ```
 
+联机（准实时轮询，房间与动作只走 RPC）：
+
+```
+test.html 远程联机 → rpg-data-rooms.js → POST /v1/rdb/rest/rpc/rpg_room_* → rpg_rooms / rpg_room_actions
+结算 → BattleRecord.build → rpg-data.createBattle → rpg_battles（id 固定 room-<房间码>，两端都尝试保存，重复视为已保存）
+```
+
+## 远程联机
+
+两位朋友各用自己的设备打一局；v1 只做准实时轮询，不做账号、观战、聊天与强反作弊。
+
+入口与流程：
+
+- `test.html` 设置区展开「远程联机」，甲填昵称、选自己的角色、点「创建房间」；页面给出 8 位房间码与链接，复制发给乙。
+- 乙打开链接，填昵称、选自己的角色、点「加入房间」；乙一加入即开始，双方只在自己回合操作，对方回合只读。
+- 轮询间隔 2 秒（`POLL_MS`），页面隐藏时降到 10 秒（`HIDDEN_MS`），连续失败指数退避到 15 秒并显示「同步中断，重试中」。
+- 座位密钥 32 位十六进制，存 `localStorage` 的 `rpg6-room-seats`（最多 8 个房间，按时间淘汰），昵称存 `rpg6-nick`；创建/加入后 URL 写入 `?room=CODE`，离开时去掉。
+- 刷新：地址带 `?room=` 且本机有该房间座位时，自动拉全量动作重放；换设备、清缓存、无痕窗口都不能恢复。
+
+RPC（`rpg_rooms` / `rpg_room_actions` 对 anon 不可读，只调函数）：
+
+| 函数 | 用途 |
+|---|---|
+| `rpg_room_create` | 建房，生成房间码与种子，返回 `side:"a"` |
+| `rpg_room_join` | 加入，只允许 `waiting` 且乙位为空，返回 `side:"b"` |
+| `rpg_room_get` | 按 `after_seq` 拉房间状态与动作，单页 500 条 |
+| `rpg_room_append` | 追加一步动作：校验座位密钥、`expected_seq`、房间状态、引擎版本 |
+| `rpg_room_abandon` | 取消 / 离开 / 指纹中止时关闭房间 |
+| `rpg_rooms_purge` | 删除 `updated_at` 早于 30 天的房间 |
+
+服务端只校验座位密钥、动作序号、房间状态与引擎版本，**不校验招式合法性**；招式靠两端用同一份引擎重算，并在每一步比对状态指纹。指纹不一致就停止轮询、调用 `rpg_room_abandon`，对方看到房间关闭，不会静默继续。
+
+引擎版本必须一致（建房时写入 `engine_version`，加入与追加都比对）；联机本身不升 `ENGINE_VERSION`。
+
+限制：只支持 1v1、两人；无观战、聊天、账号；无撤销，联机下隐藏撤销按钮；没有服务端权威，朋友局不防改本机脚本；房间 30 天未活动由 `rpg_rooms_purge` 清理。
+
+动作上限：刷新恢复最多拉 5 页 × 500 步（`MAX_PAGES` 4 加首页，共 2500 步），超出显示「对局步数过多」。
+
 ## 容易踩的坑
 
 - `Prefer` 头必须拼接：`"return=minimal, gui-token=" + token`，覆盖会丢令牌。
@@ -215,6 +256,13 @@ test.html?record=<id> → rpg-data.getBattle → BattleRecord.states → 逐步�
 - 中途刷新靠 `localStorage` 的 `rpg6-live-battle` 恢复，和数据库无关；结束后保存成功才清掉它。
 - 手机适配的断点是 `(orientation: landscape) and (max-height: 520px)`，不是 `max-width`：手机横屏宽 844px，用宽度断点会误判成竖屏。竖屏遮罩的条件带 `(pointer: coarse)`，桌面窄窗口不该弹。三项细节（速度条 details、技能效果展开、Buff 气泡）见 [游戏说明-坑.md](游戏说明-坑.md)。
 - `docgen` 只扫模块根下的 `js/*.js`，`js/engine/`、`js/battle/` 不进架构图，说明写在 [架构.md](架构.md) 的「战斗引擎」一节。
+
+联机：
+
+- 未执行 `_local/sql/rpg-room-setup.sql` 时，`rpc/rpg_room_*` 返回 `PGRST202`，数据层映射成「联机服务未部署」；热座与战报不受影响。
+- 房间码输入先转大写、去掉非字母数字，最后才校验 8 位；输入框 `maxlength` 是 16，别改成 8，否则带分隔符的粘贴会在归一化前被截断。
+- 两端结算时都保存 `room-<房间码>`；后到的一端拿到 409 / `23505` 属正常幂等，不要当保存失败。
+- 晚到的轮询响应可能带回已经应用过的 seq；`applyRemote` 必须跳过 `seq <= 本地 seq`，否则会被误判成序号不连续或失步。
 
 ## 原始资料
 

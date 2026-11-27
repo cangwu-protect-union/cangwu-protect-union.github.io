@@ -55,6 +55,7 @@
   }
 
   P.maybeSave = function () {
+    if (P.remote && P.remote.saveBattle) return P.remote.saveBattle();
     if (P.saved || P.saving || P.saveTried || !root.BattleRecord) return;
     if (P.mode !== "play" || P.state.phase !== "finished") return;
     P.saving = true;
@@ -84,6 +85,7 @@
   }
 
   P.showResult = function () {
+    if (P.remote && P.remote.showResult) { P.remote.showResult(); return; }
     if (P.mode !== "play" || !P.state) return;
     var winnerUid = P.state.result;
     var winner = winnerUid === "a" ? P.meta.a : P.meta.b;
