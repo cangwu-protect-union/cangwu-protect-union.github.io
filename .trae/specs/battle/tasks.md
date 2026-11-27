@@ -89,7 +89,7 @@
 
 ## battle-08 窗口内容迁移与渲染解耦
 
-- 状态：待做
+- 状态：已验
 - 对应规划：UI-02
 - 允许改的路径：`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/css/battle-live.css`
 - 共享文件：无
@@ -101,6 +101,7 @@
 - 不做什么：不做 three.js 场景、召唤物地图层、状态条改版、手机细化；不改热座与回放。
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
 - 验收标准：联机两窗口出招正常；角色面板有血条且无召唤物/伤害记录；查询无六维；扣血记录两栏与合计正确；战报窗可折叠、内容滚动到最新；热座不回归。
+- 验证记录：`verify.ps1 -Browser` 全绿（引擎 214、冒烟 29 局、浏览器 14/14）；adversary 第一轮判 P1/P3 不通过（折叠态战报窗展开后停在最早一条；速度窗未按 side 映射），已修：battle-log 展开时补滚到底、`renderSpeed` 支持 ownSide 并把己方列放前，复验 PASS；两参数旧调用输出逐字一致。
 
 ## battle-09 three.js 场景与标签层
 

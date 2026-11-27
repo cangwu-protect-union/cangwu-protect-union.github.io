@@ -59,10 +59,13 @@
     return '<span class="stat is-changed"><i>' + label + '</i><s>' + base + '</s><b>' + now + '</b></span>';
   }
 
-  P.renderSpeed = function (state, rows) {
+  P.renderSpeed = function (state, rows, ownSide) {
+    var units = ownSide === "b" ? [state.units[1], state.units[0]] : state.units;
+    var labeled = ownSide === "a" || ownSide === "b";
     var head = '<tr><th class="fc-round">回合</th>';
-    state.units.forEach(function (unit) {
-      head += '<th>' + P.esc(unit.name) + '<i>(' + B.state.spdOf(unit) + ')</i></th>';
+    units.forEach(function (unit, idx) {
+      var tag = labeled ? (idx === 0 ? "己方 · " : "敌方 · ") : "";
+      head += '<th>' + P.esc(tag + unit.name) + '<i>(' + B.state.spdOf(unit) + ')</i></th>';
     });
     head += "</tr>";
 
@@ -70,7 +73,7 @@
     rows.forEach(function (row) {
       body += '<tr' + (row.cells[state.units[0].uid].current ? ' class="is-current"' : "") + ">";
       body += '<th class="fc-round">' + row.round + "</th>";
-      state.units.forEach(function (unit) {
+      units.forEach(function (unit) {
         var cell = row.cells[unit.uid];
         var slashes = "";
         for (var i = 0; i < cell.actions; i++) slashes += '<span class="slash"></span>';
@@ -102,6 +105,85 @@
         (item.delta > 0 ? "is-gain" : "is-loss") + '">' + sign + item.delta + "</b></div>";
     }
     return html;
+  }
+
+  /* 可视化血条与细蓝条：宽度用内部算出的整数百分比，颜色按血量比例三档 */
+  P.renderVitalBars = function (unit) {
+    var maxHp = B.state.maxHpOf(unit) || 1;
+    var maxMp = B.state.maxMpOf(unit) || 1;
+    var hp = Math.max(0, Math.min(unit.hp, maxHp));
+    var mp = Math.max(0, Math.min(unit.mp, maxMp));
+    var hpPct = Math.max(0, Math.min(100, Math.round(hp / maxHp * 100)));
+    var mpPct = Math.max(0, Math.min(100, Math.round(mp / maxMp * 100)));
+    var tone = hpPct > 60 ? "is-high" : hpPct > 30 ? "is-mid" : "is-low";
+    return '<div class="bu-bars">' +
+      '<span class="bu-hp-bar ' + tone + '"><i style="width:' + hpPct + '%"></i><b>血 ' +
+        hp + "/" + maxHp + " · " + hpPct + '%</b></span>' +
+      '<span class="bu-mp-bar"><i style="width:' + mpPct + '%"></i><b>蓝 ' +
+        mp + "/" + maxMp + " · " + mpPct + '%</b></span>' +
+      "</div>";
+  }
+
+  /* 扣血记录窗：左右两栏，按标准回合合并，底部各栏合计 */
+  P.renderHpRecord = function (state, ownSide) {
+    var leftIdx = ownSide === "b" ? 1 : 0;
+    var rightIdx = leftIdx === 0 ? 1 : 0;
+    var left = state.units[leftIdx];
+    var right = state.units[rightIdx];
+
+    function column(unit, label, sideKey) {
+      var groups = [];
+      var index = {};
+      var hpLog = unit.hpLog || [];
+      for (var i = 0; i < hpLog.length; i++) {
+        var entry = hpLog[i];
+        if (!index[entry.round]) {
+          index[entry.round] = { round: entry.round, delta: 0 };
+          groups.push(index[entry.round]);
+        }
+        index[entry.round].delta += entry.delta;
+      }
+      var html = '<section class="lw-hp-col" data-hp-side="' + sideKey + '">' +
+        "<h3>" + P.esc(label) + "</h3>";
+      if (!groups.length) {
+        html += '<p class="bu-log-empty">还没有血量变化</p>';
+      } else {
+        var total = 0;
+        for (var g = 0; g < groups.length; g++) {
+          var item = groups[g];
+          total += item.delta;
+          var sign = item.delta > 0 ? "+" : "";
+          html += '<div class="bu-log-row"><span>第 ' + item.round + " 回合</span><b class=\"" +
+            (item.delta > 0 ? "is-gain" : "is-loss") + '">' + sign + item.delta + "</b></div>";
+        }
+        var totalSign = total > 0 ? "+" : "";
+        html += '<div class="lw-hp-total"><span>合计</span><b class="' +
+          (total > 0 ? "is-gain" : "is-loss") + '">' + totalSign + total + "</b></div>";
+      }
+      html += "</section>";
+      return html;
+    }
+
+    return '<div class="lw-hp-grid">' +
+      column(left, "己方 · " + left.name, left.side || (leftIdx === 0 ? "a" : "b")) +
+      column(right, "敌方 · " + right.name, right.side || (rightIdx === 0 ? "a" : "b")) +
+      "</div>";
+  }
+
+  /* 详细战报窗：最近 160 条，不带 <details>，滚动由舞台处理 */
+  P.renderLogWindow = function (state) {
+    var list = state.log || [];
+    var start = Math.max(0, list.length - 160);
+    var html = "";
+    var rows = 0;
+    for (var i = start; i < list.length; i++) {
+      var line = P.eventLine(state, list[i]);
+      if (!line) continue;
+      rows += 1;
+      html += '<li class="bl-row ' + line.cls + '">' + P.esc(line.text) + "</li>";
+    }
+    if (!rows) html += '<li class="bl-row is-empty">还没有事件</li>';
+    return '<ol class="bl-items lw-log-rows">' + html + "</ol>";
   }
 
   /* ---------------- 战斗日志 ---------------- */
@@ -196,7 +278,8 @@
     return html;
   }
 
-  P.renderUnit = function (state, unit, active, logUid, pick) {
+  P.renderUnit = function (state, unit, active, logUid, pick, opts) {
+    var options = opts || {};
     var openLog = logUid === unit.uid;
     var html = '<article class="battle-unit' + (active ? " is-active" : "") + (unit.hp <= 0 ? " is-dead" : "") +
       (openLog ? " is-log-open" : "") + '" data-unit="' + unit.uid + '">';
@@ -204,6 +287,8 @@
       "<i>（" + P.esc(unit.job || "无主业") + (unit.subJob ? "/" + P.esc(unit.subJob) : "") + "）</i></span>";
     html += '<span class="bu-vitals">蓝 <b>' + unit.mp + "</b>/" + B.state.maxMpOf(unit) +
       " · 血 <b>" + unit.hp + "</b>/" + B.state.maxHpOf(unit) + "</span></header>";
+
+    if (options.bars) html += P.renderVitalBars(unit);
 
     html += '<div class="bu-stats">';
     ["atk", "def", "mres", "maxHp", "maxMp", "spd"].forEach(function (key) {
@@ -236,9 +321,9 @@
     }
     if (!chips) chips = '<span class="chip is-empty">无 Buff</span>';
     html += '<div class="bu-buffs">' + chips + "</div>";
-    html += P.renderSummons(state, unit, pick);
+    if (!options.hideSummons) html += P.renderSummons(state, unit, pick);
 
-    html += '<div class="bu-log">' + P.renderLog(unit) + "</div>";
+    if (!options.hideLog) html += '<div class="bu-log">' + P.renderLog(unit) + "</div>";
 
     var chargeText = "未蓄力";
     if (unit.charge) {
@@ -259,13 +344,15 @@
     });
     html += '<footer class="bu-status"><span>行动 ' + unit.actionsLeft + "</span><span>击溃值 " +
       unit.breakValue + "</span><span>眩晕值 " + unit.stunValue + "</span>" + charge + marks +
-      '<button type="button" class="bu-log-toggle">' + (openLog ? "▾伤害记录" : "▸伤害记录") + "</button>" +
+      (options.hideLog ? "" : '<button type="button" class="bu-log-toggle">' +
+        (openLog ? "▾伤害记录" : "▸伤害记录") + "</button>") +
       "</footer>";
     html += "</article>";
     return html;
   }
 
-  P.renderQuery = function (state, unit, meta, pick, readOnly) {
+  P.renderQuery = function (state, unit, meta, pick, readOnly, opts) {
+    var options = opts || {};
     var character = meta[unit.uid] || { skills: [] };
     var active = !readOnly && state.turnUid === unit.uid && state.phase === "fight";
     var html = '<div class="battle-query' + (active ? " is-active" : "") + '" data-query="' + unit.uid + '">';
@@ -274,21 +361,23 @@
     html += '<header class="bq-head">' + P.esc(alias) + P.esc(unit.name) +
       "<i>（" + P.esc(unit.job || "无主业") + (unit.subJob ? "/" + P.esc(unit.subJob) : "") + "）</i></header>";
 
-    html += '<div class="bq-stats">';
-    var atkExpr = B.skills && B.skills.basicAtkOf ? B.skills.basicAtkOf(unit) : null;
-    ["atk", "def", "mres", "maxHp", "maxMp", "spd"].forEach(function (key) {
-      if (key === "atk" && atkExpr) {
-        /* 动态普攻面板（孙嘉怿）：攻击格没有固定值，显示 − 并在下方标注实际规则 */
-        var note = atkExpr.hpPercent
-          ? "受攻击者当前血量的" + (Number(atkExpr.percent) || 0) + "%"
-          : "按公式计算";
-        html += '<span class="bq-stat is-dynamic">' + P.STAT_LABEL[key] + " −" +
-          '<em class="bq-stat-note">' + P.esc(note) + "</em></span>";
-        return;
-      }
-      html += "<span>" + P.STAT_LABEL[key] + " " + unit.base[key] + "</span>";
-    });
-    html += "</div>";
+    if (!options.hideStats) {
+      html += '<div class="bq-stats">';
+      var atkExpr = B.skills && B.skills.basicAtkOf ? B.skills.basicAtkOf(unit) : null;
+      ["atk", "def", "mres", "maxHp", "maxMp", "spd"].forEach(function (key) {
+        if (key === "atk" && atkExpr) {
+          /* 动态普攻面板（孙嘉怿）：攻击格没有固定值，显示 − 并在下方标注实际规则 */
+          var note = atkExpr.hpPercent
+            ? "受攻击者当前血量的" + (Number(atkExpr.percent) || 0) + "%"
+            : "按公式计算";
+          html += '<span class="bq-stat is-dynamic">' + P.STAT_LABEL[key] + " −" +
+            '<em class="bq-stat-note">' + P.esc(note) + "</em></span>";
+          return;
+        }
+        html += "<span>" + P.STAT_LABEL[key] + " " + unit.base[key] + "</span>";
+      });
+      html += "</div>";
+    }
 
     var sheet = character.skills || [];
     html += '<ul class="bq-skills">';
@@ -330,9 +419,9 @@
       html += '<button type="button" class="btn btn-ghost bq-btn' + (pickedBasic ? " is-picked" : "") +
         '" data-basic="' + kind + '"' + (active ? "" : " disabled") + ">" + P.esc(label) + "</button>";
     }
-    /* 额外动作（unlock/item）在 battle-view-effects.js 的 renderExtraActions 里渲染 */
-    html += P.renderExtraActions(state, unit, pick, active);
     html += "</div>";
+    /* 额外动作（unlock/item）在 battle-view-effects.js 的 renderExtraActions 里渲染，放在操作行之外 */
+    html += P.renderExtraActions(state, unit, pick, active);
 
     if (active && pick && pick.mode === "choice") {
       var choiceSkill = B.skills.find(pick.id);
@@ -423,6 +512,11 @@
     render: P.render,
     renderBar: P.renderBar,
     renderBuffBox: P.renderBuffBox,
+    renderSpeed: function () { return P.renderSpeed.apply(null, arguments); },
+    renderUnit: function () { return P.renderUnit.apply(null, arguments); },
+    renderQuery: function () { return P.renderQuery.apply(null, arguments); },
+    renderHpRecord: function () { return P.renderHpRecord.apply(null, arguments); },
+    renderLogWindow: function () { return P.renderLogWindow.apply(null, arguments); },
     chipDetail: function () { return P.chipDetail.apply(null, arguments); },
     buildForecast: function () { return P.buildForecast.apply(null, arguments); },
     STAT_LABEL: P.STAT_LABEL

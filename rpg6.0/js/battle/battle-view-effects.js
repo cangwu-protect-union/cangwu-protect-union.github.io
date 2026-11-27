@@ -13,19 +13,20 @@
   /* 额外动作按钮：unlock（解锁属性）与 item（吃碎苹果/功德回血），接在三个基础按钮后面 */
 
   P.renderExtraActions = function (state, unit, pick, active) {
-    var html = "";
+    var buttons = "";
     var extras = active && B.battle && B.battle.available ? B.battle.available(state) : [];
     for (var x = 0; x < extras.length; x++) {
       var ex = extras[x];
       if (ex.kind === "unlock") {
         var pickedUnlock = pick && pick.mode === "unlock";
-        html += '<button type="button" class="btn btn-ghost bq-btn' + (pickedUnlock ? " is-picked" : "") +
+        buttons += '<button type="button" class="btn btn-ghost bq-btn' + (pickedUnlock ? " is-picked" : "") +
           '" data-unlock' + (ex.enabled ? "" : " disabled") + ' title="' + P.esc(ex.reason) + '">' + P.esc(ex.label) + "</button>";
       } else if (ex.kind === "item") {
-        html += '<button type="button" class="btn btn-ghost bq-btn" data-item="' + P.esc(ex.key) + '"' +
+        buttons += '<button type="button" class="btn btn-ghost bq-btn" data-item="' + P.esc(ex.key) + '"' +
           (ex.enabled ? "" : " disabled") + ' title="' + P.esc(ex.reason) + '">' + P.esc(ex.label) + "</button>";
       }
     }
+    var html = buttons ? '<div class="bq-extras">' + buttons + "</div>" : "";
     if (active && pick && pick.mode === "unlock" && pick.stats && pick.stats.length) {
       html += '<div class="bq-choice"><span class="bq-choice-label">选择要解锁的属性</span>';
       pick.stats.forEach(function (st) {

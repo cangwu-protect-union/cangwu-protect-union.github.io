@@ -1,5 +1,5 @@
 /* 回合制正传 6.0 · 联机对局舞台
-   把 BattleView.render() 的旧片段分拣进 7 个浮窗；只在 P.remote 且对局中启用。
+   直接按窗口生成内容，不再解析旧网格片段；只在 P.remote 且对局中启用。
    组件自身不保存游戏状态，所有展示数据都来自 render(state, meta, pick, hint, opts)。 */
 
 import { createWindowManager } from "./battle-windows.js";
@@ -52,6 +52,23 @@ function create() {
     bar.appendChild(resetBtn);
   }
 
+  function scrollLogToEnd() {
+    if (!manager) return;
+    var body = manager.bodyOf("battle-log");
+    if (!body || !body.clientHeight) return;
+    body.scrollTop = body.scrollHeight;
+  }
+
+  /* 战报窗默认折叠；折叠时 scrollHeight 为 0，展开后补一次滚到最新 */
+  function onLiveClick(event) {
+    var chip = event.target.closest ? event.target.closest("[data-fold], [data-dock-win]") : null;
+    if (!chip) return;
+    var win = chip.closest(".lw-window");
+    var winId = win ? win.getAttribute("data-win") : chip.getAttribute("data-dock-win");
+    if (winId !== "battle-log") return;
+    root.setTimeout(scrollLogToEnd, 0);
+  }
+
   function mount(stage) {
     if (mountedFlag) return;
     stageEl = stage || root.document.querySelector("[data-stage]");
@@ -68,6 +85,7 @@ function create() {
     manager = createWindowManager({ getBarHeight: barHeight });
     manager.mount(winRoot, dockRoot);
     addResetButton();
+    liveRoot.addEventListener("click", onLiveClick);
 
     observer = new MutationObserver(function () {
       if (stageEl && stageEl.hidden) unmount();
@@ -77,30 +95,20 @@ function create() {
     mountedFlag = true;
   }
 
-  function setBody(id, node) {
+  function setBody(id, html) {
     if (!manager) return;
     var body = manager.bodyOf(id);
     if (!body) return;
-    body.innerHTML = "";
-    if (node) body.appendChild(node);
-  }
-
-  function hpCol(side, label, logNode) {
-    var col = root.document.createElement("div");
-    col.className = "lw-hp-col";
-    col.setAttribute("data-hp-side", side);
-    var title = root.document.createElement("h3");
-    title.textContent = label;
-    col.appendChild(title);
-    if (logNode) {
-      col.appendChild(logNode);
+    var prevTop = body.scrollTop;
+    var wasEmpty = !body.firstElementChild;
+    var atBottom = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
+    body.innerHTML = typeof html === "string" ? html : "";
+    var sticky = id === "battle-log" || id === "speed";
+    if (sticky && (wasEmpty || atBottom)) {
+      body.scrollTop = body.scrollHeight;
     } else {
-      var empty = root.document.createElement("p");
-      empty.className = "bu-log-empty";
-      empty.textContent = "还没有血量变化";
-      col.appendChild(empty);
+      body.scrollTop = prevTop;
     }
-    return col;
   }
 
   function restoreOpenSkills() {
@@ -119,60 +127,28 @@ function create() {
   function render(state, meta, pick, hint, opts) {
     if (!mountedFlag || !state || !root.BattleView) return;
     var options = opts || {};
-
-    var html = root.BattleView.render(state, meta, pick, hint, {
-      readOnly: !!options.readOnly,
-      speedOpen: true,
-      battleLogOpen: true,
-      battleLogPreview: false,
-      logUid: ""
-    });
-
-    var tpl = root.document.createElement("template");
-    tpl.innerHTML = html;
-    var frag = tpl.content;
-
-    var units = frag.querySelectorAll(".battle-unit");
-    var queries = frag.querySelectorAll(".battle-query");
-    var speed = frag.querySelector("[data-speed]");
-    var log = frag.querySelector("[data-log]");
+    var BV = root.BattleView;
 
     var sideKey = options.side === "b" ? "b" : "a";
     var ownIdx = SIDE_INDEX[sideKey];
     var enemyIdx = ownIdx === 0 ? 1 : 0;
-    var ownUnit = units[ownIdx] || null;
-    var enemyUnit = units[enemyIdx] || null;
-    var ownQuery = queries[ownIdx] || null;
-    var enemyQuery = queries[enemyIdx] || null;
+    var own = state.units[ownIdx];
+    var enemy = state.units[enemyIdx];
+    var readOnly = !!options.readOnly;
 
-    var ownLog = ownUnit ? ownUnit.querySelector(".bu-log") : null;
-    var enemyLog = enemyUnit ? enemyUnit.querySelector(".bu-log") : null;
-    if (ownLog && ownLog.parentNode) ownLog.parentNode.removeChild(ownLog);
-    if (enemyLog && enemyLog.parentNode) enemyLog.parentNode.removeChild(enemyLog);
-
-    var hpGrid = root.document.createElement("div");
-    hpGrid.className = "lw-hp-grid";
-    hpGrid.appendChild(hpCol("own", "己方", ownLog));
-    hpGrid.appendChild(hpCol("enemy", "敌方", enemyLog));
-
-    setBody("speed", speed);
-    setBody("panel-own", ownUnit);
-    setBody("panel-enemy", enemyUnit);
-    setBody("query-own", ownQuery);
-    setBody("query-enemy", enemyQuery);
-    setBody("hp-record", hpGrid);
-    setBody("battle-log", log);
-
-    if (speed) speed.open = true;
+    setBody("speed", '<div class="lw-speed">' +
+      BV.renderSpeed(state, BV.buildForecast(state, 21), sideKey) + "</div>");
+    setBody("panel-own", BV.renderUnit(state, own, state.turnUid === own.uid, "", pick,
+      { hideSummons: true, hideLog: true, bars: true }));
+    setBody("panel-enemy", BV.renderUnit(state, enemy, state.turnUid === enemy.uid, "", pick,
+      { hideSummons: true, hideLog: true, bars: true }));
+    setBody("query-own", BV.renderQuery(state, own, meta, pick, readOnly, { hideStats: true }));
+    setBody("query-enemy", BV.renderQuery(state, enemy, meta, pick, true, { hideStats: true }));
+    setBody("hp-record", BV.renderHpRecord(state, sideKey));
+    setBody("battle-log", BV.renderLogWindow(state));
 
     liveRoot.classList.toggle("is-picking", !!(root.BattlePick && root.BattlePick.isActive(pick)));
     restoreOpenSkills();
-
-    if (log) {
-      log.scrollTop = log.scrollHeight;
-      var items = log.querySelector(".bl-items");
-      if (items) items.scrollTop = items.scrollHeight;
-    }
 
     if (manager) manager.syncContent();
   }
@@ -194,6 +170,7 @@ function create() {
     }
     root.document.documentElement.classList.remove("is-live");
     if (liveRoot) {
+      liveRoot.removeEventListener("click", onLiveClick);
       liveRoot.classList.remove("is-picking");
       liveRoot.hidden = true;
     }
