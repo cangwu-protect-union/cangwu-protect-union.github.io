@@ -17,6 +17,9 @@ function create() {
   let stageEl = null;
   let observer = null;
   let resetBtn = null;
+  let cancelBtn = null;
+  let roomNode = null;
+  let roomObserver = null;
   let mountedFlag = false;
   let cardEl = null;
   let cardUid = "";
@@ -55,6 +58,77 @@ function create() {
     resetBtn.textContent = "复位窗口";
     resetBtn.addEventListener("click", onReset);
     bar.appendChild(resetBtn);
+  }
+
+  /* ---------------- 底栏：取消选择与状态圆点 ---------------- */
+
+  function onPickCancel(event) {
+    event.stopPropagation();
+    var P = page();
+    if (!P) return;
+    if (root.BattlePick) root.BattlePick.cancel(P.pick);
+    if (P.setHint) P.setHint("已取消选择");
+    else P.hint = "已取消选择";
+    if (P.render) P.render();
+  }
+
+  function addCancelButton() {
+    var bar = barEl();
+    if (!bar) return;
+    var status = bar.querySelector("[data-room-status]");
+    if (!status) return;
+    var old = bar.querySelector("[data-pick-cancel]");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    cancelBtn = root.document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-ghost";
+    cancelBtn.setAttribute("data-pick-cancel", "");
+    cancelBtn.textContent = "取消选择";
+    cancelBtn.hidden = true;
+    cancelBtn.addEventListener("click", onPickCancel);
+    bar.insertBefore(cancelBtn, status);
+  }
+
+  function toneOf(text) {
+    var t = (text || "").replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    /* 先认固定前缀：对手昵称可能带「失败」「轮到你」，不能拿整句正则去猜 */
+    if (/^等\s/.test(t) || /^等待对手加入/.test(t)) return "wait";
+    if (/^轮到你/.test(t)) return "you";
+    if (/^提交中|^已进入房间/.test(t)) return "busy";
+    if (/^房间已结束|^房间已关闭/.test(t)) return "end";
+    if (/不一致|不连续|同步中断|提交失败|对手离线|失败|错误|无法进入|已下架|请刷新|没有这个房间/.test(t)) return "bad";
+    return "";
+  }
+
+  /* halt 只改状态文本、不触发 render；这里跟着状态变化同步认输按钮 */
+  function refreshTone() {
+    if (!roomNode) return;
+    var tone = roomNode.hidden ? "" : toneOf(roomNode.textContent);
+    if (tone) roomNode.setAttribute("data-tone", tone);
+    else roomNode.removeAttribute("data-tone");
+    var P = page();
+    if (P && P.remote && P.dom && P.dom.restart) P.dom.restart.disabled = !P.remote.canAct();
+  }
+
+  function addRoomObserver() {
+    var bar = barEl();
+    roomNode = bar ? bar.querySelector("[data-room-status]") : null;
+    if (!roomNode) return;
+    roomObserver = new MutationObserver(refreshTone);
+    roomObserver.observe(roomNode, { childList: true, characterData: true, subtree: true });
+    refreshTone();
+  }
+
+  function syncBar(pick) {
+    var P = page();
+    if (!P) return;
+    refreshTone();
+    var active = !!(root.BattlePick && root.BattlePick.isActive(pick));
+    if (cancelBtn) cancelBtn.hidden = !active;
+    if (!active) return;
+    var hintEl = (P.dom && P.dom.hintEl) || (barEl() && barEl().querySelector("[data-hint]"));
+    if (hintEl) hintEl.textContent = (P.hint || "") + " · Esc 取消";
   }
 
   function scrollLogToEnd() {
@@ -254,6 +328,8 @@ function create() {
     manager.mount(winRoot, dockRoot);
     if (liveRoot.querySelector("[data-scene]")) scene = createScene3d(liveRoot);
     addResetButton();
+    addCancelButton();
+    addRoomObserver();
     liveRoot.addEventListener("click", onLiveClick);
     root.document.addEventListener("keydown", onLiveKeydown);
 
@@ -347,6 +423,19 @@ function create() {
       if (resetBtn.parentNode) resetBtn.parentNode.removeChild(resetBtn);
       resetBtn = null;
     }
+    if (cancelBtn) {
+      cancelBtn.removeEventListener("click", onPickCancel);
+      if (cancelBtn.parentNode) cancelBtn.parentNode.removeChild(cancelBtn);
+      cancelBtn = null;
+    }
+    if (roomObserver) {
+      roomObserver.disconnect();
+      roomObserver = null;
+    }
+    if (roomNode) {
+      roomNode.removeAttribute("data-tone");
+      roomNode = null;
+    }
     root.document.documentElement.classList.remove("is-live");
     if (liveRoot) {
       liveRoot.removeEventListener("click", onLiveClick);
@@ -369,6 +458,7 @@ function create() {
   return {
     mount: mount,
     render: render,
+    syncBar: syncBar,
     unmount: unmount,
     mounted: mounted
   };

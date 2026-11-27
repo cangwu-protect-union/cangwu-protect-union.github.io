@@ -157,8 +157,13 @@
     if (P.dom.undo) P.dom.undo.hidden = P.mode !== "play" || !!P.remote;
     if (P.dom.restart) {
       P.dom.restart.textContent = P.mode === "replay" ? "退出回放" : "认输";
-      P.dom.restart.hidden = P.mode !== "replay" &&
-        (P.remote ? (!P.remote.canAct() || P.state.phase === "finished") : P.state.phase === "finished");
+      if (P.remote) {
+        P.dom.restart.hidden = P.state.phase === "finished";
+        P.dom.restart.disabled = !P.remote.canAct();
+      } else {
+        P.dom.restart.hidden = P.mode !== "replay" && P.state.phase === "finished";
+        P.dom.restart.disabled = false;
+      }
     }
     if (P.dom.roomLeaveBar) P.dom.roomLeaveBar.hidden = !P.remote;
     document.title = P.state.phase === "finished" && P.mode === "play" ? "对局结束 · " + P.BASE_TITLE : P.BASE_TITLE;
@@ -167,6 +172,7 @@
       P.showResult();
     }
     if (P.remote && P.remote.syncStatus) P.remote.syncStatus();
+    if (live && P.live && P.live.syncBar) P.live.syncBar(P.pick);
   }
 
   P.hashMatched = true;
@@ -174,7 +180,9 @@
 
   P.setHint = function (text) {
     P.hint = text;
-    if (P.dom.hintEl) P.dom.hintEl.textContent = text;
+    if (!P.dom.hintEl) return;
+    var picking = !!P.remote && !!P.live && P.mode === "play" && root.BattlePick.isActive(P.pick);
+    P.dom.hintEl.textContent = text + (picking ? " · Esc 取消" : "");
   }
 
   /* ---------------- 存档 ---------------- */

@@ -134,7 +134,7 @@
 
 ## battle-11 底部状态条与联机状态
 
-- 状态：待做
+- 状态：已验
 - 对应规划：UI-05
 - 允许改的路径：`rpg6.0/test.html`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/battle-page.js`、`_local/tests/cases/rpg-room.mjs`（不提交）
 - 共享文件：无
@@ -142,6 +142,7 @@
 - 不做什么：不改联机协议与 `battle-remote.js`；不加新功能按钮。
 - 验收命令：`node _local/tests/run-all.mjs --group=回合制`
 - 验收标准：用例全绿；两窗口交替出招时状态文字一致；等待/离线/同步中断显示正确；认输与离开行为不变。
+- 验证记录：`node _local/tests/run-all.mjs --group=回合制` 15/15。新增断言：行动方 `[data-room-status]`「轮到你」且 `data-tone="you"`，非行动方「等 …」且 `wait`；两端 `[data-turn]` 一致（联机状态按己方视角不同是设计第 7 节要求，卡上「状态文字一致」按此口径落实）；撤销/回放隐藏，离开/复位常显；认输行动方可见可点、非行动方可见 disabled。503 注入 `rpg_room_get` 后状态变「同步中断，重试中」+ `bad`，解除后恢复 `wait`。选目标时提示带「· Esc 取消」并出现「取消选择」，取消后提示与按钮复位。`check.ps1` 全绿。adversary PASS，三条 P3 已修：昵称含「失败/轮到你」时按固定前缀判 tone、非法目标提示仍保留 Esc 后缀、halt 只改状态时同步认输 disabled。未改 `test.html`、未改 `battle-remote.js`、未升版本。
 
 ## battle-12 手机窄屏与全量回归
 

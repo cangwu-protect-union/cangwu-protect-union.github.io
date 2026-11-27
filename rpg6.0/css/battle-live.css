@@ -407,6 +407,35 @@ html.is-live .battle-bar {
   border-top: 1px solid var(--border);
 }
 
+/* 联机状态：内联圆点 + 文案，轮到你/等待/错误/结束/提交中用色调区分 */
+html.is-live .bb-room {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+html.is-live .bb-room[data-tone]::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+html.is-live .bb-room[data-tone="you"]::before { background: var(--accent); }
+html.is-live .bb-room[data-tone="wait"]::before { background: #e8a33d; }
+html.is-live .bb-room[data-tone="bad"]::before { background: #d64545; }
+html.is-live .bb-room[data-tone="end"]::before { background: var(--muted); }
+html.is-live .bb-room[data-tone="busy"]::before { background: var(--muted); }
+
+html.is-live .bb-room[hidden] { display: none; }
+
+html.is-live .battle-bar [data-pick-cancel] {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 html.is-live .battle-result {
   position: fixed;
   inset: 0;
