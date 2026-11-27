@@ -322,8 +322,27 @@
     return { kind: "item", key: item.id };
   }
 
+  /* 认输：当前行动方判负，对方英雄获胜。不依赖行动数，卡死时也能退出 */
+  function surrender(state, events) {
+    if (!state.turnUid) throw new Error("没有正在行动的角色");
+    var unit = B.state.unitOf(state, state.turnUid);
+    var winnerSide = B.state.otherSide(state, unit.side);
+    var winner = B.state.heroOf(state, winnerSide);
+    B.state.finish(state, winner ? winner.uid : winnerSide);
+    events.push({
+      type: "surrender",
+      round: state.round,
+      uid: unit.uid,
+      name: unit.name,
+      winner: winner ? winner.uid : winnerSide
+    });
+    return { kind: "surrender", uid: unit.uid, name: unit.name };
+  }
+
   function execute(state, action, events) {
     if (!action || typeof action !== "object") throw new Error("动作格式错误");
+    /* 认输先于行动数校验：本回合已无行动时也要能认输 */
+    if (action.kind === "surrender") return surrender(state, events);
     var unit = currentUnit(state);
     /* 解锁属性是额外动作：不消耗行动，也不吃「行动前掷骰跳过」 */
     if (action.kind === "unlock") return executeUnlock(state, unit, action, events);

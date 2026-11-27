@@ -139,7 +139,10 @@
       }
     }
     if (P.dom.undo) P.dom.undo.hidden = P.mode !== "play";
-    if (P.dom.restart) P.dom.restart.textContent = P.mode === "replay" ? "退出回放" : "换人";
+    if (P.dom.restart) {
+      P.dom.restart.textContent = P.mode === "replay" ? "退出回放" : "认输";
+      P.dom.restart.hidden = P.mode !== "replay" && P.state.phase === "finished";
+    }
     document.title = P.state.phase === "finished" && P.mode === "play" ? "对局结束 · " + P.BASE_TITLE : P.BASE_TITLE;
     if (P.mode === "play" && P.state.phase === "finished") {
       P.maybeSave();
@@ -318,6 +321,14 @@
     P.dom.result.hidden = true;
     P.writeLive();
     P.render();
+  }
+
+  /* 认输：当前行动方判负，对方获胜；确认后作为动作写入战报，回放照常重算 */
+  P.surrender = function () {
+    var unit = P.currentUnit();
+    if (!unit) return;
+    if (!root.confirm("确定由「" + unit.name + "」认输吗？对方获胜。")) return;
+    P.applyAction({ kind: "surrender" });
   }
 
 

@@ -171,7 +171,13 @@
       P.startBattle(P.byName[P.dom.pickA.value], P.byName[P.dom.pickB.value], null, null);
     });
     P.dom.undo.addEventListener("click", P.undo);
-    P.dom.restart.addEventListener("click", P.backToSetup);
+    P.dom.restart.addEventListener("click", function () {
+      if (P.mode === "replay") {
+        P.backToSetup();
+        return;
+      }
+      P.surrender();
+    });
     P.dom.replayBox.addEventListener("click", function (event) {
       if (event.target.closest("[data-step-prev]")) P.stepReplay(-1);
       if (event.target.closest("[data-step-next]")) P.stepReplay(1);

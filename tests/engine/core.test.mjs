@@ -118,6 +118,34 @@ export const cases = [
     }
   },
   {
+    name: "认输：当前行动方判负，对方获胜，没有行动也能用",
+    run() {
+      const { state } = mk(CHAR.liuwenzhe, CHAR.lishuo);
+      state.units[0].actionsLeft = 0;
+      const r = B.battle.apply(state, { kind: "surrender" });
+      assert.equal(r.state.phase, "finished");
+      assert.equal(r.state.result, "b");
+      assert.equal(r.state.turnUid, null);
+      assert.equal(r.committed.kind, "surrender");
+      assert.equal(r.committed.uid, "a");
+      assert.ok(r.events.some((e) => e.type === "surrender" && e.uid === "a"));
+      assert.throws(() => B.battle.apply(r.state, { kind: "basic", type: "attack", target: "b" }), /对局已结束/);
+    }
+  },
+  {
+    name: "认输后回放：同种子同动作复现结局与指纹",
+    run() {
+      const created = mk(CHAR.liuwenzhe, CHAR.lishuo);
+      const first = B.battle.apply(created.state, { kind: "basic", type: "chargeMp" });
+      const second = B.battle.apply(first.state, { kind: "surrender" });
+      const actions = [first.committed, second.committed];
+      const replayed = B.battle.replay(created.state, actions);
+      assert.equal(replayed.state.phase, "finished");
+      assert.equal(replayed.state.result, second.state.result);
+      assert.equal(B.state.hash(replayed.state), B.state.hash(second.state));
+    }
+  },
+  {
     name: "蓄蓝 +1 并消耗行动",
     run() {
       const { state } = mk(CHAR.liuwenzhe, CHAR.lishuo);

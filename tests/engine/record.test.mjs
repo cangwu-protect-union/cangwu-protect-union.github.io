@@ -87,6 +87,24 @@ export const cases = [
     }
   },
   {
+    name: "认输战报：末步是认输，回放一致且走到终局",
+    run() {
+      const created = B.battle.create({ seed: 777, a: A, b: B2 });
+      const first = B.battle.apply(created.state, { kind: "basic", type: "chargeMp" });
+      const end = B.battle.apply(first.state, { kind: "surrender" });
+      const actions = [first.committed, end.committed];
+      const record = REC.build(end.state, { a: A, b: B2 }, actions);
+      assert.equal(record.result, "a");
+      assert.equal(record.actions[record.actions.length - 1].kind, "surrender");
+      const replayed = REC.replay(record, { a: A, b: B2 });
+      assert.equal(replayed.match, true);
+      assert.equal(replayed.state.result, end.state.result);
+      const list = REC.states(record, { a: A, b: B2 });
+      assert.equal(list.length, actions.length + 1);
+      assert.equal(list[list.length - 1].phase, "finished");
+    }
+  },
+  {
     name: "胜负文案与角色名对应",
     run() {
       const { state, actions } = playToEnd(777);
