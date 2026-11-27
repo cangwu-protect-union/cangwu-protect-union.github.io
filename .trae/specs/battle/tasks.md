@@ -122,7 +122,7 @@
 
 ## battle-10 召唤物地图层与选目标
 
-- 状态：待做
+- 状态：已验
 - 对应规划：UI-04
 - 允许改的路径：`rpg6.0/js/battle/scene3d.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-page.js`、`rpg6.0/css/battle-live.css`、`_local/tests/cases/rpg-room.mjs`（不提交）
 - 共享文件：无
@@ -130,6 +130,7 @@
 - 不做什么：不改召唤物规则与引擎；不做状态条最终样式与手机适配。
 - 验收命令：`node _local/tests/run-all.mjs --group=回合制`
 - 验收标准：用例全绿；双窗口能选中敌方角色/召唤物并结算；详情卡只在可选中时出现「选为目标」；取消与 Esc 正常。
+- 验证记录：`node _local/tests/run-all.mjs --group=回合制` 15/15，新增「召唤物详情卡与选为目标」：吕场龄 3 个己方回合内召唤土豆地雷 → 非选目标时卡无按钮、Esc 关闭 → 乙普攻点 `.scene-hit[data-summon]` 开卡出现「选为目标」→ 点击后两端动作数与指纹一致、卡关闭、召唤物掉血；`actOnce` 选目标改点 `.scene-hit[data-unit]`，未被浮窗遮挡。`check.ps1` 全绿。adversary PASS，两条 P3 已修（readOnly 不出现「选为目标」、卡内容变化后重新定位）。召唤物图层与亮圈沿用 battle-09 的 scene3d，未改 scene3d / battle-page，未升版本。
 
 ## battle-11 底部状态条与联机状态
 

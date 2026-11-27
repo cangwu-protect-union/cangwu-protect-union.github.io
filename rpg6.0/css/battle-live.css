@@ -568,3 +568,59 @@ html.is-live .battle-result {
     width: 72px;
   }
 }
+
+/* ---------- 召唤物详情卡 ---------- */
+
+.lw-summon-card {
+  position: absolute;
+  z-index: 55;
+  width: max-content;
+  max-width: min(280px, calc(100% - 16px));
+  padding: 8px 10px 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+}
+
+.lw-sc-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lw-sc-rows {
+  margin: 6px 0 0;
+}
+
+.lw-sc-rows > div {
+  display: flex;
+  gap: 8px;
+}
+
+.lw-sc-rows dt {
+  flex: none;
+  min-width: 56px;
+  color: var(--muted);
+}
+
+.lw-sc-rows dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.lw-sc-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lw-sc-btns .btn {
+  padding: 4px 12px;
+  font-size: 12px;
+}
