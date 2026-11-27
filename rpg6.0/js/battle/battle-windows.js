@@ -2,7 +2,7 @@
    只负责窗口壳、拖动、折叠、置顶与位置记忆；窗口内容由 stage-live 写入 [data-body]。 */
 
 const STORAGE_KEY = "rpg6-live-windows-v1";
-const COMPACT_QUERY = "(max-width: 900px)";
+const COMPACT_QUERY = "(max-width: 900px), (orientation: landscape) and (max-height: 520px)";
 
 const WINDOW_DEFS = [
   { id: "speed", title: "速度条预期" },
@@ -17,6 +17,12 @@ const WINDOW_DEFS = [
 const DESKTOP_EXPANDED = ["speed", "panel-own", "panel-enemy", "query-own"];
 const COMPACT_EXPANDED = ["panel-own", "query-own"];
 const DOCK_ORDER = ["hp-record", "battle-log", "query-enemy"];
+
+/* 紧凑模式各窗上限：己方面板压到 0.22、己方查询 0.40，其余沿用 0.46 */
+function compactHeight(id, vh) {
+  var ratio = id === "panel-own" ? 0.22 : (id === "query-own" ? 0.40 : 0.46);
+  return Math.max(id === "panel-own" ? 72 : 80, Math.round(vh * ratio));
+}
 
 export function createWindowManager(options) {
   const opts = options || {};
@@ -33,6 +39,8 @@ export function createWindowManager(options) {
   let zTop = 10;
   let mq = null;
   let mounted = false;
+  let lastCompact = null;
+  let desktopSnapshot = null;
 
   function isCompact() {
     return !!(rootWin.matchMedia && rootWin.matchMedia(COMPACT_QUERY).matches);
@@ -72,8 +80,9 @@ export function createWindowManager(options) {
       out["query-enemy"] = { left: 6, top: mid, w: out["query-enemy"].w, h: out["query-enemy"].h };
       out["hp-record"] = { left: 6, top: 8, w: out["hp-record"].w, h: out["hp-record"].h };
       out["battle-log"] = { left: 6, top: 8, w: out["battle-log"].w, h: out["battle-log"].h };
-      out["panel-own"] = { left: 6, top: 8, w: out["panel-own"].w, h: out["panel-own"].h };
-      out["query-own"] = { left: 6, top: mid, w: out["query-own"].w, h: out["query-own"].h };
+      var queryH = Math.min(out["query-own"].h, compactHeight("query-own", vh));
+      out["panel-own"] = { left: 6, top: 26, w: out["panel-own"].w, h: out["panel-own"].h };
+      out["query-own"] = { left: 6, top: Math.max(0, vh - queryH - 6), w: out["query-own"].w, h: out["query-own"].h };
     }
     return out;
   }
@@ -81,8 +90,9 @@ export function createWindowManager(options) {
   function effectiveSize(w) {
     var b = bounds();
     var compact = isCompact();
-    var ew = compact ? Math.max(120, b.vw - 12) : w.w;
-    var eh = compact ? Math.min(w.h, Math.max(80, Math.round(b.vh * 0.46))) : w.h;
+    var ew = w.w;
+    if (compact) ew = w.id === "panel-own" ? Math.max(160, Math.round(b.vw * 0.5)) : Math.max(120, b.vw - 12);
+    var eh = compact ? Math.min(w.h, compactHeight(w.id, b.vh)) : w.h;
     ew = Math.min(ew, b.vw);
     eh = Math.min(eh, Math.max(80, b.vh - 6));
     return { w: ew, h: eh };
@@ -103,7 +113,7 @@ export function createWindowManager(options) {
     var el = w.el;
     el.style.left = Math.round(w.left) + "px";
     el.style.top = Math.round(w.top) + "px";
-    el.style.width = compact ? "calc(100vw - 12px)" : Math.round(w.w) + "px";
+    el.style.width = Math.round(size.w) + "px";
     el.style.height = Math.round(size.h) + "px";
     el.style.zIndex = String(w.z);
     el.classList.toggle("is-compact", compact);
@@ -159,6 +169,7 @@ export function createWindowManager(options) {
   }
 
   function writeSaved() {
+    if (isCompact()) return;
     try {
       var out = {};
       wins.forEach(function (w) {
@@ -292,11 +303,48 @@ export function createWindowManager(options) {
   function onResize() {
     if (!mounted) return;
     var compact = isCompact();
+    var enteredCompact = compact && lastCompact === false;
+    var leftCompact = !compact && lastCompact === true;
+    var anchors = enteredCompact ? defaultLayout() : null;
+    var restored = leftCompact ? defaultLayout() : null;
+    var snapById = {};
+    if (enteredCompact) {
+      desktopSnapshot = wins.map(function (w) {
+        return { id: w.id, left: w.left, top: w.top, collapsed: !!w.collapsed, z: w.z };
+      });
+    }
+    if (leftCompact) {
+      (desktopSnapshot || []).forEach(function (s) { snapById[s.id] = s; });
+    }
+    lastCompact = compact;
     wins.forEach(function (w) {
+      if (enteredCompact && (w.id === "panel-own" || w.id === "query-own")) {
+        w.left = anchors[w.id].left;
+        w.top = anchors[w.id].top;
+      }
+      if (leftCompact) {
+        var s = snapById[w.id];
+        if (s) {
+          w.left = s.left;
+          w.top = s.top;
+          w.collapsed = !!s.collapsed;
+          w.z = s.z;
+        } else {
+          w.left = restored[w.id].left;
+          w.top = restored[w.id].top;
+          w.collapsed = DESKTOP_EXPANDED.indexOf(w.id) < 0;
+        }
+      }
+      if (enteredCompact) w.collapsed = COMPACT_EXPANDED.indexOf(w.id) < 0;
       if (compact && COMPACT_EXPANDED.indexOf(w.id) < 0) w.collapsed = true;
       clampWin(w);
       applyWin(w);
     });
+    if (leftCompact) {
+      desktopSnapshot = null;
+      zTop = 10;
+      wins.forEach(function (w) { zTop = Math.max(zTop, w.z); });
+    }
     renderDock();
   }
 
@@ -311,7 +359,10 @@ export function createWindowManager(options) {
     var saved = readSaved();
     var layout = defaultLayout();
     var compact = isCompact();
+    var useSavedPos = !compact;
     var expanded = expandedIds(compact);
+    lastCompact = compact;
+    desktopSnapshot = null;
 
     wins = [];
     byId = {};
@@ -326,14 +377,13 @@ export function createWindowManager(options) {
         title: def.title,
         el: shell.el,
         bodyEl: shell.bodyEl,
-        left: prev && isFinite(prev.left) ? Number(prev.left) : base.left,
-        top: prev && isFinite(prev.top) ? Number(prev.top) : base.top,
+        left: useSavedPos && prev && isFinite(prev.left) ? Number(prev.left) : base.left,
+        top: useSavedPos && prev && isFinite(prev.top) ? Number(prev.top) : base.top,
         w: base.w,
         h: base.h,
-        collapsed: prev ? !!prev.collapsed : expanded.indexOf(def.id) < 0,
+        collapsed: compact ? COMPACT_EXPANDED.indexOf(def.id) < 0 : (prev ? !!prev.collapsed : expanded.indexOf(def.id) < 0),
         z: prev && isFinite(prev.z) ? Math.max(10, Math.min(29, Number(prev.z))) : (10 + idx)
       };
-      if (compact && COMPACT_EXPANDED.indexOf(def.id) < 0) w.collapsed = true;
       clampWin(w);
       applyWin(w);
       winRoot.appendChild(shell.el);

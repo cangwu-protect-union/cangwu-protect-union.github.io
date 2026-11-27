@@ -449,19 +449,26 @@ html.is-live .battle-result {
 /* ---------- 窄屏 ---------- */
 
 .lw-window.is-compact {
-  width: calc(100vw - 12px) !important;
   max-height: 46vh;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 520px) {
   .lw-window {
-    width: calc(100vw - 12px) !important;
     max-height: 46vh;
+  }
+
+  .lw-title {
+    font-size: 11px;
+  }
+
+  .lw-fold {
+    width: 26px;
+    height: 24px;
   }
 
   .lw-body {
     padding: 6px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .live-dock {
@@ -470,7 +477,7 @@ html.is-live .battle-result {
 
   .lw-dock-chip {
     font-size: 11px;
-    padding: 5px 8px;
+    padding: 3px 8px;
   }
 
   html.is-live .battle-bar {
@@ -588,7 +595,7 @@ html.is-live .battle-result {
   outline-offset: 2px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 520px) {
   .scene-tag {
     font-size: 11px;
   }

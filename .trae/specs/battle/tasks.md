@@ -146,14 +146,17 @@
 
 ## battle-12 手机窄屏与全量回归
 
-- 状态：待做
+- 状态：已验
 - 对应规划：UI-06
-- 允许改的路径：`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-page-ui.js`、`rpg6.0/test.html`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 允许改的路径：`rpg6.0/css/battle-live.css`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-windows.js`、`rpg6.0/js/battle/battle-page-ui.js`、`rpg6.0/test.html`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 路径补充：battle-12 开工时加入 `battle-windows.js`。全宽两窗按原 46vh 会把 844×390 的热区全部盖住，紧凑默认高度与上下锚点只能改窗口管理器；不新增缩放，不改窗口 API。
 - 共享文件：无
 - 做什么：≤900px 默认只展开己方面板与己方查询；窗口全宽、最高 46vh、内部滚动；触摸拖动只认标题栏并吸附边缘；折叠条横向滚动；字号与画布 DPR 收紧；页面隐藏暂停渲染；沿用现有横屏遮罩；场景标签与热区不得被默认展开的窗口完全盖住（必要时下移小人/热区或调整窗口）；补齐全量回归。
 - 不做什么：不做窗口缩放；不改引擎、联机协议、建房与结算。
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`node _local/tests/run-all.mjs --group=回合制`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
 - 验收标准：三条命令全绿；844×390 一屏能完成进入、出招、折叠、刷新恢复；桌面两窗口完整一局；热座与回放不回归。
+- 实施口径：紧凑断点按 `游戏说明-坑.md` 写成 `(max-width: 900px), (orientation: landscape) and (max-height: 520px)`，覆盖 932×430/915×412 手机横屏，同时不丢窄桌面窗。844×390 下 top 面板改 50% 宽（全宽会压掉敌方名字标签），query 仍全宽；面板 77px、查询 141px、中间场景带 102px；其余 5 窗仍 46vh。
+- 验证记录：三条命令全绿：引擎 214、冒烟 29 局、浏览器 16/16、回合制 16/16、`check.ps1` 通过。844×390 实测面板 `6,26..428,103`、查询 `6,205..838,346`、折叠条底 23、敌方热区中心 x 可用 140px、敌方名字标签横向至少露 30px；932×430 仍紧凑两窗。用例改为建房前设 844×390（覆盖首次紧凑挂载），新增 dock 不压标题栏、标签露出与 932 断点断言。adversary 两轮复核：P2-1 桌面快照回退、P2-2 折叠条压标题栏、P2-3 932/915 未进紧凑、P2-4 紧凑写脏桌面记录均已修并复验；P2-N（800×900 回退桌面重叠）由组合断点修复。紧凑下不写窗口位置（折叠状态刷新回默认），桌面 saved 不受污染。
 
 ## 收尾（不单独开卡）
 
