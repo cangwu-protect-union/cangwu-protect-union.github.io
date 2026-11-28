@@ -37,6 +37,9 @@
     noDeath: "不会死亡",
     breakLock: "击溃值锁定",
     undying: "向死而生",
+    strongImmune: "强免疫（只吃真伤）",
+    extraActions: "额外行动",
+    noMpCharge: "无法蓄蓝",
     cannotAct: "无法行动",
     onlyBasic: "只能普攻"
   };

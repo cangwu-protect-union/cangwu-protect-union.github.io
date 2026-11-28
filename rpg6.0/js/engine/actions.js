@@ -376,6 +376,7 @@
       } else if (action.type === "break") {
         result = basicBreak(state, unit, requireTarget(state, unit, action.target), events);
       } else if (action.type === "chargeMp") {
+        if (B.state.hasStatus(unit, "noMpCharge")) throw new Error("无法蓄蓝");
         result = basicChargeMp(state, unit, events);
       } else {
         throw new Error("未知的基础动作：" + action.type);
@@ -419,6 +420,7 @@
     var onlyBasic = B.state.hasStatus(unit, "onlyBasic");
     var noBasic = B.state.hasStatus(unit, "noBasic") ||
       !!(B.state.effectHasFlag && B.state.effectHasFlag(unit, "selfNoBasic"));
+    var noMpCharge = B.state.hasStatus(unit, "noMpCharge");
     var gate = B.skills && B.skills.basicGate
       ? B.skills.basicGate(state, unit, targets[0] || "", [])
       : { allow: true, reason: "" };
@@ -457,12 +459,14 @@
       kind: "basic",
       type: "chargeMp",
       label: "蓄蓝",
-      enabled: hasAction && !onlyBasic && unit.mp < B.state.maxMpOf(unit),
+      enabled: hasAction && !onlyBasic && !noMpCharge && unit.mp < B.state.maxMpOf(unit),
       reason: !hasAction
         ? "本回合行动已用完"
         : (onlyBasic
           ? "现在只能普攻"
-          : (unit.mp < B.state.maxMpOf(unit) ? "" : "蓝已满")),
+          : (noMpCharge
+            ? "无法蓄蓝"
+            : (unit.mp < B.state.maxMpOf(unit) ? "" : "蓝已满"))),
       targets: []
     });
     var unlock = unlockAction(state, unit);

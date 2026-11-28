@@ -43,7 +43,7 @@
     {
       "path": "rpg6.0/js/engine/state.js",
       "class": "C",
-      "cap": 520,
+      "cap": 580,
       "why": "clone/hash 手写枚举单位字段，拆开漏字段时回放比对测不出"
     },
     {

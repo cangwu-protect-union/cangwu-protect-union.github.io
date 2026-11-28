@@ -5,6 +5,6 @@ window.RPG_APP = {
     submissions: "rpg_submissions",
     battles: "rpg_battles"
   },
-  engineVersion: "6.0-engine.14",
+  engineVersion: "6.0-engine.15",
   pageSize: 12
 };

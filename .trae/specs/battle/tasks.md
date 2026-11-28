@@ -244,6 +244,17 @@
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-jiatianhao.json -Browser`
 - 验收标准：plan、引擎单测、冒烟、`check.ps1`、浏览器组全绿；甲天浩可选；0 血窗口内可行动与选目标；复活/判负/死亡计数、再攀高峰真伤、身残志坚与妙手回春数值正确；指纹与回放一致。
 
+## battle-19 朱弘毅：天下第一 / 且看世事多艰 / 急了 / 这个世界... / 反方向的钟
+
+- 状态：已验（2026-11-28）
+- 验证记录：`verify.ps1 -Plan _local/tmp/plan-zhuhongyi.json -Browser` 全绿（引擎 237/0、冒烟 32 局 0 异常 0 僵局、浏览器 17/17、`check.ps1` 通过）；新增 8 条单测覆盖强免疫、5 回合回血/到期恢复、禁普攻禁蓄蓝、82 次额外行动、自伤判胜、快照回溯/clock 不重置/400 不回溯/死亡触发；`state.js` 548 行，额度按规则调到 580 并记入 `改动索引.md` 待拆；全角色浏览器冒烟 32 人、109 次技能行无 pageerror。
+- 允许改的路径：`rpg6.0/data/skills/zhuhongyi.js`（新建）、`rpg6.0/data/skills/index.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/engine/timeline.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/effect-ops-helpers.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/engine/ops/ops-damage.js`、`rpg6.0/js/engine/ops/ops-state.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/engine/battle.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`tools/rpg6-spec.js`、`.dsh/skills/rpg6-character-batch/scripts/plan.mjs`、`tests/engine/`、`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`_local/tmp/plan-zhuhongyi.json`（不提交）
+- 共享文件：`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`（改前看 `git status --short`）
+- 做什么：加入朱弘毅 5 条技能。引擎新增强免疫 `strongImmune`（非真伤伤害、强扣、异常状态、属性降低、击溃全免，治疗与增益可进）、额外行动 `extraActions`、血量代价致死判自己胜 `selfKillWin`、禁蓄蓝 `noMpCharge`、快照回溯 `rewind`（奇数次记录全状态、偶数次回溯；独立 `clock` 13 回合倒计时，第 13 回合 400 强扣且不触发死亡回溯）。天下第一 5 回合；且看世事多艰 3 个目标回合；急了每回合额外 ceil(血上限/现有血) 次（1 血 82 次）；这个世界 50 血换 25n 普伤 + 25n 法伤；反方向的钟按 12 回合窗口。
+- 不做什么：不做 13 回合后的额外保险；不改联机协议与战报结构。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-zhuhongyi.json -Browser`
+- 验收标准：plan、引擎单测、冒烟、`check.ps1`、浏览器组全绿；朱弘毅可选；强免疫/额外行动/自伤判胜/禁蓄蓝/快照回溯与 400 强扣数值正确；指纹与回放一致。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

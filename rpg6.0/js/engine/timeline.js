@@ -19,6 +19,7 @@
 
   function startRound(state, events) {
     state.round += 1;
+    state.clock = (state.clock || 0) + 1;
     pushEvent(events, { type: "roundStart", round: state.round });
 
     if (B.effectOps && B.effectOps.roundStart) {
@@ -94,7 +95,12 @@
           pushEvent(events, { type: "turnSkip", round: state.round, uid: uid });
           continue;
         }
-        unit.actionsLeft = B.traits.actionsPerTurn(unit);
+        var extra = 0;
+        if (B.state.hasStatus(unit, "extraActions")) {
+          extra = Math.ceil(B.state.maxHpOf(unit) / Math.max(1, unit.hp));
+          if (!isFinite(extra) || extra < 1) extra = 1;
+        }
+        unit.actionsLeft = B.traits.actionsPerTurn(unit) + extra;
         unit.flags.chargedThisTurn = false;
         unit.stats.turns += 1;
         if (unit.trait && unit.trait.mpPerTurn) {

@@ -296,7 +296,7 @@
       unit.mp = Math.max(0, unit.mp - inputValue);
       events.push({ type: "mp", round: state.round, uid: unit.uid, delta: -inputValue, mp: unit.mp, reason: "costInput" });
     }
-    if (skill.cost && skill.cost.hp) {
+    if (skill.cost && skill.cost.hp && !skill.selfKillWin) {
       B.damage.directLoss(state, {
         sourceUid: unit.uid,
         targetUid: unit.uid,
@@ -374,6 +374,17 @@
 
     var choice = pickChoice(skill, action);
     B.effectOps.runOps(state, ctx, prepareOps(choice.ops, unit), events);
+    if (skill.cost && skill.cost.hp && skill.selfKillWin && state.phase !== "finished") {
+      state.selfKillWinner = unit.uid;
+      B.damage.directLoss(state, {
+        sourceUid: unit.uid,
+        targetUid: unit.uid,
+        amount: skill.cost.hp,
+        skillId: skill.id,
+        label: "代价"
+      }, events);
+      state.selfKillWinner = "";
+    }
     var done = { kind: "skill", skillId: skill.id, target: targetUid };
     if (choice.key) done.choice = choice.key;
     if (skill.input) done[skill.input.key || "n"] = inputValue;

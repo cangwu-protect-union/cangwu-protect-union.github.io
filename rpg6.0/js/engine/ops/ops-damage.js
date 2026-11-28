@@ -127,6 +127,7 @@
 
         target = H.sideUnit(state, ctx, op.who || "target");
         if (!target) return;
+        if (B.state.strongImmune && B.state.strongImmune(target)) return;
         var rounds = B.rules.breakRounds(target.breakValue);
         if (rounds <= 0) return;
         var breakStatus = B.state.enterBreak(target, rounds, H.sourceTag(ctx), "击溃");
@@ -147,6 +148,7 @@
 
         target = H.sideUnit(state, ctx, op.who || "target");
         if (!target) return;
+        if (B.state.strongImmune && B.state.strongImmune(target)) return;
         var key = op.op === "breakValue" ? "breakValue" : "stunValue";
         var cap = B.rules.CONFIG[key === "breakValue" ? "breakValueMax" : "stunValueMax"];
         target[key] = B.rules.clamp(target[key] + H.evalValue(state, ctx, op.delta), 0, cap);
@@ -160,6 +162,7 @@
 
         target = H.sideUnit(state, ctx, op.who || "target");
         if (!target) return;
+        if (B.state.strongImmune && B.state.strongImmune(target)) return;
         var key = op.op === "breakValue" ? "breakValue" : "stunValue";
         var cap = B.rules.CONFIG[key === "breakValue" ? "breakValueMax" : "stunValueMax"];
         target[key] = B.rules.clamp(target[key] + H.evalValue(state, ctx, op.delta), 0, cap);

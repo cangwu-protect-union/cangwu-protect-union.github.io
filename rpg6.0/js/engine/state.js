@@ -273,6 +273,11 @@
     return !!unit && (unit.hp > 0 || !!unit.undying);
   }
 
+  /* 强免疫（朱弘毅天下第一）：非真伤伤害、强扣、异常、属性降低、击溃全部免疫 */
+  function strongImmune(unit) {
+    return !!unit && hasStatus(unit, "strongImmune");
+  }
+
   function addMod(unit, mod) {
     var entry = {
       stat: mod.stat,
@@ -363,7 +368,7 @@
 
   /* 进入击溃：击溃值固定为 0，击溃状态期间也不会再增加 */
   function enterBreak(unit, remain, source, label) {
-    if (unit.breakImmune || effectHasFlag(unit, "breakImmune")) {
+    if (unit.breakImmune || effectHasFlag(unit, "breakImmune") || strongImmune(unit)) {
       return { kind: "break", remain: 0, unit: "standard", source: source || "", skillId: "", label: (label || "击溃") + "（免疫）" };
     }
     unit.breakValue = 0;
@@ -405,6 +410,7 @@
       seed: rawSeed,
       rng: B.rng.init(rawSeed),
       round: 0,
+      clock: 0,
       phase: "fight",
       result: "",
       order: [],
@@ -436,6 +442,71 @@
     state.queue = [];
   }
 
+  /* 反方向的钟：记录全状态快照（不含 clock 与回溯元数据） */
+  function snapshotRewind(state, uid) {
+    var snap = JSON.parse(JSON.stringify(state));
+    delete snap.clock;
+    delete snap.pendingRewind;
+    delete snap.selfKillWinner;
+    for (var i = 0; i < snap.units.length; i++) {
+      delete snap.units[i].rewind;
+      delete snap.units[i].pendingRewind;
+    }
+    for (var s = 0; s < (snap.summons || []).length; s++) {
+      delete snap.summons[s].rewind;
+    }
+    return snap;
+  }
+
+  function applyRewind(state, uid) {
+    var current = unitOf(state, uid);
+    var meta = current && current.rewind;
+    if (!meta || !meta.snapshot) return false;
+    var snap = meta.snapshot;
+    var clock = state.clock || 0;
+    var count = meta.count;
+    var penaltyAtClock = meta.penaltyAtClock || 0;
+    var keys = ["units", "summons", "round", "phase", "result", "order", "firstRound", "queue", "turnUid", "log", "summonSeq", "effectSeq", "actionSeq", "rng"];
+    for (var i = 0; i < keys.length; i++) state[keys[i]] = snap[keys[i]];
+    state.clock = clock;
+    state.pendingRewind = null;
+    state.selfKillWinner = "";
+    var restored = unitOf(state, uid);
+    if (restored) {
+      restored.rewind = {
+        count: count,
+        pending: false,
+        snapshot: null,
+        penaltyAtClock: penaltyAtClock
+      };
+    }
+    return true;
+  }
+
+  /* 第 13 个标准回合结束的 400 强扣：先让快照失效，死亡不再回溯 */
+  function checkRewindPenalty(state, events) {
+    for (var i = 0; i < state.units.length; i++) {
+      var unit = state.units[i];
+      if (!unit.rewind || !unit.rewind.penaltyAtClock) continue;
+      if ((state.clock || 0) < unit.rewind.penaltyAtClock) continue;
+      var until = unit.rewind.penaltyAtClock;
+      unit.rewind = null;
+      if (B.damage && B.damage.directLoss) {
+        B.damage.directLoss(state, {
+          sourceUid: unit.uid,
+          targetUid: unit.uid,
+          amount: 400,
+          skillId: "zhuhongyi.fangxiang",
+          label: "反方向的钟"
+        }, events);
+      }
+      if (events) {
+        events.push({ type: "rewindPenalty", round: state.round, uid: unit.uid, untilClock: until, amount: 400 });
+      }
+      if (state.phase === "finished") return;
+    }
+  }
+
   function fnv1a(text) {
     var h = 0x811c9dc5;
     for (var i = 0; i < text.length; i++) {
@@ -446,7 +517,7 @@
   }
 
   function hash(state) {
-    var parts = [state.round, state.phase, state.rng, state.turnUid, state.queue.join(",")];
+    var parts = [state.round, state.clock || 0, state.phase, state.rng, state.turnUid, state.queue.join(",")];
     for (var i = 0; i < state.units.length; i++) {
       var u = state.units[i];
       var buffs = [];
@@ -471,7 +542,8 @@
         u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0,
         u.shield ? u.shield.hp + ":" + u.shield.remain : "-",
         u.reflectFixed ? u.reflectFixed.charges + ":" + u.reflectFixed.value + ":" + u.reflectFixed.type : "-",
-        u.undying ? "u" + u.undying.untilRound : "-"
+        u.undying ? "u" + u.undying.untilRound : "-",
+        u.rewind ? "r" + u.rewind.count + ":" + (u.rewind.pending ? 1 : 0) + ":" + (u.rewind.penaltyAtClock || 0) : "-"
       ].join("|"));
     }
     var summonParts = [];
@@ -519,6 +591,10 @@
   api.spdOf = spdOf;
   api.hasStatus = hasStatus;
   api.isAlive = isAlive;
+  api.strongImmune = strongImmune;
+  api.snapshotRewind = snapshotRewind;
+  api.applyRewind = applyRewind;
+  api.checkRewindPenalty = checkRewindPenalty;
   api.guardEffectOf = guardEffectOf;
   api.effectHasFlag = effectHasFlag;
   api.hasEffectKey = hasEffectKey;

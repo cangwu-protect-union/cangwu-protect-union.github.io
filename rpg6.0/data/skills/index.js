@@ -33,6 +33,7 @@ import zhaoyunzhe from "./zhaoyunzhe.js";
 import zhengwanwan from "./zhengwanwan.js";
 import zhengyingli from "./zhengyingli.js";
 import zhuangwenxi from "./zhuangwenxi.js";
+import zhuhongyi from "./zhuhongyi.js";
 /* RPG6-SCAFFOLD:imports */
 
 const lib = {
@@ -193,6 +194,7 @@ const lib = {
     "韩东晓": handongxiao,
     "泥浩恺": nihaokai,
     "甲天浩": jiatianhao,
+    "朱弘毅": zhuhongyi,
     /* RPG6-SCAFFOLD:characters */
   }
 };

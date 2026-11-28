@@ -175,10 +175,24 @@
       var tctx = H.ctxFor(ctx, target);
       var before = B.state.statOf(target, op.stat);
       var spec = H.durationOf(op.duration);
+      var value = op.value == null ? 0 : H.evalValue(state, tctx, op.value);
+      if (B.state.strongImmune && B.state.strongImmune(target) && tctx.sourceUid !== target.uid) {
+        var nextValue = op.mode === "set" ? value : (op.mode === "mul" ? before * value : before + value);
+        if (nextValue < before) {
+          H.pushEvent(state, events, {
+            type: "strongImmune",
+            uid: target.uid,
+            sourceUid: tctx.sourceUid,
+            stat: op.stat,
+            label: tctx.label || ""
+          });
+          continue;
+        }
+      }
       var mod = B.state.addMod(target, {
         stat: op.stat,
         mode: op.mode || "add",
-        value: op.value == null ? 0 : H.evalValue(state, tctx, op.value),
+        value: value,
         remain: spec ? spec.count : B.state.PERMANENT,
         unit: spec ? spec.unit : "standard",
         source: H.sourceTag(tctx),
@@ -223,6 +237,18 @@
     for (var ti = 0; ti < targets.length; ti++) {
       var target = targets[ti];
       var tctx = H.ctxFor(ctx, target);
+      var immuneBuff = B.state.strongImmune && B.state.strongImmune(target) &&
+        tctx.sourceUid !== target.uid && (H.DEBUFF_KINDS[op.kind] || op.kind === "magicVuln");
+      if (immuneBuff) {
+        H.pushEvent(state, events, {
+          type: "strongImmune",
+          uid: target.uid,
+          sourceUid: tctx.sourceUid,
+          kind: op.kind,
+          label: tctx.label || ""
+        });
+        continue;
+      }
       var immune = B.skills && B.skills.immuneBuffs ? B.skills.immuneBuffs(target) : [];
       if (op.kind && immune.indexOf(op.kind) >= 0) {
         H.pushEvent(state, events, {
@@ -280,6 +306,16 @@
     for (var ti = 0; ti < targets.length; ti++) {
       var target = targets[ti];
       var tctx = H.ctxFor(ctx, target);
+      if (B.state.strongImmune && B.state.strongImmune(target) && tctx.sourceUid !== target.uid) {
+        H.pushEvent(state, events, {
+          type: "strongImmune",
+          uid: target.uid,
+          sourceUid: tctx.sourceUid,
+          kind: op.kind,
+          label: tctx.label || ""
+        });
+        continue;
+      }
       if (H.STATUS_DEBUFF[op.kind] && target.reflect) {
         target = H.sideUnit(state, tctx, "self");
         if (!target) continue;
@@ -303,7 +339,7 @@
         ? B.state.enterBreak(target, spec ? spec.count : 0, H.sourceTag(tctx), label)
         : B.state.addStatus(target, {
           kind: op.kind,
-          remain: spec ? spec.count : 0,
+          remain: op.permanent ? B.state.PERMANENT : (spec ? spec.count : 0),
           unit: spec ? spec.unit : "standard",
           source: H.sourceTag(tctx),
           skillId: op.skillId || "",
@@ -328,6 +364,16 @@
     for (var ti = 0; ti < targets.length; ti++) {
       var target = targets[ti];
       var tctx = H.ctxFor(ctx, target);
+      if (op.debuff && B.state.strongImmune && B.state.strongImmune(target) && tctx.sourceUid !== target.uid) {
+        H.pushEvent(state, events, {
+          type: "strongImmune",
+          uid: target.uid,
+          sourceUid: tctx.sourceUid,
+          kind: "tick",
+          label: tctx.label || ""
+        });
+        continue;
+      }
       var spec = H.durationOf(op.duration);
       if (spec && op.duration && op.duration.count && typeof op.duration.count === "object") {
         spec.count = Math.max(0, Math.floor(H.evalValue(state, tctx, op.duration.count)));

@@ -106,6 +106,7 @@
 
   function addBreakValue(state, unit, events) {
     if (B.state.hasStatus(unit, "breakLock")) return false;
+    if (B.state.strongImmune && B.state.strongImmune(unit)) return false;
     if (B.state.hasStatus(unit, "break")) {
       unit.breakValue = 0;
       return false;
@@ -118,6 +119,7 @@
   }
 
   function addStunValue(state, unit, events) {
+    if (B.state.strongImmune && B.state.strongImmune(unit)) return false;
     var max = B.rules.CONFIG.stunValueMax;
     if (unit.stunValue >= max) return false;
     unit.stunValue += 1;
@@ -192,9 +194,19 @@
   function resolveDeath(state, unit, events) {
     if (unit.hp > 0) return false;
     if (unit.undying) return false;
+    if (state.selfKillWinner && state.selfKillWinner === unit.uid) {
+      B.state.finish(state, unit.uid);
+      pushEvent(events, { type: "death", round: state.round, uid: unit.uid });
+      if (B.summons && B.summons.clearSide) B.summons.clearSide(state, unit.side, "ownerDeath", events);
+      return true;
+    }
     if (B.state.hasStatus(unit, "noDeath")) {
       unit.hp = 1;
       pushEvent(events, { type: "noDeath", round: state.round, uid: unit.uid });
+      return false;
+    }
+    if (unit.rewind && unit.rewind.pending && unit.rewind.snapshot) {
+      state.pendingRewind = { uid: unit.uid, mode: "death" };
       return false;
     }
     if (unit.undyingEnabled && !unit.undyingLethal) {
@@ -245,6 +257,18 @@
     }
     var type = spec.type || "phys";
     var amount = Number(spec.amount) || 0;
+    if (B.state.strongImmune && B.state.strongImmune(target) && type !== "true") {
+      pushEvent(events, {
+        type: "strongImmune",
+        round: state.round,
+        uid: target.uid,
+        sourceUid: spec.sourceUid || "",
+        damageType: type,
+        skillId: spec.skillId || "",
+        label: spec.label || ""
+      });
+      return 0;
+    }
     var targetStats = { def: B.state.defOf(target), mres: B.state.mresOf(target) };
     var raw = B.rules.rawByType(type, amount, targetStats);
     var mul = source ? B.rules.multiplier(source, target, type) : 1;
@@ -460,6 +484,17 @@
 
   function directLoss(state, spec, events) {
     var target = B.state.unitOf(state, spec.targetUid);
+    if (B.state.strongImmune && B.state.strongImmune(target)) {
+      pushEvent(events, {
+        type: "strongImmune",
+        round: state.round,
+        uid: target.uid,
+        sourceUid: spec.sourceUid || "",
+        skillId: spec.skillId || "",
+        label: spec.label || ""
+      });
+      return 0;
+    }
     var amount = B.rules.round5(Number(spec.amount) || 0);
     if (amount <= 0) return 0;
     var beforeHp = target.hp;

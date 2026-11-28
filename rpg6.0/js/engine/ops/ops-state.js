@@ -32,6 +32,10 @@
           var value = op.percent != null
             ? H.statValue(state, ct, stat) * (Number(op.percent) || 0) / 100
             : H.evalValue(state, cctx, op.delta);
+          if (B.state.strongImmune && B.state.strongImmune(ct) && cctx.sourceUid !== ct.uid && value < 0) {
+            H.pushEvent(state, events, { type: "strongImmune", uid: ct.uid, sourceUid: cctx.sourceUid, stat: stat, label: cctx.label || "" });
+            continue;
+          }
           var added = B.state.addMod(ct, {
             stat: stat,
             mode: "add",
@@ -71,6 +75,10 @@
           var value = op.percent != null
             ? H.statValue(state, ct, stat) * (Number(op.percent) || 0) / 100
             : H.evalValue(state, cctx, op.delta);
+          if (B.state.strongImmune && B.state.strongImmune(ct) && cctx.sourceUid !== ct.uid && value < 0) {
+            H.pushEvent(state, events, { type: "strongImmune", uid: ct.uid, sourceUid: cctx.sourceUid, stat: stat, label: cctx.label || "" });
+            continue;
+          }
           var added = B.state.addMod(ct, {
             stat: stat,
             mode: "add",

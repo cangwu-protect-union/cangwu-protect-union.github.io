@@ -27,20 +27,33 @@
     if (next.phase === "finished") throw new Error("对局已结束");
     if (!next.turnUid) B.timeline.beginTurn(next, events);
     var committed = B.actions.execute(next, action, events);
+    var rewound = false;
+    if (next.pendingRewind) {
+      var pending = next.pendingRewind;
+      next.pendingRewind = null;
+      rewound = B.state.applyRewind(next, pending.uid);
+      if (rewound) {
+        if (pending.mode === "death") {
+          var restored = B.state.unitOf(next, pending.uid);
+          if (restored && restored.rewind) restored.rewind.count += 1;
+        }
+        events = [{ type: "rewind", round: next.round, uid: pending.uid, mode: pending.mode, label: "反方向的钟" }];
+      }
+    }
     var unit = next.turnUid ? B.state.unitOf(next, next.turnUid) : null;
     /* 解锁属性/额外动作（吃苹果、功德回血）不消耗行动；noAction 技能同样不消耗 */
     var noAction = false;
-    if (unit && action.kind === "skill" && B.skills && B.skills.find) {
+    if (!rewound && unit && action.kind === "skill" && B.skills && B.skills.find) {
       var usedSkill = B.skills.find(action.skillId);
       noAction = !!(usedSkill && usedSkill.noAction);
     }
-    if (unit && action.kind !== "unlock" && action.kind !== "item" && !noAction) unit.actionsLeft -= 1;
-    if (next.phase !== "finished" && unit && unit.actionsLeft <= 0) {
+    if (!rewound && unit && action.kind !== "unlock" && action.kind !== "item" && !noAction) unit.actionsLeft -= 1;
+    if (!rewound && next.phase !== "finished" && unit && unit.actionsLeft <= 0) {
       B.timeline.endTurn(next, events);
       B.timeline.beginTurn(next, events);
     }
     appendLog(next, events);
-    return { state: next, events: events, committed: committed };
+    return { state: next, events: events, committed: committed, rewound: rewound };
   }
 
   function available(state) {

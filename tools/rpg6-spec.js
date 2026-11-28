@@ -19,7 +19,7 @@ const WHOS = ["target", "self", "allEnemies", "allAllies", "enemyHero"];
 const BUFF_KINDS = ["strong", "fragile", "brave", "panic", "magicVuln"];
 
 /* 界面有名字的状态；其余 kind 也能跑，只是显示原始 kind，lint 只提醒不拦 */
-const STATUS_KINDS_KNOWN = ["break", "stun", "daze", "noSkill", "noBasic", "noCharge", "cannotAct", "onlyBasic", "noBreakOut", "noDeath", "breakLock", "undying", "wlk", "ducai", "chedi", "xipi", "zhiyin"];
+const STATUS_KINDS_KNOWN = ["break", "stun", "daze", "noSkill", "noBasic", "noCharge", "noMpCharge", "cannotAct", "onlyBasic", "noBreakOut", "noDeath", "breakLock", "undying", "strongImmune", "extraActions", "wlk", "ducai", "chedi", "xipi", "zhiyin"];
 
 /* skills.runHooks 的钩子名，写错的钩子永远不会被调用 */
 const HOOKS = [
@@ -32,7 +32,7 @@ const SKILL_FIELDS = [
   "id", "owner", "name", "conditionText", "target", "ops", "choices", "chargeOps", "hooks",
   "cost", "charge", "cooldown", "once", "costFromLost", "requires", "input", "passive",
   "unsupported", "rollDodge", "buffImmune", "baseUnsupported", "items", "forbidEffect",
-  "noAction", "undying"
+  "noAction", "undying", "selfKillWin"
 ];
 
 /* 数值表达式认的键，与 effect-ops.evalValue 的分支一一对应 */
@@ -92,8 +92,8 @@ const OPS = {
     enums: { kind: BUFF_KINDS }
   },
   status: {
-    desc: "状态，按标准回合计时",
-    fields: { kind: "必填", duration: "数字或 {unit,count}", rounds: "同 duration", skillId: "只封锁该技能时填", chargeOk: "noSkill 下仍可蓄力（只禁释放）" },
+    desc: "状态，按标准回合计时；permanent 表示整局",
+    fields: { kind: "必填", duration: "数字或 {unit,count}", rounds: "同 duration", permanent: "整局", skillId: "只封锁该技能时填", chargeOk: "noSkill 下仍可蓄力（只禁释放）" },
     required: ["kind"]
   },
   breakValue: {
@@ -187,6 +187,10 @@ const OPS = {
     desc: "计数器增减，供 `{counter}` 读取",
     fields: { key: "必填", delta: "默认 +1", perTarget: "默认 true" },
     required: ["key"]
+  },
+  rewind: {
+    desc: "反方向的钟：奇数次记录全状态快照，偶数次回到快照；独立 clock 计时，回溯不重置",
+    fields: {}
   },
   use: {
     desc: "内联执行另一个技能的 ops",

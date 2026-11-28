@@ -107,6 +107,47 @@
       
   });
 
+  api.registerOp("rewind", function (state, ctx, op, events) {
+    var unit = H.sideUnit(state, ctx, "self");
+    if (!unit) return;
+    var meta = unit.rewind || { count: 0, pending: false, snapshot: null, penaltyAtClock: 0 };
+    meta.count = (meta.count || 0) + 1;
+    var clock = state.clock || 0;
+    if (meta.count % 2 === 1) {
+      meta.snapshot = B.state.snapshotRewind(state, unit.uid);
+      meta.pending = true;
+      meta.penaltyAtClock = clock + 13;
+      unit.rewind = meta;
+      H.pushEvent(state, events, {
+        type: "rewindRecord",
+        uid: unit.uid,
+        count: meta.count,
+        untilClock: meta.penaltyAtClock,
+        skillId: ctx.skillId || ""
+      });
+      return;
+    }
+    if (meta.pending && meta.snapshot && clock < meta.penaltyAtClock) {
+      meta.pending = false;
+      unit.rewind = meta;
+      state.pendingRewind = { uid: unit.uid, mode: "active" };
+      H.pushEvent(state, events, {
+        type: "rewindArmed",
+        uid: unit.uid,
+        count: meta.count,
+        skillId: ctx.skillId || ""
+      });
+      return;
+    }
+    unit.rewind = meta;
+    H.pushEvent(state, events, {
+      type: "rewindTimeout",
+      uid: unit.uid,
+      count: meta.count,
+      skillId: ctx.skillId || ""
+    });
+  });
+
   api.registerOp("use", function (state, ctx, op, events) {
 
         var ref = B.skills && B.skills.find ? B.skills.find(op.skillId) : null;

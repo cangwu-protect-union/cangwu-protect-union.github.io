@@ -419,6 +419,9 @@
     if (state.phase !== "finished" && B.damage && B.damage.checkUndying) {
       B.damage.checkUndying(state, events);
     }
+    if (state.phase !== "finished" && B.state.checkRewindPenalty) {
+      B.state.checkRewindPenalty(state, events);
+    }
   }
 
   /* op 全表：直接从注册表推导（排序后稳定），不手写清单；

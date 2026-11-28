@@ -134,6 +134,31 @@
       case "undyingRevive":
         line = { text: round + who + " 复活（血 " + e.hp + "/" + e.maxHp + "，血上限 −100）", cls: "is-heal" };
         break;
+      case "strongImmune":
+        line = {
+          text: round + who + " 免疫了" + (e.damageType ? " " + P.typeName(e.damageType) : "该效果") +
+            (e.stat ? "（" + (P.STAT_LABEL[e.stat] || e.stat) + "）" : ""),
+          cls: "is-cancel"
+        };
+        break;
+      case "rewindRecord":
+        line = {
+          text: round + who + " 记录快照（第 " + e.count + " 次，第 " + e.untilClock + " 回合结束受 400）",
+          cls: "is-status"
+        };
+        break;
+      case "rewindArmed":
+        line = { text: round + who + " 准备回到快照", cls: "is-status" };
+        break;
+      case "rewind":
+        line = { text: round + who + " 回到快照（" + (e.mode === "death" ? "死亡触发" : "主动") + "）", cls: "is-status" };
+        break;
+      case "rewindTimeout":
+        line = { text: round + who + " 的快照已过期，无法回溯", cls: "is-mute" };
+        break;
+      case "rewindPenalty":
+        line = { text: round + who + " 受 400 强扣（反方向的钟）", cls: "is-damage" };
+        break;
       case "heal":
         if (e.amount > 0) line = { text: round + (e.label || "回复") + " · " + who + " +" + e.amount, cls: "is-heal" };
         break;
