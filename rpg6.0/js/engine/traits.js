@@ -20,7 +20,7 @@
     "执旗手": { taunt: -1, openMp: 2 },
     "破阵师": { taunt: -1, openMp: 2 },
     "召唤师": { taunt: -1, openMp: 2 },
-    "爆破手": { taunt: 1, basicCharge: 1, basicGroup: true },
+    "爆破手": { taunt: 1, basicCharge: 1 },
     "射手": { taunt: -2, ignoreTaunt: true },
     "嘲讽手": { taunt: 2, openMp: -2, mpPerTurn: 1 }
   };
@@ -37,7 +37,6 @@
       chargeUnbreakable: false,
       canHitAlly: false,
       basicCharge: 0,
-      basicGroup: false,
       ignoreTaunt: false,
       lowHpBoost: false,
       openMp: 0,
