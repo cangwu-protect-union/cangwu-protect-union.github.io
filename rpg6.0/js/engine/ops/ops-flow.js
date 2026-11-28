@@ -62,6 +62,26 @@
 
         target = H.sideUnit(state, ctx, op.who || "self");
         if (!target) return;
+        if (op.charges) {
+          target.reflectFixed = {
+            charges: Math.max(1, Number(op.charges) || 1),
+            value: Number(op.value) || 0,
+            type: op.type || "magic",
+            noBreak: op.noBreak !== false,
+            label: op.label || ctx.label || "固定反弹",
+            skillId: ctx.skillId || ""
+          };
+          H.pushEvent(state, events, {
+            type: "reflectFixedOn",
+            uid: target.uid,
+            charges: target.reflectFixed.charges,
+            value: target.reflectFixed.value,
+            damageType: target.reflectFixed.type,
+            label: target.reflectFixed.label,
+            skillId: ctx.skillId || ""
+          });
+          return;
+        }
         target.reflect = {
           factor: Number(op.factor) || 2,
           stunRounds: Number(op.stunRounds) || 0,

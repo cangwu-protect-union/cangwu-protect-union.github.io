@@ -28,8 +28,13 @@
     if (!next.turnUid) B.timeline.beginTurn(next, events);
     var committed = B.actions.execute(next, action, events);
     var unit = next.turnUid ? B.state.unitOf(next, next.turnUid) : null;
-    /* 解锁属性/额外动作（吃苹果、功德回血）不消耗行动 */
-    if (unit && action.kind !== "unlock" && action.kind !== "item") unit.actionsLeft -= 1;
+    /* 解锁属性/额外动作（吃苹果、功德回血）不消耗行动；noAction 技能同样不消耗 */
+    var noAction = false;
+    if (unit && action.kind === "skill" && B.skills && B.skills.find) {
+      var usedSkill = B.skills.find(action.skillId);
+      noAction = !!(usedSkill && usedSkill.noAction);
+    }
+    if (unit && action.kind !== "unlock" && action.kind !== "item" && !noAction) unit.actionsLeft -= 1;
     if (next.phase !== "finished" && unit && unit.actionsLeft <= 0) {
       B.timeline.endTurn(next, events);
       B.timeline.beginTurn(next, events);

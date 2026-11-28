@@ -306,6 +306,10 @@
       chips += '<span class="chip is-shield">护盾 ' + Math.max(0, unit.shield.hp) +
         "（剩 " + unit.shield.remain + " 回合）</span>";
     }
+    if (unit.reflectFixed && unit.reflectFixed.charges > 0) {
+      chips += '<span class="chip is-effect">' + P.esc(unit.reflectFixed.label || "固定反弹") +
+        " " + unit.reflectFixed.charges + " 次</span>";
+    }
     unit.statuses.forEach(function (status) {
       chips += '<span class="chip is-status">' + P.esc(status.label || P.STATUS_TEXT[status.kind] || status.kind) + " " + status.remain + "</span>";
     });

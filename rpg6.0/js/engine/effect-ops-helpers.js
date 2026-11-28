@@ -100,6 +100,7 @@
     }
     if (expr.stat) return H.targetStatValue(state, ctx, expr);
     if (expr.mult) return H.evalValue(state, ctx, expr.mult) * (expr.factor == null ? 1 : expr.factor);
+    if (expr.pow) return Math.pow(H.evalValue(state, ctx, expr.pow[0]), H.evalValue(state, ctx, expr.pow[1]));
     if (expr.per) return H.evalValue(state, ctx, expr.per) * (expr.factor == null ? 1 : expr.factor);
     if (expr.hpPercent) {
       var path = String(expr.hpPercent).split(".");
@@ -497,9 +498,20 @@
   H.runSchedule = function (state, ctx, op, events) {
     var target = H.sideUnit(state, ctx, op.on || "self");
     if (!target) return;
+    var capture = null;
+    if (op.capture && typeof op.capture === "object") {
+      capture = {};
+      for (var key in op.capture) {
+        if (Object.prototype.hasOwnProperty.call(op.capture, key)) {
+          capture[key] = H.evalValue(state, ctx, op.capture[key]);
+        }
+      }
+    }
     var effect = {
       id: "sc" + ((state.effectSeq = (state.effectSeq || 0) + 1)),
       atRound: state.round + (Number(op.after) || 0),
+      atPhase: op.atPhase || "",
+      capture: capture,
       ops: op.ops || [],
       sourceUid: ctx.sourceUid,
       targetUid: ctx.targetUid,
@@ -512,6 +524,7 @@
       uid: target.uid,
       scheduleId: effect.id,
       atRound: effect.atRound,
+      atPhase: effect.atPhase,
       label: effect.label,
       skillId: ctx.skillId || ""
     });

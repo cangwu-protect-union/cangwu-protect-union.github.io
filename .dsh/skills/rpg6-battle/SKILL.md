@@ -36,7 +36,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->29 人 104 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.12<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->30 人 108 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.13<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -63,6 +63,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 时长单位 `enemyRound`：按持有者对手英雄的回合计时（学富五车），被跳过的回合也算；selfRound 需要 `sourceUid`（已存）。
 - 技能字段 `items` + 动作 `kind:"item"`：额外动作（吃碎苹果/功德回血），不消耗行动、不吃掷骰跳过；`requires` 卡库存、`oncePerRound` 每回合限 1 次、`noEffect` 效果在身时不列入口；眩晕/击溃不可用，onlyBasic/noSkill 不拦（Q14）；入口 conditions.itemsOf/itemAvailable 与 actions.list/execute。
 - 技能字段 `forbidEffect:"key"`：自身有该 key 的持续效果时置灰。
+- 技能字段 `noAction`：释放不消耗行动、同一回合可连放（泥浩恺核蔼可氢）。`reflect` 带 `charges`/`value` 时是固定值+次数反弹（扣分!）；`schedule` 支持 `atPhase:"roundStart"`（下一标准回合开始、速度条之前）与 `capture`（调度时把数值快照进这次延迟结算，ops 用 `{ctx:键}` 读）；数值表达式新增 `{pow:[底,指数]}`。
 - 费用 `cost.maxMp`：判蓝上限 ≥ 值，释放后永久扣蓝上限、当前蓝钳到新上限（机枪射手）。
 - 负面数据标记 `debuff:true`（`stat`/`maxHp`/`maxMp`/`tick`）：`dispel scope:"marked"` 清除；不加标记的不清。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
@@ -112,6 +113,9 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 标准回合开始钩子 | `roundStart`，在速度条结算之前跑（宋知远血 ≤600 回 25） |
 | 防护层 `guard` | 挂在 `tick` 上：`{remaining,onBreak,ops}`，每次伤害取消一次（同一动作多段只算一次，靠 `actionId` 去重）；`onBreak` 让击溃也触发；用完移除并执行 `ops`（目标取敌方英雄）；配 `immune.buffs/statuses`、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic`；进 hash |
 | 护盾 | `shield` op → `unit.shield`：独立血量池，`damage.hit` 全额吸收、不扣血，破盾多余伤害消失；强扣穿透；标准回合末计时，到期执行 `onExpire`（坚若磐石 +5 防），提前破盾不加防；进 hash |
+| 固定反弹 `reflectFixed` | `reflect` 带 `charges`/`value` 时：取消该次伤害，对攻击者造成固定法伤；反弹不加击溃值；进 hash；界面显示剩余次数；重复释放重置次数（扣分!） |
+| 不耗行动技能 `noAction` | 释放不扣 `actionsLeft`，同一回合可连放；仍然要求轮到该单位且有行动、费用足够（核蔼可氢） |
+| 回合开始调度 | `schedule.atPhase:"roundStart"` 在下一标准回合开始、速度条之前结算；`capture` 在调度时求值，ops 用 `{ctx:键}` 读取；`{pow}` 指数表达式（复燃 70/140/280…） |
 | 动态普攻面板 | 技能库 `panels:{角色:{atk}}` 覆盖面板，`basicAtk:{角色:表达式}` 算实际攻击值，优先级高于面板与 Buff 修正（孙嘉怿：面板 0、普攻按目标当前血 20%）；界面攻击栏显示 `−` 加注记 |
 | 解锁动作 | `kind:"unlock"`：`actions.list` 在单位身上有 `lockAtk/lockDef/lockMres`（0=未解锁）时列出，支付 1 蓝解锁一个，不消耗行动、可重复、全部解锁后隐藏；解锁后 3 标准回合用 `schedule` 写回原值（原值开局存 counter） |
 | 防御代价 | `cost.def`：`conditions` 判防御是否足够（不足置灰），`releaseSkill` 扣永久防御，可到 0 |

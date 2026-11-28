@@ -13,6 +13,7 @@ import liuwenzhe from "./liuwenzhe.js";
 import liuyixuan from "./liuyixuan.js";
 import liyuxuan from "./liyuxuan.js";
 import lvchangling from "./lvchangling.js";
+import nihaokai from "./nihaokai.js";
 import nimanyun from "./nimanyun.js";
 import songzhiyuan from "./songzhiyuan.js";
 import sunjiaqi from "./sunjiaqi.js";
@@ -77,6 +78,11 @@ const lib = {
       { key: "apple", name: "碎苹果", max: 36, init: 0 }
     ],
     "吕场龄": [{ key: "gongde", name: "功德", max: 99, init: 0 }],
+    "泥浩恺": [
+      { key: "heCount", name: "核蔼可氢次数", max: 6, init: 0 },
+      { key: "zyRound", name: "职业道德回合", max: 4, init: 0 },
+      { key: "abyssRestored", name: "凝视已复原", max: 1, init: 0 }
+    ],
     /* RPG6-SCAFFOLD:marks */
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
@@ -183,6 +189,7 @@ const lib = {
     "吕场龄": lvchangling,
     "王春雨": wangchunyu,
     "韩东晓": handongxiao,
+    "泥浩恺": nihaokai,
     /* RPG6-SCAFFOLD:characters */
   }
 };

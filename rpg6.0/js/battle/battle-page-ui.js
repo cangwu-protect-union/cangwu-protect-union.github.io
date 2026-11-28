@@ -93,6 +93,7 @@
       else if (e.type === "summonDeath") parts.push("「" + e.name + "」被击毁");
       else if (e.type === "summonBlocked") parts.push("召唤上限，未能召唤");
       else if (e.type === "reflect") parts.push("反弹 " + e.amount);
+      else if (e.type === "reflectFixed") parts.push("反弹 " + e.value);
       else if (e.type === "interrupt" && e.removed.length) parts.push("打断 " + e.removed.length + " 个持续效果");
       else if (e.type === "dispel" && e.removed.length) parts.push("清除 " + e.removed.length + " 个负面效果");
       else if (e.type === "turnSkip") parts.push(B.state.unitOf(P.state, e.uid).name + " 无法行动");

@@ -31,11 +31,12 @@ const HOOKS = [
 const SKILL_FIELDS = [
   "id", "owner", "name", "conditionText", "target", "ops", "choices", "chargeOps", "hooks",
   "cost", "charge", "cooldown", "once", "costFromLost", "requires", "input", "passive",
-  "unsupported", "rollDodge", "buffImmune", "baseUnsupported", "items", "forbidEffect"
+  "unsupported", "rollDodge", "buffImmune", "baseUnsupported", "items", "forbidEffect",
+  "noAction"
 ];
 
 /* 数值表达式认的键，与 effect-ops.evalValue 的分支一一对应 */
-const VALUE_EXPR_KEYS = ["stat", "mult", "per", "hpPercent", "plus", "minus", "counter", "mark", "ctx", "summonCount"];
+const VALUE_EXPR_KEYS = ["stat", "mult", "per", "hpPercent", "plus", "minus", "counter", "mark", "ctx", "summonCount", "pow"];
 
 /* 每个 op 都允许的字段 */
 const GLOBAL_OP_FIELDS = ["op", "who", "label"];
@@ -153,16 +154,17 @@ const OPS = {
     extra: ["on", "ops"]
   },
   reflect: {
-    desc: "蓄力期间的伤害反射（江雨轩）",
-    fields: { factor: "默认 2", stunRounds: "" }
+    desc: "蓄力期间的伤害反射（江雨轩）；带 `charges` 时改为固定值 + 次数的反弹（泥浩恺扣分!）",
+    fields: { factor: "默认 2", stunRounds: "", charges: "固定反弹次数", value: "固定反弹伤害", type: "phys/magic/true，默认 magic", noBreak: "反弹不加击溃值" },
+    enums: { type: ["phys", "magic", "true"] }
   },
   interrupt: {
     desc: "打断带 `tag` 的持续效果",
     fields: { tag: "" }
   },
   schedule: {
-    desc: "延迟结算；`after` 是几个标准回合后",
-    fields: { after: "必填", ops: "必填" },
+    desc: "延迟结算；`after` 是几个标准回合后；`atPhase:\"roundStart\"` 改在下一标准回合开始时结算；`capture` 把数值在调度时快照下来供 ops 用 `{ctx:键}` 读取",
+    fields: { after: "必填", ops: "必填", atPhase: "默认 roundEnd；roundStart 表示回合开始", capture: "调度时求值的数值快照" },
     required: ["after", "ops"],
     extra: ["on", "ops"]
   },

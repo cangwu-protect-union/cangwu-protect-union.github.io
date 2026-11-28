@@ -463,7 +463,8 @@
         u.charge ? u.charge.skillId + ":" + u.charge.amount : "-",
         buffs.join(","), mods.join(","), st.join(","), eff.join(","),
         u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0,
-        u.shield ? u.shield.hp + ":" + u.shield.remain : "-"
+        u.shield ? u.shield.hp + ":" + u.shield.remain : "-",
+        u.reflectFixed ? u.reflectFixed.charges + ":" + u.reflectFixed.value + ":" + u.reflectFixed.type : "-"
       ].join("|"));
     }
     var summonParts = [];

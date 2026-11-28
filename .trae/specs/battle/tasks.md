@@ -222,6 +222,17 @@
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
 - 验收标准：844×390 点角色迷你卡后宽度仍约 300、高度增加且不铺满 live 区，六维与 Buff 可见；点 Buff chip 出现详情气泡；`–` 回迷你卡；932×430 与桌面 1280×900 不回归。
 
+## battle-17 泥浩恺：核蔼可氢 / 职业道德 / 扣分! / 来自深渊的凝视
+
+- 状态：已验（2026-11-28）
+- 验证记录：`verify.ps1 -Plan _local/tmp/plan-nihaokai.json -Browser` 全绿（引擎 222/0、冒烟 30 局 0 异常 0 僵局、浏览器 17/17、`check.ps1` 通过）；新增 8 条单测覆盖 noAction、复燃 70/140 快照、固定反弹 5 段、职业道德覆盖与 300→80、深渊抽蓝/强扣/复原；全角色浏览器冒烟 30 人、99 次技能行无 pageerror。数据库改名脚本 `_local/sql/rpg-nihaokai-rename.sql` 待执行，执行前线上仍显示旧名「加分」。
+- 允许改的路径：`rpg6.0/data/skills/nihaokai.js`（新建）、`rpg6.0/data/skills/index.js`、`rpg6.0/js/engine/battle.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/effect-ops-helpers.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`tools/rpg6-spec.js`、`.dsh/skills/rpg6-character-batch/scripts/plan.mjs`、`tests/engine/`、`rpg6.0/data/seeds/characters-2.js`、`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`_local/sql/rpg-nihaokai-rename.sql`（新建，不提交）、`_local/tmp/plan-nihaokai.json`（不提交）
+- 共享文件：`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`（改前看 `git status --short`）
+- 做什么：加入泥浩恺 4 条技能。引擎新增 `noAction`（释放不占行动）、`reflect` 固定值+次数反弹（进 `state.hash` 与界面）、`schedule.atPhase:"roundStart"`、`schedule.capture`、数值表达式 `{pow}`。核蔼可氢 n=6−释放次数，命中 35 真伤并回实际伤害，复燃在下一标准回合开始、伤害 70/140/280…逐次翻倍且可叠加；职业道德攻 300→80、200% 脆弱 4 自己回合、期间不加击溃值、重复释放覆盖；扣分! 5 段固定 50 法伤反弹；来自深渊每敌方回合抽 1 蓝上限、≤0 后每标准回合 50 强扣、被击溃后复原并永久 −2。seed 把「加分」改名「扣分!」。
+- 不做什么：不改朱弘毅/甲天浩；不做场外行为判定；不改联机协议与战报结构；不处理 `_local/sql` 的实际执行。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-nihaokai.json -Browser`
+- 验收标准：plan 验收、引擎单测、冒烟、`check.ps1`、浏览器组全绿；泥浩恺可选，4 条技能条件/置灰正确；扣分! 剩余次数可见；核蔼复燃在下一标准回合开始依次结算；指纹与回放一致。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

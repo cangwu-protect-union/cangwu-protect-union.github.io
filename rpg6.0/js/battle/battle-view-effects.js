@@ -115,6 +115,16 @@
       case "reflect":
         line = { text: round + "反弹 " + e.amount + " 回 " + P.unitName(state, e.against || who), cls: "is-damage" };
         break;
+      case "reflectFixedOn":
+        line = { text: round + who + " 获得「" + (e.label || "固定反弹") + "」" + e.charges + " 次", cls: "is-status" };
+        break;
+      case "reflectFixed":
+        line = {
+          text: round + "「" + (e.label || "固定反弹") + "」反弹 " + e.value + " " + P.typeName(e.damageType) +
+            " 回 " + P.unitName(state, e.against || who) + "（剩 " + e.remain + " 次）",
+          cls: "is-damage"
+        };
+        break;
       case "heal":
         if (e.amount > 0) line = { text: round + (e.label || "回复") + " · " + who + " +" + e.amount, cls: "is-heal" };
         break;

@@ -36,13 +36,19 @@
   }
 
   function ctxOfEffect(effect) {
-    return {
+    var ctx = {
       sourceUid: effect.sourceUid,
       targetUid: effect.targetUid,
       skillId: effect.skillId,
       label: effect.label,
       fromBuff: effect.fromBuff
     };
+    if (effect.capture) {
+      for (var key in effect.capture) {
+        if (Object.prototype.hasOwnProperty.call(effect.capture, key)) ctx[key] = effect.capture[key];
+      }
+    }
+    return ctx;
   }
 
   function tickDown(list, events, state, uid, kind, unitFilter) {
@@ -174,7 +180,9 @@
       var due = [];
       var later = [];
       for (var s = 0; s < unit.scheduled.length; s++) {
-        if (unit.scheduled[s].atRound <= state.round) due.push(unit.scheduled[s]);
+        if (unit.scheduled[s].atPhase === "roundStart") {
+          later.push(unit.scheduled[s]);
+        } else if (unit.scheduled[s].atRound <= state.round) due.push(unit.scheduled[s]);
         else later.push(unit.scheduled[s]);
       }
       unit.scheduled = later;
@@ -347,6 +355,22 @@
   }
 
   function roundStart(state, events) {
+    /* 回合开始结算的延迟效果（核蔼可氢复燃）：在标准回合开始、速度条之前跑 */
+    for (var s = 0; s < state.units.length; s++) {
+      var owner = state.units[s];
+      var due = [];
+      var later = [];
+      for (var q = 0; q < owner.scheduled.length; q++) {
+        var item = owner.scheduled[q];
+        if (item.atPhase === "roundStart" && item.atRound <= state.round) due.push(item);
+        else later.push(item);
+      }
+      owner.scheduled = later;
+      for (var d = 0; d < due.length; d++) {
+        if (state.phase === "finished") return events;
+        H.runOps(state, ctxOfEffect(due[d]), due[d].ops, events);
+      }
+    }
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
       if (unit.hp <= 0) continue;

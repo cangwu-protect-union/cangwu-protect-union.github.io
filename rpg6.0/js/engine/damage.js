@@ -258,6 +258,36 @@
       if (state.phase === "finished") return 0;
     }
 
+    /* 固定值反弹（扣分!）：取消该次伤害，对攻击者造成固定法伤，消耗 1 次 */
+    if (dmg > 0 && target.reflectFixed && target.reflectFixed.charges > 0 && source && !spec.reflected) {
+      var rf = target.reflectFixed;
+      rf.charges -= 1;
+      pushEvent(events, {
+        type: "reflectFixed",
+        round: state.round,
+        uid: target.uid,
+        against: source.uid,
+        value: rf.value,
+        damageType: rf.type,
+        remain: rf.charges,
+        label: rf.label || "",
+        skillId: spec.skillId || ""
+      });
+      hit(state, {
+        sourceUid: target.uid,
+        targetUid: source.uid,
+        type: rf.type,
+        amount: rf.value,
+        noBreak: true,
+        noReaction: true,
+        reflected: true,
+        skillId: spec.skillId,
+        label: rf.label || ""
+      }, events);
+      if (rf.charges <= 0) target.reflectFixed = null;
+      return 0;
+    }
+
     if (dmg > 0 && target.reflect && target.charge && !spec.reflected) {
       pushEvent(events, {
         type: "reflect",

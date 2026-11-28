@@ -131,10 +131,10 @@ js/
 | `maxMp` | `delta` 增减量、`percent` 按当前上限的百分比、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 蓝上限增减，常驻修正 |
 | `mp` | `delta` 必填 | 蓝增减，钳制在 0..蓝上限 |
 | `note` | `text` 必填 | 只产出日志，不改变状态；用于「无法打断」这类声明的落点 |
-| `reflect` | `factor` 默认 2、`stunRounds` | 蓄力期间的伤害反射（江雨轩） |
+| `reflect` | `factor` 默认 2、`stunRounds`、`charges` 固定反弹次数、`value` 固定反弹伤害、`type` phys/magic/true，默认 magic、`noBreak` 反弹不加击溃值 | 蓄力期间的伤害反射（江雨轩）；带 `charges` 时改为固定值 + 次数的反弹（泥浩恺扣分!） |
 | `removeEffect` | `key` 必填 | 按 key 移除持续效果，并把 `untilRecast` 标记为该 key 的属性修正一并回滚（剃发为僧复原） |
 | `roll` | `sides` 默认 6、`key` 计数器名、`perTarget` 默认 true | 掷骰并存进计数器，供 `{counter}` 读取 |
-| `schedule` | `after` 必填、`ops` 必填 | 延迟结算；`after` 是几个标准回合后 |
+| `schedule` | `after` 必填、`ops` 必填、`atPhase` 默认 roundEnd；roundStart 表示回合开始、`capture` 调度时求值的数值快照 | 延迟结算；`after` 是几个标准回合后；`atPhase:"roundStart"` 改在下一标准回合开始时结算；`capture` 把数值在调度时快照下来供 ops 用 `{ctx:键}` 读取 |
 | `setBasicMod` | `type`、`factor`、`healInstead`、`hits`、`noBreak`、`misfire` | 改这次普攻：类型、倍率、段数、回血、无击溃、哑火 |
 | `setBasicMode` | `healSummon` 召唤物 key、`mode` | 把普攻改成给召唤物回血 |
 | `shield` | `hp` 必填、`duration` 标准回合数，默认 1、`label`、`onExpire` 到期执行的 ops | 护盾：独立血量池，伤害全额吸收；标准回合末计时，到期执行 `onExpire`（杨冬明坚若磐石） |
