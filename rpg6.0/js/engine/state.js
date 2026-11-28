@@ -120,7 +120,7 @@
   function combatantsOf(state, side) {
     var out = [];
     var hero = heroOf(state, side);
-    if (hero && hero.hp > 0) out.push(hero);
+    if (hero && isAlive(hero)) out.push(hero);
     return out.concat(summonsOf(state, side));
   }
 
@@ -169,12 +169,13 @@
     /* 面板数值统一向下取 5 的倍数；蓝上限例外，只向下取整到个位 */
     value = stat === "maxMp" ? Math.floor(value) : B.rules.panelRound(value);
     var floor = B.rules.CONFIG.statFloor[stat];
-    if (floor != null && stat !== "mres") value = Math.max(floor, value);
+    if (floor != null && stat !== "mres" && !(stat === "maxHp" && unit.allowNegativeMaxHp)) value = Math.max(floor, value);
     return value;
   }
 
   function maxHpOf(unit) {
-    return Math.max(1, statOf(unit, "maxHp"));
+    var value = statOf(unit, "maxHp");
+    return unit.allowNegativeMaxHp ? value : Math.max(1, value);
   }
 
   function maxMpOf(unit) {
@@ -265,6 +266,11 @@
 
   function canAct(unit) {
     return !hasStatus(unit, "break") && !hasStatus(unit, "stun") && !hasStatus(unit, "cannotAct");
+  }
+
+  /* 不死窗口（甲天浩向死而生）：血量 ≤0 但 undying 生效时仍算活着 */
+  function isAlive(unit) {
+    return !!unit && (unit.hp > 0 || !!unit.undying);
   }
 
   function addMod(unit, mod) {
@@ -464,7 +470,8 @@
         buffs.join(","), mods.join(","), st.join(","), eff.join(","),
         u.scheduled.length, u.lastDamageType, marks.join(","), u.hpLost || 0,
         u.shield ? u.shield.hp + ":" + u.shield.remain : "-",
-        u.reflectFixed ? u.reflectFixed.charges + ":" + u.reflectFixed.value + ":" + u.reflectFixed.type : "-"
+        u.reflectFixed ? u.reflectFixed.charges + ":" + u.reflectFixed.value + ":" + u.reflectFixed.type : "-",
+        u.undying ? "u" + u.undying.untilRound : "-"
       ].join("|"));
     }
     var summonParts = [];
@@ -511,6 +518,7 @@
   api.mresOf = mresOf;
   api.spdOf = spdOf;
   api.hasStatus = hasStatus;
+  api.isAlive = isAlive;
   api.guardEffectOf = guardEffectOf;
   api.effectHasFlag = effectHasFlag;
   api.hasEffectKey = hasEffectKey;

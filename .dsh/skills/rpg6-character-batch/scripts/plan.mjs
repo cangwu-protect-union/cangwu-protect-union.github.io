@@ -432,6 +432,7 @@ function skillData(skill) {
   data.target = skill.target || "enemy";
   if (skill.once) data.once = true;
   if (skill.noAction) data.noAction = true;
+  if (skill.undying) data.undying = true;
   if (skill.costFromLost) data.costFromLost = skill.costFromLost;
   if (skill.requires && skill.requires.length) data.requires = skill.requires;
   if (skill.input) data.input = skill.input;

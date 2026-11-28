@@ -349,6 +349,9 @@
         kept.push(item);
         continue;
       }
+      if (item.onExpire && item.onExpire.length) {
+        H.runOps(state, ctxOfEffect(item), item.onExpire, events);
+      }
       H.pushEvent(state, events, { type: kind + "Expire", uid: unit.uid, kind: item.kind || item.stat || "", label: item.label || "" });
     }
     return kept;
@@ -373,7 +376,7 @@
     }
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
-      if (unit.hp <= 0) continue;
+      if (!B.state.isAlive(unit)) continue;
       stripImmuneBuffs(state, unit, events);
       if (B.skills && B.skills.runHooks) {
         B.skills.runHooks(state, unit, "roundStart", {
@@ -413,6 +416,9 @@
 
   function roundEnd(state, events) {
     standardRoundEnd(state, events);
+    if (state.phase !== "finished" && B.damage && B.damage.checkUndying) {
+      B.damage.checkUndying(state, events);
+    }
   }
 
   /* op 全表：直接从注册表推导（排序后稳定），不手写清单；

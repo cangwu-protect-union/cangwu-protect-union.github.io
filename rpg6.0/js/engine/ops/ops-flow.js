@@ -126,6 +126,7 @@
         if (op.type) ctx.mod.type = op.type;
         if (op.factor != null) ctx.mod.factor = Number(op.factor);
         if (op.healInstead) ctx.mod.healInstead = true;
+        if (op.healBack) ctx.mod.healBack = true;
         if (op.hits != null) ctx.mod.hits = Number(op.hits);
         if (op.noBreak) ctx.mod.noBreak = true;
         if (op.misfire) ctx.mod.misfire = true;

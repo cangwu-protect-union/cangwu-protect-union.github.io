@@ -100,6 +100,14 @@
         hideMax: !!def.hideMax
       };
     }
+    var list = byOwner[unit.name] || [];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k].undying) {
+        unit.undyingEnabled = true;
+        unit.allowNegativeMaxHp = true;
+        break;
+      }
+    }
   }
 
   /* 把对方声明为 on:"opponent" 的标记挂到本侧英雄身上 */
@@ -418,7 +426,7 @@
   function runBattleStart(state, events) {
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
-      if (unit.hp <= 0) continue;
+      if (!B.state.isAlive(unit)) continue;
       runHooks(state, unit, "battleStart", {
         sourceUid: unit.uid,
         targetUid: B.state.otherUid(state, unit.uid),

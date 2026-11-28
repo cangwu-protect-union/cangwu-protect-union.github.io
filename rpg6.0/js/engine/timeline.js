@@ -12,7 +12,7 @@
 
   function alive(state) {
     for (var i = 0; i < state.units.length; i++) {
-      if (state.units[i].hp > 0) return true;
+      if (B.state.isAlive(state.units[i])) return true;
     }
     return false;
   }
@@ -28,7 +28,7 @@
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
       unit.roundActions = 0;
-      if (unit.hp <= 0) continue;
+      if (!B.state.isAlive(unit)) continue;
       var step = B.rules.gaugeStep(unit.gauge, B.state.spdOf(unit), state.firstRound);
       unit.gauge = step.gauge;
       unit.roundActions = step.actions;
@@ -51,7 +51,7 @@
     var entries = [];
     for (var i = 0; i < state.units.length; i++) {
       var unit = state.units[i];
-      if (unit.hp <= 0) continue;
+      if (!B.state.isAlive(unit)) continue;
       if (!unit.roundActions) continue;
       entries.push({
         uid: unit.uid,
@@ -84,7 +84,7 @@
       if (state.queue.length) {
         var uid = state.queue.shift();
         var unit = B.state.unitOf(state, uid);
-        if (unit.hp <= 0) continue;
+        if (!B.state.isAlive(unit)) continue;
         /* 按「回合开始」计时的状态先走一格（如彻底疯狂的眩晕余波） */
         if (B.effectOps && B.effectOps.turnStart) B.effectOps.turnStart(state, unit, events);
         if (state.phase === "finished") return false;

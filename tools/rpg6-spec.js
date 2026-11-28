@@ -19,7 +19,7 @@ const WHOS = ["target", "self", "allEnemies", "allAllies", "enemyHero"];
 const BUFF_KINDS = ["strong", "fragile", "brave", "panic", "magicVuln"];
 
 /* 界面有名字的状态；其余 kind 也能跑，只是显示原始 kind，lint 只提醒不拦 */
-const STATUS_KINDS_KNOWN = ["break", "stun", "daze", "noSkill", "noBasic", "noCharge", "cannotAct", "onlyBasic", "noBreakOut", "noDeath", "wlk", "ducai", "chedi", "xipi", "zhiyin"];
+const STATUS_KINDS_KNOWN = ["break", "stun", "daze", "noSkill", "noBasic", "noCharge", "cannotAct", "onlyBasic", "noBreakOut", "noDeath", "breakLock", "undying", "wlk", "ducai", "chedi", "xipi", "zhiyin"];
 
 /* skills.runHooks 的钩子名，写错的钩子永远不会被调用 */
 const HOOKS = [
@@ -32,7 +32,7 @@ const SKILL_FIELDS = [
   "id", "owner", "name", "conditionText", "target", "ops", "choices", "chargeOps", "hooks",
   "cost", "charge", "cooldown", "once", "costFromLost", "requires", "input", "passive",
   "unsupported", "rollDodge", "buffImmune", "baseUnsupported", "items", "forbidEffect",
-  "noAction"
+  "noAction", "undying"
 ];
 
 /* 数值表达式认的键，与 effect-ops.evalValue 的分支一一对应 */
@@ -148,7 +148,7 @@ const OPS = {
       tag: "给 interrupt 用", key: "给 if.cond.effect 用", gate: "{sides,cancel}",
       breakOnSourceStatus: "", breakOnHolderStatus: "", fromBuff: "", debuff: "负面标记，dispel marked 清除",
       guard: "{remaining,onBreak,ops}", immune: "{buffs,statuses}", breakImmune: "",
-      chargeGuard: "", enemyNoSkill: "", selfNoBasic: ""
+      chargeGuard: "", enemyNoSkill: "", selfNoBasic: "", onExpire: "到期时执行的 ops"
     },
     required: ["ops"],
     extra: ["on", "ops"]
@@ -195,7 +195,7 @@ const OPS = {
   },
   setBasicMod: {
     desc: "改这次普攻：类型、倍率、段数、回血、无击溃、哑火",
-    fields: { type: "", factor: "", healInstead: "", hits: "", noBreak: "", misfire: "" },
+    fields: { type: "", factor: "", healInstead: "", healBack: "普攻回复实际造成的伤害", hits: "", noBreak: "", misfire: "" },
     enums: { type: ["phys", "magic", "true"] }
   },
   clearMods: {

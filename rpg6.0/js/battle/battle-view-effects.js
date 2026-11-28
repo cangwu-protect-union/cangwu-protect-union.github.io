@@ -125,6 +125,15 @@
           cls: "is-damage"
         };
         break;
+      case "undying":
+        line = {
+          text: round + who + " 进入向死而生（第 " + e.untilRound + " 回合结束判定，死亡 " + e.deaths + " 次）",
+          cls: "is-status"
+        };
+        break;
+      case "undyingRevive":
+        line = { text: round + who + " 复活（血 " + e.hp + "/" + e.maxHp + "，血上限 −100）", cls: "is-heal" };
+        break;
       case "heal":
         if (e.amount > 0) line = { text: round + (e.label || "回复") + " · " + who + " +" + e.amount, cls: "is-heal" };
         break;

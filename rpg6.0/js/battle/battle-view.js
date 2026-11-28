@@ -35,6 +35,8 @@
     daze: "眩晕（防抗 0）",
     noBreakOut: "伤害不造成击溃值",
     noDeath: "不会死亡",
+    breakLock: "击溃值锁定",
+    undying: "向死而生",
     cannotAct: "无法行动",
     onlyBasic: "只能普攻"
   };

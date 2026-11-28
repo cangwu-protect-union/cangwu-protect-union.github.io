@@ -206,7 +206,7 @@
           amount: amount,
           noBreak: noBreak,
           noReaction: !!opts.noReaction,
-          healBack: selfHit,
+          healBack: selfHit || !!mod.healBack,
           skillId: opts.skillId || "basic.attack",
           label: opts.label || "普攻",
           actionId: opts.actionId || ""

@@ -39,15 +39,15 @@
     if (w === "self") return owner ? [owner] : [];
     if (w === "allEnemies") return B.state.combatantsOf(state, enemySide);
     if (w === "allAllies") {
-      return state.units.filter(function (u) { return u.side === mySide && u.hp > 0; });
+      return state.units.filter(function (u) { return u.side === mySide && B.state.isAlive(u); });
     }
     if (w === "enemyHero") {
       var hero = B.state.heroOf(state, enemySide);
-      return hero && hero.hp > 0 ? [hero] : [];
+      return hero && B.state.isAlive(hero) ? [hero] : [];
     }
     if (ctx.scope === "allEnemies") return B.state.combatantsOf(state, enemySide);
     if (ctx.scope === "allAllies") {
-      return state.units.filter(function (u) { return u.side === mySide && u.hp > 0; });
+      return state.units.filter(function (u) { return u.side === mySide && B.state.isAlive(u); });
     }
     var targetUid = ctx.ownerUid && ctx.ownerUid !== ctx.sourceUid ? ctx.sourceUid : ctx.targetUid;
     var target = H.tryUnit(state, targetUid);
@@ -329,6 +329,9 @@
       var target = targets[ti];
       var tctx = H.ctxFor(ctx, target);
       var spec = H.durationOf(op.duration);
+      if (spec && op.duration && op.duration.count && typeof op.duration.count === "object") {
+        spec.count = Math.max(0, Math.floor(H.evalValue(state, tctx, op.duration.count)));
+      }
       state.effectSeq = (state.effectSeq || 0) + 1;
       var effect = {
         id: "ef" + state.effectSeq,
@@ -344,6 +347,7 @@
         period: Number(op.period) || 0,
         breakOnSourceStatus: op.breakOnSourceStatus || null,
         breakOnHolderStatus: op.breakOnHolderStatus || null,
+        onExpire: op.onExpire || [],
         /* 防护层：取消 N 次伤害 + 用完后执行的 ops；免疫异常/击溃/蓄力打断 */
         guard: op.guard ? { remaining: Math.max(1, Number(op.guard.remaining) || 1), ops: op.guard.ops || [], blockedActionId: "" } : null,
         immune: op.immune || null,

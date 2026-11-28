@@ -233,6 +233,17 @@
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-nihaokai.json -Browser`
 - 验收标准：plan 验收、引擎单测、冒烟、`check.ps1`、浏览器组全绿；泥浩恺可选，4 条技能条件/置灰正确；扣分! 剩余次数可见；核蔼复燃在下一标准回合开始依次结算；指纹与回放一致。
 
+## battle-18 甲天浩：向死而生 / 再攀高峰 / 身残志坚 / 妙手回春
+
+- 状态：已验（2026-11-28）
+- 验证记录：`verify.ps1 -Plan _local/tmp/plan-jiatianhao.json -Browser` 全绿（引擎 229/0、冒烟 31 局 0 异常 0 僵局、浏览器 17/17、`check.ps1` 通过）；新增 7 条单测覆盖负血/复活/判负/负血上限/再攀高峰/身残志坚/妙手回春；压测校验器允许 `undying` 单位负血；全角色浏览器冒烟 31 人、104 次技能行无 pageerror。
+- 允许改的路径：`rpg6.0/data/skills/jiatianhao.js`（新建）、`rpg6.0/data/skills/index.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/engine/timeline.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/effect-ops-helpers.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`tools/rpg6-spec.js`、`.dsh/skills/rpg6-character-batch/scripts/plan.mjs`、`tests/engine/`、`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`_local/tmp/plan-jiatianhao.json`（不提交）
+- 共享文件：`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`（改前看 `git status --short`）
+- 做什么：加入甲天浩 4 条技能。引擎新增不死窗口 `undying`：血量 ≤0 不判负、可负血、仍可行动；触发当回合算第 1 个，第 5 个标准回合结束判定，>0 复活并永久 −100 血上限、≤0 判负；每次触发计 1 次死亡；窗口内普攻真伤并回复实际伤害，造成与承受的击溃值都不增加。血上限可负（仅向死而生）。再攀高峰 200 普伤 + 每死 100 真伤；身残志坚速度按失血重算、每回合血上限 +10、持续 2+死亡次数 自己回合，到期清速度、血上限保留；妙手回春一次性回 80、速 −15 4 自己回合。
+- 不做什么：不改朱弘毅；不做血上限负值时的额外保险；不改联机协议与战报结构。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-jiatianhao.json -Browser`
+- 验收标准：plan、引擎单测、冒烟、`check.ps1`、浏览器组全绿；甲天浩可选；0 血窗口内可行动与选目标；复活/判负/死亡计数、再攀高峰真伤、身残志坚与妙手回春数值正确；指纹与回放一致。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

@@ -135,7 +135,7 @@ js/
 | `removeEffect` | `key` 必填 | 按 key 移除持续效果，并把 `untilRecast` 标记为该 key 的属性修正一并回滚（剃发为僧复原） |
 | `roll` | `sides` 默认 6、`key` 计数器名、`perTarget` 默认 true | 掷骰并存进计数器，供 `{counter}` 读取 |
 | `schedule` | `after` 必填、`ops` 必填、`atPhase` 默认 roundEnd；roundStart 表示回合开始、`capture` 调度时求值的数值快照 | 延迟结算；`after` 是几个标准回合后；`atPhase:"roundStart"` 改在下一标准回合开始时结算；`capture` 把数值在调度时快照下来供 ops 用 `{ctx:键}` 读取 |
-| `setBasicMod` | `type`、`factor`、`healInstead`、`hits`、`noBreak`、`misfire` | 改这次普攻：类型、倍率、段数、回血、无击溃、哑火 |
+| `setBasicMod` | `type`、`factor`、`healInstead`、`healBack` 普攻回复实际造成的伤害、`hits`、`noBreak`、`misfire` | 改这次普攻：类型、倍率、段数、回血、无击溃、哑火 |
 | `setBasicMode` | `healSummon` 召唤物 key、`mode` | 把普攻改成给召唤物回血 |
 | `shield` | `hp` 必填、`duration` 标准回合数，默认 1、`label`、`onExpire` 到期执行的 ops | 护盾：独立血量池，伤害全额吸收；标准回合末计时，到期执行 `onExpire`（杨冬明坚若磐石） |
 | `stat` | `stat` 必填、`mode` add/set/mul，默认 add、`value`、`duration` 数字或 {unit,count}、`restore` 每标准回合恢复量（配合 mode:set）、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 面板修改，进 `mods`；`restore` 让 set 归零后逐标准回合恢复原值 |
@@ -144,7 +144,7 @@ js/
 | `stunValue` | `delta` 必填 | 眩晕值增减，钳制在 0..上限 |
 | `summon` | `key` 必填、`ttl` 覆盖定义里的 ttl | 生成召唤物，`key` 指向 `summons` 定义 |
 | `taunt` | `delta` 必填 | 嘲讽值增减 |
-| `tick` | `ops` 必填、`duration`、`period` 每 N 回合、`permanent`、`unstoppable`、`desc` chip 说明、`when` turnStart 时在持有者回合开始时结算、`tag` 给 interrupt 用、`key` 给 if.cond.effect 用、`gate` {sides,cancel}、`breakOnSourceStatus`、`breakOnHolderStatus`、`fromBuff`、`debuff` 负面标记，dispel marked 清除、`guard` {remaining,onBreak,ops}、`immune` {buffs,statuses}、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic` | 逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:"turnStart"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明 |
+| `tick` | `ops` 必填、`duration`、`period` 每 N 回合、`permanent`、`unstoppable`、`desc` chip 说明、`when` turnStart 时在持有者回合开始时结算、`tag` 给 interrupt 用、`key` 给 if.cond.effect 用、`gate` {sides,cancel}、`breakOnSourceStatus`、`breakOnHolderStatus`、`fromBuff`、`debuff` 负面标记，dispel marked 清除、`guard` {remaining,onBreak,ops}、`immune` {buffs,statuses}、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic`、`onExpire` 到期时执行的 ops | 逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:"turnStart"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明 |
 | `use` | `skillId` 必填、`times` 重复次数 | 内联执行另一个技能的 ops |
 <!-- RPG6-STATS:END ops-table -->
 

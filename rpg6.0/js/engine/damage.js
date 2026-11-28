@@ -105,6 +105,7 @@
   }
 
   function addBreakValue(state, unit, events) {
+    if (B.state.hasStatus(unit, "breakLock")) return false;
     if (B.state.hasStatus(unit, "break")) {
       unit.breakValue = 0;
       return false;
@@ -124,11 +125,80 @@
     return true;
   }
 
+  /* 不死窗口（甲天浩向死而生）：血量 ≤0 不判负，第 5 个标准回合结束判定。
+     触发当回合算第 1 个；窗口内可负血、可行动，普攻真伤/回血/击溃值锁定。 */
+  function startUndying(state, unit, events) {
+    unit.undying = { untilRound: state.round + 4 };
+    unit.breakValue = 0;
+    if (unit.marks && unit.marks.deaths) {
+      var mark = unit.marks.deaths;
+      mark.value = Math.min(mark.max == null ? 99 : mark.max, mark.value + 1);
+    }
+    B.state.addStatus(unit, { kind: "undying", remain: 5, unit: "standard", source: "undying", label: "向死而生" });
+    B.state.addStatus(unit, { kind: "noBreakOut", remain: 5, unit: "standard", source: "undying", label: "向死而生·不造成击溃值" });
+    B.state.addStatus(unit, { kind: "breakLock", remain: 5, unit: "standard", source: "undying", label: "向死而生·击溃值锁定" });
+    pushEvent(events, {
+      type: "undying",
+      round: state.round,
+      uid: unit.uid,
+      untilRound: unit.undying.untilRound,
+      deaths: unit.marks && unit.marks.deaths ? unit.marks.deaths.value : 0
+    });
+  }
+
+  function clearUndying(unit) {
+    unit.undying = null;
+    unit.statuses = (unit.statuses || []).filter(function (status) {
+      return status.source !== "undying";
+    });
+  }
+
+  function checkUndying(state, events) {
+    for (var i = 0; i < state.units.length; i++) {
+      var unit = state.units[i];
+      if (!unit.undying) continue;
+      if (state.round < unit.undying.untilRound) continue;
+      var revived = unit.hp > 0;
+      clearUndying(unit);
+      if (revived) {
+        B.state.addMod(unit, {
+          stat: "maxHp",
+          mode: "add",
+          value: -100,
+          remain: B.state.PERMANENT,
+          source: "undying.revive",
+          label: "向死而生·复活"
+        });
+        B.state.clampHpToMax(unit);
+        revived = unit.hp > 0;
+      }
+      if (revived) {
+        pushEvent(events, {
+          type: "undyingRevive",
+          round: state.round,
+          uid: unit.uid,
+          hp: unit.hp,
+          maxHp: B.state.maxHpOf(unit)
+        });
+      } else {
+        unit.undyingLethal = true;
+        resolveDeath(state, unit, events);
+        unit.undyingLethal = false;
+        if (state.phase === "finished") return;
+      }
+    }
+  }
+
   function resolveDeath(state, unit, events) {
     if (unit.hp > 0) return false;
+    if (unit.undying) return false;
     if (B.state.hasStatus(unit, "noDeath")) {
       unit.hp = 1;
       pushEvent(events, { type: "noDeath", round: state.round, uid: unit.uid });
+      return false;
+    }
+    if (unit.undyingEnabled && !unit.undyingLethal) {
+      startUndying(state, unit, events);
       return false;
     }
     if (unit.isSummon) {
@@ -336,7 +406,8 @@
       return 0;
     }
     if (dmg > 0 && type === "magic") consumeMagicVuln(state, target, events);
-    target.hp = Math.max(0, target.hp - dmg);
+    var hpFloor = target.undying || (target.undyingEnabled && !target.undyingLethal) ? -Infinity : 0;
+    target.hp = Math.max(hpFloor, target.hp - dmg);
     B.state.markHpLoss(target, beforeHp);
     target.lastDamageType = type;
     if (dmg > 0) {
@@ -392,7 +463,8 @@
     var amount = B.rules.round5(Number(spec.amount) || 0);
     if (amount <= 0) return 0;
     var beforeHp = target.hp;
-    target.hp = Math.max(0, target.hp - amount);
+    var hpFloor = target.undying || (target.undyingEnabled && !target.undyingLethal) ? -Infinity : 0;
+    target.hp = Math.max(hpFloor, target.hp - amount);
     B.state.markHpLoss(target, beforeHp);
     B.state.addHpLog(target, state.round, -amount);
     pushEvent(events, {
@@ -448,6 +520,7 @@
   api.clearCharge = clearCharge;
   api.consumeGuard = consumeGuard;
   api.shieldAbsorb = shieldAbsorb;
+  api.checkUndying = checkUndying;
 
   if (typeof module === "object" && module.exports) module.exports = B;
 })(typeof globalThis !== "undefined" ? globalThis : this);

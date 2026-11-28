@@ -36,7 +36,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->30 人 108 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.13<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->31 人 112 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.14<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -64,6 +64,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 技能字段 `items` + 动作 `kind:"item"`：额外动作（吃碎苹果/功德回血），不消耗行动、不吃掷骰跳过；`requires` 卡库存、`oncePerRound` 每回合限 1 次、`noEffect` 效果在身时不列入口；眩晕/击溃不可用，onlyBasic/noSkill 不拦（Q14）；入口 conditions.itemsOf/itemAvailable 与 actions.list/execute。
 - 技能字段 `forbidEffect:"key"`：自身有该 key 的持续效果时置灰。
 - 技能字段 `noAction`：释放不消耗行动、同一回合可连放（泥浩恺核蔼可氢）。`reflect` 带 `charges`/`value` 时是固定值+次数反弹（扣分!）；`schedule` 支持 `atPhase:"roundStart"`（下一标准回合开始、速度条之前）与 `capture`（调度时把数值快照进这次延迟结算，ops 用 `{ctx:键}` 读）；数值表达式新增 `{pow:[底,指数]}`。
+- 技能字段 `undying`：不死窗口（甲天浩向死而生）。血量 ≤0 不判负、可负血、仍可行动；触发当回合算第 1 个，第 5 个标准回合结束判定；窗口内普攻真伤并回复实际伤害、造成与承受的击溃值都不增加。`tick.onExpire` 在持续效果到期时执行 ops；`tick.duration.count` 可写数值表达式；`setBasicMod.healBack` 让普攻回复实际伤害。
 - 费用 `cost.maxMp`：判蓝上限 ≥ 值，释放后永久扣蓝上限、当前蓝钳到新上限（机枪射手）。
 - 负面数据标记 `debuff:true`（`stat`/`maxHp`/`maxMp`/`tick`）：`dispel scope:"marked"` 清除；不加标记的不清。
 - `tick` 的 `period` 表示每 N 个标准回合才结算一次（王霸之气 3 回合），`gate` 是行动前掷骰跳过，`breakOnSourceStatus` 是来源被击晕/击溃即断；`dice` 的 `times` 用于涌泉相报这类连续独立骰。
@@ -116,6 +117,11 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 固定反弹 `reflectFixed` | `reflect` 带 `charges`/`value` 时：取消该次伤害，对攻击者造成固定法伤；反弹不加击溃值；进 hash；界面显示剩余次数；重复释放重置次数（扣分!） |
 | 不耗行动技能 `noAction` | 释放不扣 `actionsLeft`，同一回合可连放；仍然要求轮到该单位且有行动、费用足够（核蔼可氢） |
 | 回合开始调度 | `schedule.atPhase:"roundStart"` 在下一标准回合开始、速度条之前结算；`capture` 在调度时求值，ops 用 `{ctx:键}` 读取；`{pow}` 指数表达式（复燃 70/140/280…） |
+| 不死窗口 `undying` | 技能字段 `undying:true`：血量 ≤0 不判负、可负血、仍可行动；触发当回合算第 1 个，第 5 个标准回合结束判定；>0 复活并永久 −100 血上限，≤0 判负；窗口内普攻真伤/回血、击溃值锁定；每次触发计 1 次死亡（甲天浩） |
+| 负血与负血上限 | `undying` 单位受伤/强扣可降到负数；`allowNegativeMaxHp` 只给向死而生，血上限可到负；存活判定统一用 `state.isAlive`（≤0 仍算活着），不要再用 `hp > 0` |
+| `tick.onExpire` | 持续效果到期时执行 ops；`tick.duration.count` 可写数值表达式（2＋死亡次数） |
+| `breakLock` | 击溃值不增加（`addBreakValue` 直接跳过）；与 `breakImmune` 不同，后者是免疫击溃状态本身 |
+| `setBasicMod.healBack` | 普攻回复实际造成的伤害（向死而生窗口内） |
 | 动态普攻面板 | 技能库 `panels:{角色:{atk}}` 覆盖面板，`basicAtk:{角色:表达式}` 算实际攻击值，优先级高于面板与 Buff 修正（孙嘉怿：面板 0、普攻按目标当前血 20%）；界面攻击栏显示 `−` 加注记 |
 | 解锁动作 | `kind:"unlock"`：`actions.list` 在单位身上有 `lockAtk/lockDef/lockMres`（0=未解锁）时列出，支付 1 蓝解锁一个，不消耗行动、可重复、全部解锁后隐藏；解锁后 3 标准回合用 `schedule` 写回原值（原值开局存 counter） |
 | 防御代价 | `cost.def`：`conditions` 判防御是否足够（不足置灰），`releaseSkill` 扣永久防御，可到 0 |

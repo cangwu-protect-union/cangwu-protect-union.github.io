@@ -6,6 +6,7 @@ import baobiran from "./baobiran.js";
 import guwenda from "./guwenda.js";
 import handongxiao from "./handongxiao.js";
 import jiangyuxuan from "./jiangyuxuan.js";
+import jiatianhao from "./jiatianhao.js";
 import jinshengjie from "./jinshengjie.js";
 import lishuo from "./lishuo.js";
 import liubinlu from "./liubinlu.js";
@@ -83,6 +84,7 @@ const lib = {
       { key: "zyRound", name: "职业道德回合", max: 4, init: 0 },
       { key: "abyssRestored", name: "凝视已复原", max: 1, init: 0 }
     ],
+    "甲天浩": [{ key: "deaths", name: "死亡次数", max: 99, init: 0 }],
     /* RPG6-SCAFFOLD:marks */
   },
   /* 召唤物定义：ttl 按标准回合；targetable 只有带血量的召唤物为真；
@@ -190,6 +192,7 @@ const lib = {
     "王春雨": wangchunyu,
     "韩东晓": handongxiao,
     "泥浩恺": nihaokai,
+    "甲天浩": jiatianhao,
     /* RPG6-SCAFFOLD:characters */
   }
 };

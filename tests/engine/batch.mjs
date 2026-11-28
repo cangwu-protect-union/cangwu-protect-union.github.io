@@ -143,7 +143,8 @@ function problemsOf(state) {
   for (const unit of state.units) {
     const maxHp = B.state.maxHpOf(unit);
     const maxMp = B.state.maxMpOf(unit);
-    if (!isFinite(unit.hp) || unit.hp < 0 || unit.hp > maxHp) out.push(unit.name + " 血量越界：" + unit.hp + "/" + maxHp);
+    var allowNegativeHp = !!(unit.undying || unit.undyingEnabled);
+    if (!isFinite(unit.hp) || unit.hp > maxHp || (unit.hp < 0 && !allowNegativeHp)) out.push(unit.name + " 血量越界：" + unit.hp + "/" + maxHp);
     if (!isFinite(unit.mp) || unit.mp < 0 || unit.mp > maxMp) out.push(unit.name + " 蓝越界：" + unit.mp + "/" + maxMp);
     if (!isFinite(unit.gauge) || unit.gauge < 0 || unit.gauge >= 100) out.push(unit.name + " 速度条越界：" + unit.gauge);
     if (unit.breakValue < 0 || unit.breakValue > 5) out.push(unit.name + " 击溃值越界：" + unit.breakValue);
