@@ -445,6 +445,47 @@
     return html;
   }
 
+  /* 角色详情窗：左右两列（左己方、右敌方），列该角色全部技能；只读，不带操作按钮 */
+  P.renderRoleDetail = function (state, ownSide, meta) {
+    var leftIdx = ownSide === "b" ? 1 : 0;
+    var rightIdx = leftIdx === 0 ? 1 : 0;
+    var left = state.units[leftIdx];
+    var right = state.units[rightIdx];
+
+    function column(unit, label) {
+      var character = (meta && meta[unit.uid]) || { skills: [] };
+      var sheet = character.skills || [];
+      var html = '<section class="lw-hp-col lw-skill-col">' +
+        "<h3>" + P.esc(label) + "</h3>";
+      if (!sheet.length) {
+        html += '<p class="bu-log-empty">这个角色没有技能档案</p>';
+      } else {
+        html += '<ol class="lw-skill-list">';
+        for (var i = 0; i < sheet.length; i++) {
+          var row = sheet[i];
+          var skill = P.findSkill(unit, row.name);
+          var cls = !skill ? " is-missing" : (skill.unsupported ? " is-unsupported" : "");
+          html += '<li class="lw-skill-row' + cls + '">' +
+            '<div class="lw-skill-name"><b>' + (i + 1) + ".</b>" + P.esc(row.name) +
+            (!skill ? '<i class="lw-skill-tag">未编码</i>'
+              : (skill.unsupported ? '<i class="lw-skill-tag">本版不可用</i>' : "")) +
+            "</div>" +
+            '<div class="lw-skill-cond">' + P.esc(row.condition) + "</div>" +
+            '<div class="lw-skill-effect">' + P.esc(row.effect) + "</div>" +
+            "</li>";
+        }
+        html += "</ol>";
+      }
+      html += "</section>";
+      return html;
+    }
+
+    return '<div class="lw-hp-grid lw-skill-grid">' +
+      column(left, "己方 · " + left.name) +
+      column(right, "敌方 · " + right.name) +
+      "</div>";
+  }
+
   P.findSkill = function (unit, name) {
     var list = B.skills ? B.skills.forUnit(unit) : [];
     for (var i = 0; i < list.length; i++) {
@@ -510,6 +551,7 @@
     renderQuery: function () { return P.renderQuery.apply(null, arguments); },
     renderHpRecord: function () { return P.renderHpRecord.apply(null, arguments); },
     renderLogWindow: function () { return P.renderLogWindow.apply(null, arguments); },
+    renderRoleDetail: function () { return P.renderRoleDetail.apply(null, arguments); },
     chipDetail: function () { return P.chipDetail.apply(null, arguments); },
     buildForecast: function () { return P.buildForecast.apply(null, arguments); },
     STAT_LABEL: P.STAT_LABEL

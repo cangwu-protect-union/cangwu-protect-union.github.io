@@ -389,7 +389,7 @@ function create() {
     setBody("panel-enemy", BV.renderUnit(state, enemy, state.turnUid === enemy.uid, "", pick,
       { hideSummons: true, hideLog: true, bars: true }));
     setBody("query-own", BV.renderQuery(state, own, meta, pick, readOnly, { hideStats: true }));
-    setBody("query-enemy", BV.renderQuery(state, enemy, meta, pick, true, { hideStats: true }));
+    setBody("role-detail", BV.renderRoleDetail(state, sideKey, meta));
     setBody("hp-record", BV.renderHpRecord(state, sideKey));
     setBody("battle-log", BV.renderLogWindow(state));
 

@@ -183,6 +183,89 @@ body.is-lw-dragging {
   user-select: none;
 }
 
+/* ---------- 紧凑迷你卡 ---------- */
+
+.lw-window.is-mini .lw-bar {
+  height: 22px;
+  padding: 0 6px;
+  cursor: move;
+}
+
+.lw-window.is-mini .lw-grip {
+  display: none;
+}
+
+.lw-window.is-mini .lw-title {
+  font-size: 11px;
+}
+
+.lw-window.is-mini .lw-fold {
+  width: 22px;
+  height: 17px;
+  font-size: 12px;
+}
+
+.lw-window.is-mini .lw-body {
+  padding: 1px 8px 3px;
+  overflow: hidden;
+}
+
+.lw-window.is-mini .bu-stats,
+.lw-window.is-mini .bu-buffs,
+.lw-window.is-mini .bu-status,
+.lw-window.is-mini .bu-log,
+.lw-window.is-mini .bu-summons {
+  display: none;
+}
+
+.lw-window.is-mini .battle-unit {
+  gap: 1px;
+}
+
+.lw-window.is-mini .bu-head {
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.lw-window.is-mini .bu-head i {
+  display: none;
+}
+
+.lw-window.is-mini .bu-vitals {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.lw-window.is-mini .bu-bars {
+  gap: 0;
+}
+
+.lw-window.is-mini .bu-hp-bar {
+  height: 12px;
+}
+
+.lw-window.is-mini .bu-bars b {
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 12px;
+}
+
+/* ---------- 全屏浮层（紧凑角色卡 / 扣血 / 战报 / 角色详情） ---------- */
+
+.lw-window.is-overlay {
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.lw-window.is-overlay .lw-bar {
+  cursor: default;
+}
+
 /* ---------- 旧片段去壳 ---------- */
 
 .lw-body .battle-speed,
@@ -351,6 +434,82 @@ html.is-live .bu-bars b {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- 角色详情 ---------- */
+
+.lw-skill-grid {
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.lw-skill-col {
+  overflow: auto;
+  min-height: 0;
+}
+
+.lw-skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lw-skill-row {
+  padding: 4px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.lw-skill-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.lw-skill-row.is-missing,
+.lw-skill-row.is-unsupported {
+  opacity: 0.55;
+}
+
+.lw-skill-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.lw-skill-name b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.lw-skill-tag {
+  flex: none;
+  padding: 0 5px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 15px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.lw-skill-cond,
+.lw-skill-effect {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.lw-skill-cond {
+  color: var(--muted);
+}
+
+.lw-skill-effect {
+  color: var(--fg);
+}
+
 /* ---------- 战报窗、速度窗、额外动作 ---------- */
 
 html.is-live .lw-log-rows {
@@ -441,10 +600,6 @@ html.is-live .battle-result {
 
 /* ---------- 窄屏 ---------- */
 
-.lw-window.is-compact {
-  max-height: 46vh;
-}
-
 @media (max-width: 900px), (orientation: landscape) and (max-height: 520px) {
   .lw-window {
     max-height: 46vh;
@@ -476,6 +631,13 @@ html.is-live .battle-result {
   html.is-live .battle-bar {
     font-size: 12px;
   }
+}
+
+/* 紧凑窗口高度由 JS 给出（迷你卡 58、速度/查询最高 200），不能被 46vh 压矮；
+   全屏浮层同理。特异性高于上面的媒体查询规则。 */
+.lw-window.is-compact,
+.lw-window.is-overlay {
+  max-height: none;
 }
 
 /* ---------- 三维场景与标签层 ---------- */

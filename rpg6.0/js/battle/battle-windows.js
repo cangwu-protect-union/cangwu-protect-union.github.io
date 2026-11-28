@@ -9,19 +9,24 @@ const WINDOW_DEFS = [
   { id: "panel-own", title: "角色 · 己方" },
   { id: "panel-enemy", title: "角色 · 敌方" },
   { id: "query-own", title: "操作 · 己方" },
-  { id: "query-enemy", title: "操作 · 敌方" },
+  { id: "role-detail", title: "角色详情" },
   { id: "hp-record", title: "扣血记录" },
   { id: "battle-log", title: "详细战报" }
 ];
 
 const DESKTOP_EXPANDED = ["speed", "panel-own", "panel-enemy", "query-own"];
-const COMPACT_EXPANDED = ["panel-own", "query-own"];
-const DOCK_ORDER = ["hp-record", "battle-log", "query-enemy"];
+const COMPACT_EXPANDED = ["speed", "panel-own", "panel-enemy", "query-own"];
+const COMPACT_MINI = ["panel-own", "panel-enemy"];
+const COMPACT_OVERLAY = ["hp-record", "battle-log", "role-detail"];
+const DOCK_ORDER = ["hp-record", "battle-log", "role-detail"];
 
-/* 紧凑模式各窗上限：己方面板压到 0.22、己方查询 0.40，其余沿用 0.46 */
-function compactHeight(id, vh) {
-  var ratio = id === "panel-own" ? 0.22 : (id === "query-own" ? 0.40 : 0.46);
-  return Math.max(id === "panel-own" ? 72 : 80, Math.round(vh * ratio));
+/* 紧凑模式尺寸：迷你卡 min(300, vw*0.36)、查询 min(400, vw*0.48)、
+   速度 min(150, vw*0.2)；高度统一 min(200, vh*0.58)，迷你卡固定 58。 */
+function compactSize(id, vw, vh) {
+  if (id === "speed") return { w: Math.round(Math.min(150, vw * 0.2)), h: Math.round(Math.min(200, vh * 0.58)) };
+  if (id === "panel-own" || id === "panel-enemy") return { w: Math.round(Math.min(300, vw * 0.36)), h: 58 };
+  if (id === "query-own") return { w: Math.round(Math.min(400, vw * 0.48)), h: Math.round(Math.min(200, vh * 0.58)) };
+  return { w: vw, h: vh };
 }
 
 export function createWindowManager(options) {
@@ -69,20 +74,29 @@ export function createWindowManager(options) {
       "panel-own": { left: 8, top: Math.max(0, vh - 156 - 8), w: 375, h: 156 },
       "panel-enemy": { left: Math.max(0, vw - 372 - 8), top: 8, w: 372, h: 156 },
       "query-own": { left: Math.max(0, vw - 468 - 8), top: Math.max(0, vh - 261 - 8), w: 468, h: 261 },
-      "query-enemy": { left: Math.max(0, vw - 468 - 8), top: Math.max(0, vh - 261 - 8), w: 468, h: 261 },
+      "role-detail": { left: Math.max(0, vw - 468 - 8), top: Math.max(0, vh - 261 - 8), w: 468, h: 261 },
       "hp-record": { left: Math.max(0, Math.round((vw - 390) / 2)), top: Math.max(0, Math.round(vh * 0.12)), w: 390, h: 225 },
       "battle-log": { left: Math.max(0, Math.round((vw - 375) / 2)), top: Math.max(0, Math.round((vh - 285) / 2)), w: 375, h: 285 }
     };
     if (compact) {
-      var mid = Math.round(vh * 0.48);
-      out.speed = { left: 6, top: 8, w: out.speed.w, h: out.speed.h };
-      out["panel-enemy"] = { left: 6, top: 8, w: out["panel-enemy"].w, h: out["panel-enemy"].h };
-      out["query-enemy"] = { left: 6, top: mid, w: out["query-enemy"].w, h: out["query-enemy"].h };
-      out["hp-record"] = { left: 6, top: 8, w: out["hp-record"].w, h: out["hp-record"].h };
-      out["battle-log"] = { left: 6, top: 8, w: out["battle-log"].w, h: out["battle-log"].h };
-      var queryH = Math.min(out["query-own"].h, compactHeight("query-own", vh));
-      out["panel-own"] = { left: 6, top: 26, w: out["panel-own"].w, h: out["panel-own"].h };
-      out["query-own"] = { left: 6, top: Math.max(0, vh - queryH - 6), w: out["query-own"].w, h: out["query-own"].h };
+      var sp = compactSize("speed", vw, vh);
+      var mini = compactSize("panel-own", vw, vh);
+      var qs = compactSize("query-own", vw, vh);
+      out.speed = { left: 6, top: 6, w: sp.w, h: sp.h };
+      out["panel-own"] = { left: 6, top: Math.max(0, vh - mini.h - 6), w: mini.w, h: mini.h };
+      out["panel-enemy"] = { left: Math.max(0, vw - mini.w - 6), top: 6, w: mini.w, h: mini.h };
+      var qLeft = Math.max(0, vw - qs.w - 6);
+      var qTop = Math.max(0, vh - qs.h - 6);
+      /* 查询与敌方迷你卡在 x 上相交且 y 上压住时，下移到敌方卡底部 */
+      var ec = out["panel-enemy"];
+      if (qLeft < ec.left + ec.w && qLeft + qs.w > ec.left &&
+          qTop < ec.top + ec.h && qTop + qs.h > ec.top) {
+        qTop = Math.min(ec.top + ec.h + 6, Math.max(0, vh - qs.h));
+      }
+      out["query-own"] = { left: qLeft, top: qTop, w: qs.w, h: qs.h };
+      out["role-detail"] = { left: 0, top: 0, w: vw, h: vh };
+      out["hp-record"] = { left: 0, top: 0, w: vw, h: vh };
+      out["battle-log"] = { left: 0, top: 0, w: vw, h: vh };
     }
     return out;
   }
@@ -90,16 +104,17 @@ export function createWindowManager(options) {
   function effectiveSize(w) {
     var b = bounds();
     var compact = isCompact();
-    var ew = w.w;
-    if (compact) ew = w.id === "panel-own" ? Math.max(160, Math.round(b.vw * 0.5)) : Math.max(120, b.vw - 12);
-    var eh = compact ? Math.min(w.h, compactHeight(w.id, b.vh)) : w.h;
-    ew = Math.min(ew, b.vw);
-    eh = Math.min(eh, Math.max(80, b.vh - 6));
-    return { w: ew, h: eh };
+    if (compact && w.overlay) return { w: b.vw, h: b.vh };
+    if (compact) {
+      var s = compactSize(w.id, b.vw, b.vh);
+      return { w: Math.min(s.w, b.vw), h: Math.min(s.h, b.vh) };
+    }
+    return { w: Math.min(w.w, b.vw), h: Math.min(w.h, Math.max(80, b.vh - 6)) };
   }
 
   function clampWin(w) {
     var b = bounds();
+    if (isCompact() && w.overlay) return;
     var size = effectiveSize(w);
     var maxLeft = Math.max(0, b.vw - size.w);
     var maxTop = Math.max(0, b.vh - size.h - 6);
@@ -109,15 +124,18 @@ export function createWindowManager(options) {
 
   function applyWin(w) {
     var compact = isCompact();
+    var overlay = !!(compact && w.overlay);
     var size = effectiveSize(w);
     var el = w.el;
-    el.style.left = Math.round(w.left) + "px";
-    el.style.top = Math.round(w.top) + "px";
+    el.style.left = overlay ? "0px" : Math.round(w.left) + "px";
+    el.style.top = overlay ? "0px" : Math.round(w.top) + "px";
     el.style.width = Math.round(size.w) + "px";
     el.style.height = Math.round(size.h) + "px";
-    el.style.zIndex = String(w.z);
+    el.style.zIndex = String(overlay ? 40 : w.z);
     el.classList.toggle("is-compact", compact);
     el.classList.toggle("is-folded", !!w.collapsed);
+    el.classList.toggle("is-mini", !!(compact && !w.overlay && COMPACT_MINI.indexOf(w.id) >= 0));
+    el.classList.toggle("is-overlay", overlay);
   }
 
   function buildShell(def) {
@@ -240,6 +258,8 @@ export function createWindowManager(options) {
   function onPointerDown(e) {
     var w = findWin(e.target);
     if (!w) return;
+    /* 紧凑下全屏浮层固定铺满，不拖动也不置顶 */
+    if (isCompact() && w.overlay) return;
     lift(w);
     if (e.target.closest && e.target.closest("[data-fold]")) return;
     var bar = e.target.closest ? e.target.closest(".lw-bar") : null;
@@ -278,12 +298,46 @@ export function createWindowManager(options) {
   }
 
   function onWinClick(e) {
-    var fold = e.target.closest ? e.target.closest("[data-fold]") : null;
-    if (!fold) return;
-    var w = findWin(fold);
-    if (!w) return;
+    var target = e.target;
+    var compact = isCompact();
+    var win = findWin(target);
+    var overlayClick = !!(compact && win && win.overlay);
+    var fold = target.closest ? target.closest("[data-fold]") : null;
+    if (fold) {
+      var w = findWin(fold);
+      if (!w) return;
+      e.preventDefault();
+      if (compact && w.overlay) {
+        w.overlay = false;
+        /* 全屏窗点 – 收回折叠条；迷你卡的全屏卡点 – 只回迷你卡，不折叠 */
+        if (COMPACT_OVERLAY.indexOf(w.id) >= 0) w.collapsed = true;
+        applyWin(w);
+        renderDock();
+        writeSaved();
+        /* 阻止冒泡到舞台的角色热区代理 */
+        e.stopPropagation();
+        return;
+      }
+      toggleFold(w);
+      if (overlayClick) e.stopPropagation();
+      return;
+    }
+    /* 全屏卡内的点击不落到舞台的选目标/普攻代理 */
+    if (overlayClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    /* 紧凑迷你卡：点正文打开同一个窗口的全屏完整卡 */
+    if (!compact) return;
+    if (!win || win.overlay) return;
+    if (COMPACT_MINI.indexOf(win.id) < 0) return;
+    if (!(target.closest && target.closest(".lw-body"))) return;
+    win.overlay = true;
+    lift(win);
+    applyWin(win);
     e.preventDefault();
-    toggleFold(w);
+    e.stopPropagation();
   }
 
   function onDockClick(e) {
@@ -293,6 +347,7 @@ export function createWindowManager(options) {
     var w = byId[chip.getAttribute("data-dock-win")];
     if (!w || !w.collapsed) return;
     w.collapsed = false;
+    if (isCompact()) w.overlay = COMPACT_OVERLAY.indexOf(w.id) >= 0;
     clampWin(w);
     lift(w);
     applyWin(w);
@@ -305,7 +360,7 @@ export function createWindowManager(options) {
     var compact = isCompact();
     var enteredCompact = compact && lastCompact === false;
     var leftCompact = !compact && lastCompact === true;
-    var anchors = enteredCompact ? defaultLayout() : null;
+    var anchors = compact ? defaultLayout() : null;
     var restored = leftCompact ? defaultLayout() : null;
     var snapById = {};
     if (enteredCompact) {
@@ -318,11 +373,16 @@ export function createWindowManager(options) {
     }
     lastCompact = compact;
     wins.forEach(function (w) {
-      if (enteredCompact && (w.id === "panel-own" || w.id === "query-own")) {
-        w.left = anchors[w.id].left;
-        w.top = anchors[w.id].top;
+      if (enteredCompact) {
+        w.overlay = false;
+        var a = anchors[w.id];
+        if (a && COMPACT_EXPANDED.indexOf(w.id) >= 0) {
+          w.left = a.left;
+          w.top = a.top;
+        }
       }
       if (leftCompact) {
+        w.overlay = false;
         var s = snapById[w.id];
         if (s) {
           w.left = s.left;
@@ -333,6 +393,14 @@ export function createWindowManager(options) {
           w.left = restored[w.id].left;
           w.top = restored[w.id].top;
           w.collapsed = DESKTOP_EXPANDED.indexOf(w.id) < 0;
+        }
+      }
+      if (compact && !leftCompact) {
+        /* 紧凑下视口变化时重锚到当前视口的默认位置（桌面与 overlay 不受影响） */
+        var aa = anchors[w.id];
+        if (aa && !w.overlay && COMPACT_EXPANDED.indexOf(w.id) >= 0) {
+          w.left = aa.left;
+          w.top = aa.top;
         }
       }
       if (enteredCompact) w.collapsed = COMPACT_EXPANDED.indexOf(w.id) < 0;
@@ -382,6 +450,7 @@ export function createWindowManager(options) {
         top: useSavedPos && prev && isFinite(prev.top) ? Number(prev.top) : base.top,
         w: base.w,
         h: base.h,
+        overlay: false,
         collapsed: compact ? COMPACT_EXPANDED.indexOf(def.id) < 0 : (prev ? !!prev.collapsed : expanded.indexOf(def.id) < 0),
         z: prev && isFinite(prev.z) ? Math.max(10, Math.min(29, Number(prev.z))) : (10 + idx)
       };
@@ -451,6 +520,7 @@ export function createWindowManager(options) {
       w.top = base.top;
       w.w = base.w;
       w.h = base.h;
+      w.overlay = false;
       w.collapsed = expanded.indexOf(w.id) < 0;
       if (compact && COMPACT_EXPANDED.indexOf(w.id) < 0) w.collapsed = true;
       clampWin(w);
