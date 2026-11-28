@@ -282,7 +282,6 @@ html.is-live .bu-bars > span {
 }
 
 html.is-live .bu-hp-bar { height: 18px; }
-html.is-live .bu-mp-bar { height: 12px; }
 
 html.is-live .bu-bars i {
   position: absolute;
@@ -296,7 +295,6 @@ html.is-live .bu-bars i {
 html.is-live .bu-hp-bar.is-high i { background: #2f9e44; opacity: 0.5; }
 html.is-live .bu-hp-bar.is-mid i { background: #e8a33d; opacity: 0.55; }
 html.is-live .bu-hp-bar.is-low i { background: #d64545; opacity: 0.55; }
-html.is-live .bu-mp-bar i { background: #3f7fd6; opacity: 0.4; }
 
 html.is-live .bu-bars b {
   position: relative;
@@ -308,11 +306,6 @@ html.is-live .bu-bars b {
   color: var(--fg);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-
-html.is-live .bu-mp-bar b {
-  font-size: 10px;
-  line-height: 12px;
 }
 
 /* ---------- 扣血记录 ---------- */

@@ -158,6 +158,39 @@
 - 实施口径：紧凑断点按 `游戏说明-坑.md` 写成 `(max-width: 900px), (orientation: landscape) and (max-height: 520px)`，覆盖 932×430/915×412 手机横屏，同时不丢窄桌面窗。844×390 下 top 面板改 50% 宽（全宽会压掉敌方名字标签），query 仍全宽；面板 77px、查询 141px、中间场景带 102px；其余 5 窗仍 46vh。
 - 验证记录：三条命令全绿：引擎 214、冒烟 29 局、浏览器 16/16、回合制 16/16、`check.ps1` 通过。844×390 实测面板 `6,26..428,103`、查询 `6,205..838,346`、折叠条底 23、敌方热区中心 x 可用 140px、敌方名字标签横向至少露 30px；932×430 仍紧凑两窗。用例改为建房前设 844×390（覆盖首次紧凑挂载），新增 dock 不压标题栏、标签露出与 932 断点断言。adversary 两轮复核：P2-1 桌面快照回退、P2-2 折叠条压标题栏、P2-3 932/915 未进紧凑、P2-4 紧凑写脏桌面记录均已修并复验；P2-N（800×900 回退桌面重叠）由组合断点修复。紧凑下不写窗口位置（折叠状态刷新回默认），桌面 saved 不受污染。
 
+## battle-13 联机角色卡：去蓝条与桌面自适应高度
+
+- 状态：已验（2026-11-28）
+- 验证记录：`verify.ps1 -Browser` 通过（引擎 214/0、冒烟 29 局 0 异常、check 全绿、浏览器 17/0）；`fitAutoHeights` 按「标题栏 + padding + 内容 + 边框」取整，headless 复算溢出 0；新增测试断言桌面角色卡无蓝条、无内部滚动；adversary 复核通过。
+- 允许改的路径：`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-windows.js`、`rpg6.0/css/battle-live.css`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无（不动 `battle-view.js` 之外的渲染、不升引擎版本）
+- 做什么：`renderVitalBars` 只输出血条（当前/最大/百分比与三档颜色），删掉蓝条标记与 `bu-mp-bar` 样式，标题行保留蓝量数字；`battle-windows.js` 给角色面板两窗加桌面自动高度——按内容实际高度设窗口高度（最低 120px、最高视口可用高度），己方卡底边固定向上长、敌方卡顶边固定向下长，内容仍超出时才内部滚动；紧凑断点不启用自动高度，留给 battle-15。
+- 不做什么：不做手机迷你条、不改紧凑默认布局（battle-15）；不改查询窗、速度条、战报、扣血记录；不改引擎、战报结构、联机协议。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
+- 验收标准：1280×900 联机角色卡无内部滚动、无蓝条、蓝量数字仍在；844×390 旧紧凑布局不回归；热座与回放无变化。
+
+## battle-14 详细战报全量渲染
+
+- 状态：已验（2026-11-28）
+- 验证记录：两处 160 条截断已删，从 `state.log` 第 0 条渲染；引擎单测 214/0，回合制浏览器 17/0；adversary 复核无其它截断点。
+- 允许改的路径：`rpg6.0/js/battle/battle-view.js`
+- 共享文件：无
+- 做什么：`renderLogWindow` 与 `renderBattleLog` 去掉「最近 160 条」截断，从 `state.log` 第一条渲染到最后一条；保留联机战报窗自动滚到最新、单机折叠态预览最后一个有效回合。
+- 不做什么：不改日志生成、引擎、数据库、回放数据结构；不做分页或虚拟滚动。
+- 验收命令：`node tests/engine/run.mjs`、`node _local/tests/run-all.mjs --group=回合制`
+- 验收标准：25 回合以上对局能看到第 1 回合事件；联机、单机、回放三处都不再截断；长局渲染无明显卡顿。
+
+## battle-16 横屏遮罩只在游戏过程中触发
+
+- 状态：已验（2026-11-28）
+- 验证记录：竖屏设置区无遮罩、开局后出现、回设置区消失（新增用例通过）；读战报失败也会撤销 `is-battle`；`verify.ps1 -Browser` 全绿。
+- 允许改的路径：`rpg6.0/css/battle.css`、`_local/tests/cases/rpg-battle.mjs`（不提交）
+- 共享文件：无
+- 做什么：把竖屏遮罩与 `body` 滚动锁定的选择器从 `html.is-phone` 收紧到 `html.is-phone.is-battle`；`is-battle` 已由 `setImmersive(true)` 在开局/回放入口加、回设置区/离开房间移除。设置区（选人、建房/加入）在竖屏手机上不弹遮罩且可正常滚动。
+- 不做什么：不改遮罩按钮的全屏/锁方向逻辑；不改 `is-phone` 判定；不动联机舞台与桌面布局。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
+- 验收标准：竖屏手机进入 `test.html` 设置区不弹遮罩、页面可滚；开始对局或打开回放后弹遮罩；回到设置区遮罩消失；横屏游戏不受影响。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

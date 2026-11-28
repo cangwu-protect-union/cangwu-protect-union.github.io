@@ -845,18 +845,19 @@ html.is-battle .site-footer {
 
 /* ---------- 横屏入口遮罩 ----------
    只在竖屏手机上出现：html.is-phone 由 JS 判定（粗指针 + 有触摸 + 短边 ≤520），
-   桌面窄窗口、平板、鼠标设备都不弹。没有第二个出口：唯一的按钮负责全屏 + 锁方向。 */
+   桌面窄窗口、平板、鼠标设备都不弹。遮罩只在已进入对局/回放时显示（html.is-battle）。
+   没有第二个出口：唯一的按钮负责全屏 + 锁方向。 */
 
 .rotate-gate {
   display: none;
 }
 
 @media (orientation: portrait) {
-  html.is-phone body {
+  html.is-phone.is-battle body {
     overflow: hidden;
   }
 
-  html.is-phone .rotate-gate {
+  html.is-phone.is-battle .rotate-gate {
     display: flex;
     position: fixed;
     inset: 0;

@@ -345,6 +345,7 @@ export function createWindowManager(options) {
       zTop = 10;
       wins.forEach(function (w) { zTop = Math.max(zTop, w.z); });
     }
+    if (!compact) fitAutoHeights();
     renderDock();
   }
 
@@ -459,11 +460,37 @@ export function createWindowManager(options) {
     if (onChange) onChange();
   }
 
+  /* 桌面端角色面板按内容自适应高度：取内容块 + 标题栏 + 内边距 + 边框，
+     最低 120px、最高不超过视口；超出部分仍由内部滚动处理。 */
+  function fitAutoHeights() {
+    if (isCompact()) return;
+    var b = bounds();
+    ["panel-own", "panel-enemy"].forEach(function (id) {
+      var w = byId[id];
+      if (!w || w.collapsed) return;
+      if (!w.bodyEl || !w.bodyEl.firstElementChild) return;
+      var child = w.bodyEl.firstElementChild;
+      var cs = rootWin.getComputedStyle(w.el);
+      var borderY = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      var bs = rootWin.getComputedStyle(w.bodyEl);
+      var padY = (parseFloat(bs.paddingTop) || 0) + (parseFloat(bs.paddingBottom) || 0);
+      var barEl = w.el.querySelector(".lw-bar");
+      var barH = barEl ? barEl.offsetHeight : 30;
+      var h = Math.ceil(barH + padY + child.offsetHeight + borderY);
+      h = Math.max(120, Math.min(h, b.vh));
+      if (h === Math.round(w.h)) return;
+      w.h = h;
+      clampWin(w);
+      applyWin(w);
+    });
+  }
+
   function syncContent() {
     wins.forEach(function (w) {
       if (!w.bodyEl) return;
       w.bodyEl.classList.toggle("is-empty", !w.bodyEl.firstElementChild);
     });
+    fitAutoHeights();
     renderDock();
     if (onChange) onChange();
   }

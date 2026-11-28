@@ -121,6 +121,7 @@
     P.dom.grid.innerHTML = '<p class="setup-note">正在读取战报…</p>';
 
     if (!window.RpgData || typeof window.RpgData.getBattle !== "function") {
+      P.setImmersive(false);
       P.dom.grid.innerHTML = '<p class="setup-note">数据层不可用，无法回放。</p>';
       return;
     }
@@ -149,6 +150,7 @@
         P.render();
       });
     }).catch(function (err) {
+      P.setImmersive(false);
       P.dom.grid.innerHTML = '<p class="setup-note">读不出这份战报：' + P.esc(err.message) + "</p>";
     });
   }

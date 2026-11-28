@@ -107,20 +107,15 @@
     return html;
   }
 
-  /* 可视化血条与细蓝条：宽度用内部算出的整数百分比，颜色按血量比例三档 */
+  /* 可视化血条：宽度用内部算出的整数百分比，颜色按血量比例三档 */
   P.renderVitalBars = function (unit) {
     var maxHp = B.state.maxHpOf(unit) || 1;
-    var maxMp = B.state.maxMpOf(unit) || 1;
     var hp = Math.max(0, Math.min(unit.hp, maxHp));
-    var mp = Math.max(0, Math.min(unit.mp, maxMp));
     var hpPct = Math.max(0, Math.min(100, Math.round(hp / maxHp * 100)));
-    var mpPct = Math.max(0, Math.min(100, Math.round(mp / maxMp * 100)));
     var tone = hpPct > 60 ? "is-high" : hpPct > 30 ? "is-mid" : "is-low";
     return '<div class="bu-bars">' +
       '<span class="bu-hp-bar ' + tone + '"><i style="width:' + hpPct + '%"></i><b>血 ' +
         hp + "/" + maxHp + " · " + hpPct + '%</b></span>' +
-      '<span class="bu-mp-bar"><i style="width:' + mpPct + '%"></i><b>蓝 ' +
-        mp + "/" + maxMp + " · " + mpPct + '%</b></span>' +
       "</div>";
   }
 
@@ -170,13 +165,12 @@
       "</div>";
   }
 
-  /* 详细战报窗：最近 160 条，不带 <details>，滚动由舞台处理 */
+  /* 详细战报窗：完整日志，不带 <details>，滚动由舞台处理 */
   P.renderLogWindow = function (state) {
     var list = state.log || [];
-    var start = Math.max(0, list.length - 160);
     var html = "";
     var rows = 0;
-    for (var i = start; i < list.length; i++) {
+    for (var i = 0; i < list.length; i++) {
       var line = P.eventLine(state, list[i]);
       if (!line) continue;
       rows += 1;
@@ -226,12 +220,11 @@
 
   P.renderBattleLog = function (state, open, preview) {
     var list = state.log || [];
-    var start = Math.max(0, list.length - 160);
     var head = '<summary><span class="bl-title">战斗日志</span>' +
       (preview ? P.renderLogPreview(state) : "") + "</summary>";
     var html = '<details class="battle-log" data-log' + (open ? " open" : "") + ">" + head + '<ol class="bl-items">';
     var rows = 0;
-    for (var i = start; i < list.length; i++) {
+    for (var i = 0; i < list.length; i++) {
       var line = P.eventLine(state, list[i]);
       if (!line) continue;
       rows += 1;
