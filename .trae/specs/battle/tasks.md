@@ -208,6 +208,20 @@
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`
 - 验收标准：竖屏手机进入 `test.html` 设置区不弹遮罩、页面可滚；开始对局或打开回放后弹遮罩；回到设置区遮罩消失；横屏游戏不受影响。
 
+## battle-17 联机手机紧凑：角色卡原位增高与 Buff 气泡
+
+- 状态：已验（2026-11-28）
+- 验证记录：`verify.ps1 -Browser` 全绿（引擎 214/0、冒烟 29 局 0 异常、浏览器 17/0、`check.ps1` 通过）；844×390 己方迷你卡展开为 300×238（迷你 300×58），宽度与左边位置不变、底边继续贴 live 底边，敌方卡贴顶向下长；展开卡内点「王霸之气」chip 弹出详情气泡；`–` 收回迷你卡；932×430 与桌面联机用例不回归。
+- 允许改的路径：`rpg6.0/js/battle/battle-windows.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/css/battle-live.css`、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：无（不改引擎、不改 `battle-view.js`、不升 `ENGINE_VERSION`）
+- 做什么：
+  - 紧凑模式下点角色迷你卡正文不再切全屏 overlay；改为宽度不变、按内容测高：敌方卡贴顶向下长，己方卡贴底向上长，高度上限为 live 区高度 −12，内容超出时卡内滚动。
+  - 展开态显示六维面板、Buff/持续效果/状态与页脚；状态变化后重新测高，`–` 收回迷你卡，再点 `–` 折叠进 dock。
+  - 展开卡内点 `[data-detail]` 弹 Buff 气泡，复用 `P.showBuffPop`，点别处或滚动关闭。
+- 不做什么：不改桌面浮窗；`role-detail` / `hp-record` / `battle-log` 的全屏行为保持不变；不改引擎、战报、联机协议；不做竖屏布局；单机手机不加同样的展开。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
+- 验收标准：844×390 点角色迷你卡后宽度仍约 300、高度增加且不铺满 live 区，六维与 Buff 可见；点 Buff chip 出现详情气泡；`–` 回迷你卡；932×430 与桌面 1280×900 不回归。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

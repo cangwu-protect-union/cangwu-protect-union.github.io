@@ -107,6 +107,7 @@ export function createWindowManager(options) {
     if (compact && w.overlay) return { w: b.vw, h: b.vh };
     if (compact) {
       var s = compactSize(w.id, b.vw, b.vh);
+      if (w.expanded) return { w: Math.min(s.w, b.vw), h: Math.min(w.h || s.h, b.vh) };
       return { w: Math.min(s.w, b.vw), h: Math.min(s.h, b.vh) };
     }
     return { w: Math.min(w.w, b.vw), h: Math.min(w.h, Math.max(80, b.vh - 6)) };
@@ -134,7 +135,8 @@ export function createWindowManager(options) {
     el.style.zIndex = String(overlay ? 40 : w.z);
     el.classList.toggle("is-compact", compact);
     el.classList.toggle("is-folded", !!w.collapsed);
-    el.classList.toggle("is-mini", !!(compact && !w.overlay && COMPACT_MINI.indexOf(w.id) >= 0));
+    el.classList.toggle("is-mini", !!(compact && !w.overlay && !w.expanded && COMPACT_MINI.indexOf(w.id) >= 0));
+    el.classList.toggle("is-expanded", !!(compact && !w.overlay && w.expanded));
     el.classList.toggle("is-overlay", overlay);
   }
 
@@ -258,8 +260,8 @@ export function createWindowManager(options) {
   function onPointerDown(e) {
     var w = findWin(e.target);
     if (!w) return;
-    /* 紧凑下全屏浮层固定铺满，不拖动也不置顶 */
-    if (isCompact() && w.overlay) return;
+    /* 紧凑下全屏浮层固定铺满，原位展开的角色卡贴边锚定，都不拖动 */
+    if (isCompact() && (w.overlay || w.expanded)) return;
     lift(w);
     if (e.target.closest && e.target.closest("[data-fold]")) return;
     var bar = e.target.closest ? e.target.closest(".lw-bar") : null;
@@ -318,6 +320,19 @@ export function createWindowManager(options) {
         e.stopPropagation();
         return;
       }
+      if (compact && w.expanded) {
+        /* 原位展开态点 – 收回迷你卡，不折叠进 dock */
+        var b = bounds();
+        var mini = compactSize(w.id, b.vw, b.vh);
+        w.expanded = false;
+        w.h = mini.h;
+        w.top = w.id === "panel-own" ? Math.max(0, b.vh - mini.h - 6) : 6;
+        applyWin(w);
+        renderDock();
+        writeSaved();
+        e.stopPropagation();
+        return;
+      }
       toggleFold(w);
       if (overlayClick) e.stopPropagation();
       return;
@@ -328,13 +343,20 @@ export function createWindowManager(options) {
       e.stopPropagation();
       return;
     }
-    /* 紧凑迷你卡：点正文打开同一个窗口的全屏完整卡 */
     if (!compact) return;
     if (!win || win.overlay) return;
     if (COMPACT_MINI.indexOf(win.id) < 0) return;
+    /* Buff chip 交给舞台弹气泡，不要在这里吞掉 */
+    if (target.closest && target.closest("[data-detail]")) return;
+    /* 原位展开只用高度装下六维/Buff，宽度与左右位置不变 */
+    if (win.expanded) {
+      e.stopPropagation();
+      return;
+    }
     if (!(target.closest && target.closest(".lw-body"))) return;
-    win.overlay = true;
+    win.expanded = true;
     lift(win);
+    fitExpanded(win);
     applyWin(win);
     e.preventDefault();
     e.stopPropagation();
@@ -347,7 +369,10 @@ export function createWindowManager(options) {
     var w = byId[chip.getAttribute("data-dock-win")];
     if (!w || !w.collapsed) return;
     w.collapsed = false;
-    if (isCompact()) w.overlay = COMPACT_OVERLAY.indexOf(w.id) >= 0;
+    if (isCompact()) {
+      w.overlay = COMPACT_OVERLAY.indexOf(w.id) >= 0;
+      if (COMPACT_MINI.indexOf(w.id) >= 0) w.expanded = false;
+    }
     clampWin(w);
     lift(w);
     applyWin(w);
@@ -375,6 +400,7 @@ export function createWindowManager(options) {
     wins.forEach(function (w) {
       if (enteredCompact) {
         w.overlay = false;
+        w.expanded = false;
         var a = anchors[w.id];
         if (a && COMPACT_EXPANDED.indexOf(w.id) >= 0) {
           w.left = a.left;
@@ -383,6 +409,7 @@ export function createWindowManager(options) {
       }
       if (leftCompact) {
         w.overlay = false;
+        w.expanded = false;
         var s = snapById[w.id];
         if (s) {
           w.left = s.left;
@@ -414,6 +441,7 @@ export function createWindowManager(options) {
       wins.forEach(function (w) { zTop = Math.max(zTop, w.z); });
     }
     if (!compact) fitAutoHeights();
+    else fitExpandedHeights();
     renderDock();
   }
 
@@ -451,6 +479,7 @@ export function createWindowManager(options) {
         w: base.w,
         h: base.h,
         overlay: false,
+        expanded: false,
         collapsed: compact ? COMPACT_EXPANDED.indexOf(def.id) < 0 : (prev ? !!prev.collapsed : expanded.indexOf(def.id) < 0),
         z: prev && isFinite(prev.z) ? Math.max(10, Math.min(29, Number(prev.z))) : (10 + idx)
       };
@@ -521,6 +550,7 @@ export function createWindowManager(options) {
       w.w = base.w;
       w.h = base.h;
       w.overlay = false;
+      w.expanded = false;
       w.collapsed = expanded.indexOf(w.id) < 0;
       if (compact && COMPACT_EXPANDED.indexOf(w.id) < 0) w.collapsed = true;
       clampWin(w);
@@ -555,12 +585,42 @@ export function createWindowManager(options) {
     });
   }
 
+  /* 紧凑端角色卡原位展开：宽度不变，按内容测高；
+     敌方卡贴顶向下长，己方卡贴底向上长，内容超出上限时卡内滚动。 */
+  function fitExpanded(w) {
+    if (!w || !w.expanded || w.overlay || !w.bodyEl) return;
+    var b = bounds();
+    var mini = compactSize(w.id, b.vw, b.vh);
+    /* 先摘掉迷你卡样式，否则六维/Buff 仍是 display:none，量不到真实高度 */
+    w.el.classList.remove("is-mini");
+    w.el.classList.add("is-expanded");
+    var barEl = w.el.querySelector(".lw-bar");
+    var barH = barEl ? barEl.offsetHeight : 30;
+    var cs = rootWin.getComputedStyle(w.el);
+    var borderY = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    var h = Math.ceil(barH + w.bodyEl.scrollHeight + borderY);
+    w.h = Math.min(Math.max(mini.h, b.vh - 12), Math.max(mini.h, h));
+    w.left = Math.max(0, Math.min(w.left, b.vw - mini.w));
+    w.top = w.id === "panel-enemy" ? 6 : Math.max(6, b.vh - w.h - 6);
+  }
+
+  function fitExpandedHeights() {
+    if (!isCompact()) return;
+    wins.forEach(function (w) {
+      if (!w.expanded || w.collapsed) return;
+      fitExpanded(w);
+      clampWin(w);
+      applyWin(w);
+    });
+  }
+
   function syncContent() {
     wins.forEach(function (w) {
       if (!w.bodyEl) return;
       w.bodyEl.classList.toggle("is-empty", !w.bodyEl.firstElementChild);
     });
     fitAutoHeights();
+    fitExpandedHeights();
     renderDock();
     if (onChange) onChange();
   }

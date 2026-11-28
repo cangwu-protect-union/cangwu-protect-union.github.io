@@ -276,6 +276,15 @@ function create() {
   /* 战报窗默认折叠；折叠时 scrollHeight 为 0，展开后补一次滚到最新 */
   function onLiveClick(event) {
     var target = event.target;
+    /* 角色卡里的 Buff/持续效果/状态 chip：触摸端没有 hover，点了直接弹气泡 */
+    var detail = target.closest ? target.closest("[data-detail]") : null;
+    if (detail) {
+      var P = page();
+      if (P && P.showBuffPop) P.showBuffPop(detail);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     var card = target.closest ? target.closest("[data-summon-card]") : null;
     if (card) {
       event.stopPropagation();
