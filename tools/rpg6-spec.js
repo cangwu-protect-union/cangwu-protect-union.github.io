@@ -32,7 +32,7 @@ const SKILL_FIELDS = [
   "id", "owner", "name", "conditionText", "target", "ops", "choices", "chargeOps", "hooks",
   "cost", "charge", "cooldown", "once", "costFromLost", "requires", "input", "passive",
   "unsupported", "rollDodge", "buffImmune", "baseUnsupported", "items", "forbidEffect",
-  "noAction", "undying", "selfKillWin"
+  "noAction", "undying", "selfKillWin", "activeDodge", "basicGroupWhen", "toggleEffect"
 ];
 
 /* 数值表达式认的键，与 effect-ops.evalValue 的分支一一对应 */
@@ -120,9 +120,24 @@ const OPS = {
     fields: { sides: "默认 6", key: "计数器名", perTarget: "默认 true" },
     required: ["key"]
   },
+  ask: {
+    desc: "挂起等待对方选择：answer 选首项走 then、否则走 else；guess 猜中走 then、否则走 else",
+    fields: {
+      kind: "answer/guess",
+      key: "响应 key",
+      sides: "guess 面数，默认 6",
+      prompt: "弹窗文案",
+      options: "answer 选项数组",
+      default: "answer 默认选项",
+      value: "guess 要比对的数值表达式"
+    },
+    required: ["kind"],
+    enums: { kind: ["answer", "guess"] },
+    extra: ["then", "else"]
+  },
   strike: {
     desc: "立刻执行一次普攻",
-    fields: { target: "source 表示打来源", victim: "显式指定打谁（target/enemyHero 等）", noBreak: "" },
+    fields: { target: "source 表示打来源", victim: "显式指定打谁（target/enemyHero 等）", times: "重复次数", noBreak: "" },
     enums: { target: ["source"] }
   },
   deny: {
@@ -144,13 +159,15 @@ const OPS = {
     desc: "逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:\"turnStart\"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明",
     fields: {
       ops: "必填", duration: "", period: "每 N 回合", permanent: "", unstoppable: "", desc: "chip 说明",
-      when: "turnStart 时在持有者回合开始时结算",
+      when: "turnStart 时在持有者回合开始时结算；roundStart 时在每个标准回合开始时结算",
       tag: "给 interrupt 用", key: "给 if.cond.effect 用", gate: "{sides,cancel}",
       breakOnSourceStatus: "", breakOnHolderStatus: "", fromBuff: "", debuff: "负面标记，dispel marked 清除",
       guard: "{remaining,onBreak,ops}", immune: "{buffs,statuses}", breakImmune: "",
-      chargeGuard: "", enemyNoSkill: "", selfNoBasic: "", onExpire: "到期时执行的 ops"
+      chargeGuard: "", enemyNoSkill: "", selfNoBasic: "", onExpire: "到期时执行的 ops",
+      ignoreTaunt: "效果在身时无视嘲讽等级", autoBreakAtCap: "效果在身时敌方击溃值到上限自动击溃"
     },
     required: ["ops"],
+    enums: { when: ["turnStart", "roundStart"] },
     extra: ["on", "ops"]
   },
   reflect: {
@@ -188,6 +205,11 @@ const OPS = {
     fields: { key: "必填", delta: "默认 +1", perTarget: "默认 true" },
     required: ["key"]
   },
+  flag: {
+    desc: "写单位 flags（说帅回合等）",
+    fields: { key: "必填", value: "数值表达式", who: "" },
+    required: ["key", "value"]
+  },
   rewind: {
     desc: "反方向的钟：奇数次记录全状态快照，偶数次回到快照；独立 clock 计时，回溯不重置",
     fields: {}
@@ -210,6 +232,10 @@ const OPS = {
     desc: "生成召唤物，`key` 指向 `summons` 定义",
     fields: { key: "必填", ttl: "覆盖定义里的 ttl" },
     required: ["key"]
+  },
+  clearSummons: {
+    desc: "清除一侧全部召唤物",
+    fields: { who: "self 或侧" }
   },
   setBasicMode: {
     desc: "把普攻改成给召唤物回血",

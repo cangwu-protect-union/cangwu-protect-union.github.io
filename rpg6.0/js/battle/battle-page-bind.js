@@ -43,6 +43,14 @@
         P.render();
         return;
       }
+      var respondBtn = event.target.closest("[data-respond]");
+      if (respondBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        P.onRespond(respondBtn.getAttribute("data-respond"));
+        return;
+      }
+      if (event.target.closest(".bq-response")) return;
       var skill = event.target.closest("[data-skill]");
       if (skill) {
         event.preventDefault();

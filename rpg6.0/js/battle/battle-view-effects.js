@@ -57,6 +57,8 @@
       case "action":
         if (e.kind === "item") {
           line = { text: round + who + " 使用「" + (e.name || e.itemId) + "」", cls: "is-action" };
+        } else if (e.closed) {
+          line = { text: round + who + " 关闭「" + (e.name || e.skillId) + "」", cls: "is-action" };
         } else {
           line = { text: round + who + " 施放「" + (e.name || e.skillId) + "」", cls: "is-action" };
         }

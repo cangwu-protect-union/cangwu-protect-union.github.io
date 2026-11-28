@@ -4,7 +4,7 @@
   "use strict";
 
   function create() {
-    return { mode: "", type: "", id: "", targets: [], stats: [] };
+    return { mode: "", type: "", id: "", targets: [], stats: [], group: false };
   }
 
   function begin(pick, spec) {
@@ -13,6 +13,7 @@
     pick.id = spec.id || "";
     pick.targets = (spec.targets || []).slice();
     pick.stats = (spec.stats || []).slice();
+    pick.group = !!spec.group;
     return pick;
   }
 
@@ -22,6 +23,7 @@
     pick.id = "";
     pick.targets = [];
     pick.stats = [];
+    pick.group = false;
     return pick;
   }
 

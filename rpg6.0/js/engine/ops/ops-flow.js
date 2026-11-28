@@ -6,6 +6,60 @@
   var api = B.effectOps || (B.effectOps = {});
   var H = api._helpers || {};
 
+  /* 响应 key 必须稳定、可回放：
+     动作里用 actN，持续效果里用 eff<effectId>，都没有时退回技能 id；后面再拼标准回合与 op.key。 */
+  function responseKey(state, ctx, op) {
+    var base = String(op.key || op.kind);
+    var prefix = "";
+    if (ctx && ctx.actionId) prefix = String(ctx.actionId);
+    else if (ctx && ctx.effectId) prefix = "eff" + ctx.effectId;
+    else if (ctx && ctx.skillId) prefix = String(ctx.skillId);
+    if (!prefix) prefix = "r" + state.round;
+    return prefix + ":" + state.round + ":" + base;
+  }
+
+  function responderUidOf(state, ctx) {
+    var self = H.sideUnit(state, ctx, "self");
+    if (!self) return "";
+    var side = B.state.otherSide(state, B.state.sideOf(state, self.uid));
+    var hero = B.state.heroOf(state, side);
+    return hero ? hero.uid : "";
+  }
+
+  /* 挂起等待对方选择：有响应就按 then/else 继续，没有就抛 err.pending 交给 battle.apply。
+     不写任何事件与状态，重放的副作用全部由响应后的重新执行产生。 */
+  api.registerOp("ask", function (state, ctx, op, events) {
+    /* 同一动作里可能有多个同 key 的 ask：每次调用递增 askSeq，重放时序列一致 */
+    state.askSeq = (state.askSeq || 0) + 1;
+    var key = responseKey(state, ctx, op) + ":a" + state.askSeq;
+    var kind = op.kind || "answer";
+    var responses = state.responses || {};
+    if (Object.prototype.hasOwnProperty.call(responses, key)) {
+      var value = responses[key];
+      var pass;
+      if (kind === "guess") pass = Number(value) === Number(H.evalValue(state, ctx, op.value));
+      else pass = String(value) === String((op.options || ["是", "否"])[0]);
+      H.runOps(state, ctx, pass ? (op.then || []) : (op.else || []), events);
+      return;
+    }
+    var options = kind === "answer" ? (op.options || ["是", "否"]) : ["1", "2", "3", "4", "5", "6"];
+    var pend = {
+      key: key,
+      kind: kind,
+      responderUid: responderUidOf(state, ctx),
+      requesterUid: ctx ? ctx.sourceUid : "",
+      skillId: (ctx && ctx.skillId) || "",
+      round: state.round,
+      prompt: op.prompt || "请选择",
+      options: options,
+      defaultChoice: kind === "answer" ? (op.default || options[0]) : 0,
+      payload: { kind: kind, sides: Number(op.sides) || 6 }
+    };
+    var err = new Error("需要对方选择");
+    err.pending = pend;
+    throw err;
+  });
+
   api.registerOp("dice", function (state, ctx, op, events) {
 
         H.runDice(state, ctx, op, events);
@@ -191,6 +245,16 @@
         B.summons.create(state, op.key, summoner, events, { ttl: op.ttl });
         return;
       
+  });
+
+  api.registerOp("clearSummons", function (state, ctx, op, events) {
+    var owner = H.sideUnit(state, ctx, op.who || "self");
+    if (!owner || !B.summons || !B.summons.ofSide) return;
+    var side = B.state.sideOf(state, owner.uid);
+    var list = B.summons.ofSide(state, side).slice();
+    for (var i = 0; i < list.length; i++) {
+      B.summons.remove(state, list[i].uid, "clearSummons", events);
+    }
   });
 
   api.registerOp("dodge", function (state, ctx, op, events) {

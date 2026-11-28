@@ -280,9 +280,18 @@ function lintLibrary(lib, options) {
           fail(owner, label, where, "不是对象");
           return;
         }
-        if (!req.mark) fail(owner, label, where, "缺少 mark");
-        else if (!declaredFor(owner, req.mark)) fail(owner, label, where + ".mark", "「" + req.mark + "」没有在 marks 里声明");
-        if (req.gte == null && req.lte == null && req.eq == null) fail(owner, label, where, "需要 gte / lte / eq 之一");
+        if (!req.mark && !req.flag && !req.summonCount) fail(owner, label, where, "缺少 mark、flag 或 summonCount");
+        else if (req.mark && !declaredFor(owner, req.mark)) fail(owner, label, where + ".mark", "「" + req.mark + "」没有在 marks 里声明");
+        if (req.once != null && typeof req.once !== "boolean") fail(owner, label, where + ".once", "once 必须是布尔值");
+        if (req.summonCount) {
+          if (typeof req.summonCount !== "object") fail(owner, label, where + ".summonCount", "需要对象 {op,right}");
+          else if (["gte", "gt", "lte", "lt", "eq"].indexOf(req.summonCount.op) < 0) fail(owner, label, where + ".summonCount.op", "比较方式非法，应为 gte/gt/lte/lt/eq");
+          else if (req.summonCount.right == null) fail(owner, label, where + ".summonCount.right", "缺少 right");
+        } else if (req.flag) {
+          if (req.gap == null) fail(owner, label, where, "flag 条件需要 gap");
+        } else if (req.gte == null && req.lte == null && req.eq == null) {
+          fail(owner, label, where, "需要 gte / lte / eq 之一");
+        }
       });
     }
 

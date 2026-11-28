@@ -113,10 +113,14 @@
             : (ctx.ownerUid && ctx.ownerUid !== ctx.sourceUid ? ctx.sourceUid : ctx.targetUid));
         if (!victim) return;
         if (B.actions && B.actions.strike) {
-          B.actions.strike(state, striker, victim, events, {
-            noBreak: !!op.noBreak,
-            label: op.label || ctx.label || "普攻"
-          });
+          var times = Math.max(1, Math.floor(Number(H.evalValue(state, ctx, op.times == null ? 1 : op.times)) || 1));
+          for (var i = 0; i < times; i++) {
+            if (state.phase === "finished") return;
+            B.actions.strike(state, striker, victim, events, {
+              noBreak: !!op.noBreak,
+              label: op.label || ctx.label || "普攻"
+            });
+          }
         }
         return;
       

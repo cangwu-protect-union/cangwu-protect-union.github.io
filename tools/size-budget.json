@@ -43,7 +43,7 @@
     {
       "path": "rpg6.0/js/engine/state.js",
       "class": "C",
-      "cap": 580,
+      "cap": 600,
       "why": "clone/hash 手写枚举单位字段，拆开漏字段时回放比对测不出"
     },
     {
@@ -55,7 +55,7 @@
     {
       "path": "rpg6.0/js/battle/battle-remote.js",
       "class": "C",
-      "cap": 900,
+      "cap": 940,
       "why": "联机房间状态机、重放与轮询共用一份闭包；拆开时座位、序号与中止标记会跨文件重复"
     }
   ]

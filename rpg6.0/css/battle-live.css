@@ -542,6 +542,44 @@ html.is-live .lw-body .bq-actions {
   gap: 6px;
 }
 
+/* ---------- 响应块（pendingResponse 挂起时替代技能与动作区） ---------- */
+
+.bq-response {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.bq-response.is-wait {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bq-response.is-wait p {
+  margin: 0;
+}
+
+.bq-response-prompt {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.bq-response-timer {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bq-response-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 /* ---------- 底栏与结算覆盖 ---------- */
 
 html.is-live .battle-bar {
@@ -757,6 +795,20 @@ html.is-live .battle-result {
 
   .scene-tag-hp {
     width: 72px;
+  }
+
+  .bq-response-options {
+    gap: 4px;
+  }
+
+  .bq-response-options .bq-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 6px;
+  }
+
+  [data-resp-timer] {
+    font-size: 12px;
   }
 }
 

@@ -35,6 +35,7 @@
   P.logUid = "";
   P.battleLogOpen = null;
   P.live = null;
+  P.responseTimer = null;
 
 
 
@@ -117,7 +118,7 @@
       P.live.mount(P.dom.stage);
       P.live.render(P.state, P.meta, P.pick, P.hint, {
         side: P.remote.side || "a",
-        readOnly: !P.remote.canAct()
+        readOnly: !P.remote.canAct() && !P.remote.canRespond()
       });
     } else {
       if (P.live) {
@@ -126,7 +127,7 @@
       }
       var compact = P.isCompact();
       P.dom.grid.innerHTML = root.BattleView.render(P.state, P.meta, P.pick, P.hint, {
-        readOnly: P.mode !== "play" || (!!P.remote && !P.remote.canAct()),
+        readOnly: P.mode !== "play" || (!!P.remote && !P.remote.canAct() && !P.remote.canRespond()),
         speedOpen: P.speedOpen === null ? !compact : P.speedOpen,
         battleLogOpen: P.battleLogOpen === null ? !compact : P.battleLogOpen,
         battleLogPreview: !compact,
@@ -173,6 +174,7 @@
     }
     if (P.remote && P.remote.syncStatus) P.remote.syncStatus();
     if (live && P.live && P.live.syncBar) P.live.syncBar(P.pick);
+    P.ensureResponseTimer();
   }
 
   P.hashMatched = true;
@@ -192,6 +194,10 @@
   /* ---------------- 交互 ---------------- */
 
   P.applyAction = function (action) {
+    if (P.state.pendingResponse && (!action || action.kind !== "respond")) {
+      P.setHint("等待对方选择");
+      return false;
+    }
     if (P.remote) return P.remote.act ? P.remote.act(action) : false;
     var before = B.state.clone(P.state);
     var result;
@@ -207,15 +213,90 @@
     if (P.history.length > 60) P.history.shift();
     P.state = result.state;
     P.actions.push(result.committed);
-    P.hint = P.describe(result.events);
+    P.hint = action && action.kind === "respond" ? "已提交选择" : P.describe(result.events);
     root.BattlePick.cancel(P.pick);
     P.writeLive();
     P.render();
     return true;
   }
 
+  /* 提交响应选择：只有当前 pendingResponse 的响应方能通过 */
+  P.onRespond = function (choice) {
+    var pend = P.state && P.state.pendingResponse;
+    if (!pend) return false;
+    return P.applyAction({ kind: "respond", id: pend.id, uid: pend.responderUid, choice: choice });
+  };
+
+  /* ---------------- 响应倒计时 ---------------- */
+
+  /* keep=true 只停 interval，保留 id 与 deadline（提交中/等待时不能让倒计时归零） */
+  P.stopResponseTimer = function (keep) {
+    if (!P.responseTimer) return;
+    clearInterval(P.responseTimer.interval);
+    P.responseTimer.interval = null;
+    if (!keep) P.responseTimer = null;
+  };
+
+  P.refreshResponseTimerText = function (remain) {
+    var nodes = root.document.querySelectorAll("[data-resp-timer]");
+    for (var i = 0; i < nodes.length; i++) nodes[i].textContent = String(remain);
+  };
+
+  P.responseSecondsLeft = function () {
+    var timer = P.responseTimer;
+    return timer ? Math.max(0, Math.ceil((timer.deadline - Date.now()) / 1000)) : 0;
+  };
+
+  /* 到 0 提交默认选择；提交中/锁住返回 false 时 500ms 后重试，最多 3 次 */
+  P.retryRespond = function (id, tries) {
+    if (tries > 3) return;
+    setTimeout(function () {
+      var pend = P.state && P.state.pendingResponse;
+      if (!pend || pend.id !== id) return;
+      if (P.onRespond(pend.defaultChoice) === false) P.retryRespond(id, tries + 1);
+    }, 500);
+  };
+
+  P.tickResponseTimer = function () {
+    var timer = P.responseTimer;
+    var pend = P.state && P.state.pendingResponse;
+    if (!timer || !pend) {
+      P.stopResponseTimer(false);
+      return;
+    }
+    var left = P.responseSecondsLeft();
+    P.refreshResponseTimerText(left);
+    if (left > 0) return;
+    P.stopResponseTimer(true);
+    timer.fired = true;
+    if (P.onRespond(pend.defaultChoice) === false) P.retryRespond(pend.id, 1);
+  };
+
+  /* 同一 pendingResponse.id 只建一个 deadline：render 重建只刷新文本，不重置 */
+  P.ensureResponseTimer = function () {
+    var pend = P.mode === "play" && P.state ? P.state.pendingResponse : null;
+    if (!pend) {
+      P.stopResponseTimer(false);
+      return;
+    }
+    if (!P.responseTimer || P.responseTimer.id !== pend.id) {
+      P.stopResponseTimer(false);
+      P.responseTimer = { id: pend.id, deadline: Date.now() + 10000, interval: null, retries: 0, fired: false };
+    }
+    var timer = P.responseTimer;
+    var mine = true;
+    if (P.remote && P.remote.room && P.remote.canRespond) mine = P.remote.canRespond();
+    if (!mine) {
+      P.stopResponseTimer(true);
+      return;
+    }
+    if (!timer.interval && !timer.fired) timer.interval = setInterval(P.tickResponseTimer, 250);
+    P.refreshResponseTimerText(P.responseSecondsLeft());
+  };
+
   P.currentUnit = function () {
     if (!P.state || P.mode !== "play" || P.state.phase === "finished" || !P.state.turnUid) return null;
+    if (P.state.pendingResponse) return null;
     return B.state.unitOf(P.state, P.state.turnUid);
   }
 
@@ -228,9 +309,10 @@
     return hero ? hero.uid : "";
   }
 
-  P.allowedEnemyUids = function (unit) {
+  P.allowedEnemyUids = function (unit, withEffect) {
     var list = B.state.combatantsOf(P.state, P.enemySideOf(unit));
-    if (B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)) {
+    if ((B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)) ||
+        (withEffect && B.state.effectHasFlag && B.state.effectHasFlag(unit, "ignoreTaunt"))) {
       return list.map(function (u) { return u.uid; });
     }
     var max = -Infinity;
@@ -266,7 +348,20 @@
       P.render();
       return;
     }
-    var targets = P.allowedEnemyUids(unit);
+    /* 普攻群攻（卫委壮观）：防/法抗不为 0 时目标就是敌方全体，点任意一个即结算全体 */
+    var group = !!(B.skills && B.skills.basicGroupOf && B.skills.basicGroupOf(unit));
+    if (group) {
+      var groupTargets = B.state.combatantsOf(P.state, P.enemySideOf(unit)).map(function (u) { return u.uid; });
+      if (!groupTargets.length) {
+        P.setHint("没有合法目标");
+        return;
+      }
+      root.BattlePick.begin(P.pick, { mode: "basic", type: "attack", targets: groupTargets, group: true });
+      P.setHint("群攻：点任意敌人，命中全体");
+      P.render();
+      return;
+    }
+    var targets = P.allowedEnemyUids(unit, true);
     if (unit.trait && unit.trait.canHitAlly) targets = [unit.uid].concat(targets);
     if (!targets.length) {
       P.setHint("没有合法目标");

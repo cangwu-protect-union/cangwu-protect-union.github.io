@@ -36,7 +36,7 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | `tests/engine/batch.mjs` | 两两配对压测与僵局分类 |
 | `_local/tests/cases/rpg-battle.mjs` | 浏览器用例（全角色冒烟、召唤物带、墓回血、844×390） |
 
-规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->32 人 117 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.15<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
+规则文档与逐条裁定：`_local/docs/回合制6.0测试功能-plan.md`、`_local/docs/回合制6.0测试功能-角色机制.md`（第 13 节是召唤物批次）。当前 <!-- RPG6-STATS:START charsSkillsShort -->32 人 117 条技能<!-- RPG6-STATS:END charsSkillsShort -->，引擎 `<!-- RPG6-STATS:START version -->6.0-engine.16<!-- RPG6-STATS:END version -->`；`test.html` 只引一个模块入口 `js/battle/entry.js`（引擎与技能库由它 import，另有 <!-- RPG6-STATS:START scripts -->7<!-- RPG6-STATS:END scripts --> 个经典 `<script>`），`summons.js` 在 `skills.js` 之后、`actions.js` 之前（顺序见 `js/engine/index.js`）。数字不要手改，跑 `node tools/rpg6-stats.js --write`。
 
 ## 加一个能上场的角色
 
@@ -72,6 +72,10 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 - 群体目标：`who:"allEnemies"` = 敌方英雄 + 有血召唤物；`who:"allAllies"` = 己方英雄（不含召唤物）。技能 `target:"allEnemies"/"allAllies"` 时，默认 `who:"target"` 会自动展开到对应群体。
 - 数值表达式：常量、`{stat:"self.atk"}`、`{per:…,factor}`、`{hpPercent:"self.lost",percent}`、`{plus:[…]}`、`{minus:[…]}`、`{counter:"…"}`、`{mark:"…"}`、`{summonCount:"key"}`（己方该召唤物存活数量）。
 - 技能字段：`cost.mp`、`charge`、`cooldown`、`once`、`costFromLost:{per}`、`requires`、`chargeOps`（蓄力时生效，如肥肥反弹）、`hooks.basicMod`（普攻前改判）、`hooks.basicMode`（把普攻改成给召唤物回血）、`hooks.basicHit`/`breakAction`（被动）、`hooks.afterAction`（每个动作结束后）、`unsupported`（本版不做，界面置灰并显示原因）。
+- 响应类 op：`ask`（`kind:"answer"/"guess"`、`then`/`else`）在动作执行中挂起等待对方选择——answer 选首项走 then、否则 else；guess 猜中走 then、否则 else；`defaultChoice` 只给界面做 10 秒超时兜底。`flag` 写 `unit.flags`（我帅不帅记 `handsomeTurn`）；`clearSummons` 清一侧全部召唤物（旱葱大祓清己方，含无血）。
+- `strike` 的 `times` 连续普攻次数、`victim` 显式指定受击者（抽象艺术未猜中打对方 n 次，无击溃值、不耗行动）；`tick` 的 `when:"roundStart"` 在每个标准回合开始结算（早于速度条，抽象艺术的猜数）。
+- `requires` 两条扩展：`once:true` 表示这条条件只在技能从 0 蓄第一层时检查，已有蓄力后继续蓄力/释放跳过（抽象艺术「上个己方回合说帅」）；`summonCount:{op,right}` 判己方存活召唤物数量（旱葱大祓 ≥3）。
+- 技能字段：`activeDodge:{costDef,costMres}` 每段伤害命中前询问受击方闪避（花防/花抗/不闪，支付即取消该段）；`basicGroupWhen:[{stat,gt}]` 满足时普攻改敌方全体（卫委壮观 防/法抗 ≠0）；`toggleEffect:"key"` 让技能成为开关（效果在身时释放 = 关闭、不耗行动，学习氛围）。
 - 召唤物定义字段：`name`、`stats:{atk,def,mres,hp,mp,spd}`、`ttl`、`targetable`、`breakImmune`、`taunt`、`aura`（每标准回合末）、`attack`（按速度攒行动条，满 100 出手一次，所以 `stats.spd` 必须为正数）、`onExpire`（到期）；无 `stats.hp`/`hp:0` 就是无血计时物。
 
 ## 召唤物与目标（第四批）
@@ -132,6 +136,11 @@ description: 回合制正传 6.0 的战斗引擎、技能库、召唤物与对�
 | 解锁动作 | `kind:"unlock"`：`actions.list` 在单位身上有 `lockAtk/lockDef/lockMres`（0=未解锁）时列出，支付 1 蓝解锁一个，不消耗行动、可重复、全部解锁后隐藏；解锁后 3 标准回合用 `schedule` 写回原值（原值开局存 counter） |
 | 防御代价 | `cost.def`：`conditions` 判防御是否足够（不足置灰），`releaseSkill` 扣永久防御，可到 0 |
 | 无动作兜底 | 被锁到没有任何可选动作时（下潜 + 旋转同时锁普攻与蓄力、蓝已满），`actions.list` 追加 `basic/pass`「跳过本回合」 |
+| 响应与暂停 | `battle.apply` 遇到询问点只写 `state.pendingResponse`（扣费/伤害/日志不生效、不扣行动）；`kind:"respond"` 由 `responderUid` 一方提交、不消耗行动、不触发 `afterAction`；响应后从同一输入 state 重放 `resumeAction`（`state.responses` 按 key 读取，RNG 与随机序列一致）；10 秒超时用 `defaultChoice`（answer 首项 / guess 未猜中 / dodge 不闪）；actions 流 `[原动作, respond...]`；pending/responses/flags 进 `state.hash` 与回放 |
+| 主动闪避 `activeDodge` | 每段伤害命中前询问：花 15 防 / 花 10 抗 / 不闪（超时默认不闪）；支付即永久扣属性、取消该段（不加击溃/眩晕、不清蓄力、不触发受击后被动）；防 <15 且抗 <10 时不询问；防御或法抗 ≠0 时普攻改敌方全体，点任意敌人发动、全体结算，两项都为 0 时单体 |
+| 开关技能 `toggleEffect` | 效果在身时释放 = 关闭，不消耗行动（仍要求轮到自己且本回合未结束）；已回的血不回退 |
+| `requires.once` | 只在技能从 0 蓄第一层时检查该条 `requires`；已有蓄力后继续蓄力/释放跳过；蓄力被清空后重蓄要再满足 |
+| 自动击溃 `autoBreakAtCap` | 效果在身时敌方全体（英雄 + 有血召唤物）击溃值到上限 5 立即击溃 8 标准回合，不耗行动、击溃值清零 |
 
 ## 手机横屏与折叠（对局页）
 
@@ -172,4 +181,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-b
 ## 踩过的坑
 
 见 同目录 [踩过的坑.md](踩过的坑.md)。
+
+- `damage.hit` 里主动闪避的响应 key 必须整局唯一（`state.hitSeq`），不能每事务归零：否则持续伤害、召唤物攻击、反弹伤害会复用旧响应，回放与指纹错位（卫委壮观）。
 

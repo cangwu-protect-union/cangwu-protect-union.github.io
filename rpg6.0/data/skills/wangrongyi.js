@@ -29,8 +29,45 @@ export default [
         charge: 0,
         cooldown: 0,
         target: "self",
-        unsupported: "「可停止」是给已挂持续效果留的开关，界面还没有关闭入口",
-        ops: []
+        toggleEffect: "wangrongyi.xuexi",
+        ops: [
+          {
+            op: "stat",
+            who: "self",
+            stat: "atk",
+            mode: "mul",
+            value: 2,
+            duration: null,
+            untilRecast: "wangrongyi.xuexi"
+          },
+          {
+            op: "stat",
+            who: "self",
+            stat: "def",
+            mode: "mul",
+            value: 2,
+            duration: null,
+            untilRecast: "wangrongyi.xuexi"
+          },
+          {
+            op: "tick",
+            who: "self",
+            permanent: true,
+            key: "wangrongyi.xuexi",
+            label: "学习氛围",
+            ops: [
+              {
+                op: "if",
+                cond: { left: { stat: "self.mp" }, op: "le", right: 0 },
+                then: [{ op: "removeEffect", who: "self", key: "wangrongyi.xuexi" }],
+                else: [
+                  { op: "heal", who: "allAllies", value: 20 },
+                  { op: "mp", who: "self", delta: -1 }
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         id: "wangrongyi.xiti",

@@ -182,6 +182,36 @@
     return out;
   }
 
+  /* ---------------- 被动：主动闪避与普攻群攻条件 ---------------- */
+
+  /* 主动闪避（卫委壮观）：受击前问受击方是否花防御/法抗取消该段伤害 */
+  function activeDodgeOf(unit) {
+    var list = byOwner[unit && unit.name] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].activeDodge) return list[i].activeDodge;
+    return null;
+  }
+
+  /* 普攻群攻条件（卫委壮观）：basicGroupWhen 里任一条件成立就整段群攻 */
+  function basicGroupOf(unit) {
+    var list = byOwner[unit && unit.name] || [];
+    for (var i = 0; i < list.length; i++) {
+      var when = list[i].basicGroupWhen;
+      if (!when) continue;
+      for (var j = 0; j < when.length; j++) {
+        var cond = when[j];
+        /* 防御/法抗走 defOf/mresOf：眩晕与眩晕余波把两者视为 0 时，群攻也要失效 */
+        var v = cond.stat === "def" ? B.state.defOf(unit)
+          : (cond.stat === "mres" ? B.state.mresOf(unit) : B.state.statOf(unit, cond.stat));
+        if (cond.gt != null && v > cond.gt) return true;
+        if (cond.gte != null && v >= cond.gte) return true;
+        if (cond.lt != null && v < cond.lt) return true;
+        if (cond.lte != null && v <= cond.lte) return true;
+        if (cond.eq != null && v === cond.eq) return true;
+      }
+    }
+    return false;
+  }
+
   /* ---------------- 释放流程 ---------------- */
 
   function walk(value, visit) {
@@ -396,6 +426,21 @@
     if (!skill) throw new Error("技能不存在：" + action.skillId);
     if (skill.owner !== unit.name) throw new Error("这不是「" + unit.name + "」的技能");
     if (skill.unsupported) throw new Error(skill.unsupported);
+    /* 开关技：效果在身时再次释放=关闭，不检查费用/冷却/蓄力/requires；
+       removeEffect 会同时回滚 untilRecast 的攻防乘算。 */
+    if (skill.toggleEffect && B.state.hasEffectKey(unit, skill.toggleEffect)) {
+      B.effectOps.runOps(state, {
+        sourceUid: unit.uid,
+        targetUid: unit.uid,
+        skillId: skill.id,
+        label: skill.name
+      }, [{ op: "removeEffect", who: "self", key: skill.toggleEffect }], events);
+      events.push({
+        type: "action", round: state.round, uid: unit.uid,
+        kind: "skill", skillId: skill.id, name: skill.name, target: unit.uid, closed: true
+      });
+      return { kind: "skill", skillId: skill.id, closed: true, noAction: true };
+    }
     var check = B.conditions.evaluate(state, unit, skill);
     if (!check.ok) throw new Error(check.reason);
     if ((action.kind === "charge" || check.needsCharge) && B.state.hasStatus(unit, "noCharge")) {
@@ -532,6 +577,8 @@
   api.has = has;
   api.rollDodge = rollDodge;
   api.immuneBuffs = immuneBuffs;
+  api.activeDodgeOf = activeDodgeOf;
+  api.basicGroupOf = basicGroupOf;
   api.initUnit = initUnit;
   api.initOpponentMarks = initOpponentMarks;
   api.execute = execute;

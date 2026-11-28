@@ -1563,9 +1563,9 @@ export const cases = [
   {
     name: "未实现的技能给出原因，不会静默失效",
     run() {
-      const zjm = mk(CHAR.zhangjiaming, CHAR.dummy);
-      const weixiang = B.conditions.evaluate(zjm, zjm.units[0], B.skills.find("zhangjiaming.weixiang"));
-      assert.match(weixiang.reason, /本版未实现/);
+      const lcl = mk(CHAR.lvchangling, CHAR.dummy);
+      const chaodu = B.conditions.evaluate(lcl, lcl.units[0], B.skills.find("lvchangling.chaodu"));
+      assert.match(chaodu.reason, /本版未实现/);
       assert.equal(B.skills.find("songzhiyuan.picao").unsupported, "", "皮糙肉厚已实现，不应再被禁用");
       const szy = mk(CHAR.songzhiyuan, CHAR.dummy);
       assert.match(B.conditions.evaluate(szy, szy.units[0], B.skills.find("songzhiyuan.picao")).reason, /被动技能/);
@@ -2533,13 +2533,11 @@ export const cases = [
     }
   },
   {
-    name: "第七批 unsupported 四条：置灰且原因可核对",
+    name: "第七批 unsupported 两条：置灰且原因可核对",
     run() {
       const pairs = [
         ["lvchangling.chaodu", /10 秒内喊出一串数字/],
-        ["wangchunyu.chunyu", /条件写作「？」/],
-        ["handongxiao.woshuai", /对方的回答/],
-        ["handongxiao.chouxiang", /猜数/]
+        ["wangchunyu.chunyu", /条件写作「？」/]
       ];
       const state = mk(CHAR.lvchangling, CHAR.dummy);
       for (const [id, pattern] of pairs) {

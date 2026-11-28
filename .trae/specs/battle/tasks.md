@@ -255,6 +255,114 @@
 - 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Plan _local/tmp/plan-zhuhongyi.json -Browser`
 - 验收标准：plan、引擎单测、冒烟、`check.ps1`、浏览器组全绿；朱弘毅可选；强免疫/额外行动/自伤判胜/禁蓄蓝/快照回溯与 400 强扣数值正确；指纹与回放一致。
 
+## battle-20 unsupported 技能上线：引擎响应框架
+
+- 状态：已验（2026-11-28）
+- 验证记录：`node tests/engine/run.mjs` 245/0；`batch --pairs=smoke --seeds=1` 32 局 0 异常 0 僵局；`check.ps1` 全绿。adversary 两轮：第一轮 P1「resumeAction 键序进 hash」、P2「同 key ask 复用响应」；已修（stableStringify + 事务内 askSeq），新增 2 条用例锁定，复验 PASS。`state.js` 579/580，下次再动需调预算并记待拆。旧战报 hash 失配留到 battle-26 升版本解决，本卡不单独上线。
+- 背景：7 条 unsupported 技能的上线口径（2026-11-28 用户拍板）——「超度」「春雨贵如油」保持 unsupported；「我帅不帅？」用对方弹窗；「抽象艺术」每标准回合猜一次；「卫委壮观」每段伤害弹窗询问；「旱葱大祓」按用户解释；「学习氛围」补停止入口。
+- 允许改的路径：`rpg6.0/js/engine/battle.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`tools/rpg6-spec.js`、`tests/engine/`、`tests/engine/batch.mjs`
+- 共享文件：无（本卡不升 `ENGINE_VERSION`，版本在 battle-26 统一升）
+- 做什么：
+  - 新增 `state.pendingResponse`：`{ id, kind, responderUid, requesterUid, skillId, round, prompt, options, defaultChoice, payload, resumeAction }`，`state.responses` 记录已提交选择；两者进 `state.hash`、深拷贝与回放。
+  - 新增动作 `kind:"respond"`，不消耗行动、不触发 afterAction；只接受当前 `pendingResponse` 的 responder（动作带 `uid`，引擎比对 `responderUid`）。
+  - `battle.apply` 遇到需要响应时返回 pending 结果（state 只加 `pendingResponse`，动作的扣费/伤害/日志全部不生效）、不扣行动；响应后用「重放式恢复」从同一输入 state 重新执行 `resumeAction`（`state.responses` 按响应 key 读取，RNG 与随机序列一致）。
+  - `damage.hit` 在扣血前暴露询问点（通过新 op `ask` 或引擎回调），供 battle-22/23 使用；本卡只做框架与 `ask` op（`kind:"answer"` / `kind:"guess"`，支持 `then`/`else`），不放具体技能。
+  - 每个 `pendingResponse` 必带 `defaultChoice`（answer 用选项首项、guess 用「未猜中」、dodge 用「不闪」）；10 秒超时由界面层执行，引擎只提供默认值。
+  - `tests/engine/batch.mjs`：遇到 pending 自动提交 `defaultChoice`，保证压测不卡死。
+  - 单测：挂起不扣行动/不扣蓝、响应后续算、actions 流重放一致、指纹一致、响应者与 id 校验、无 pending 时提交 respond 抛错；`resumeAction` 按键序无关的稳定序列化进指纹；同一动作里同 key 的多个 `ask` 用事务内序号区分。
+  - 已知影响：hash 加了 pending/responses/flags 段，旧战报 `final_hash` 会失配；本卡不单独上线，由 battle-26 升 `6.0-engine.16` 后旧战报走「旧引擎」分支（adversary P2，2026-11-28 记录）。
+- 不做什么：不改任何 `data/skills/` 技能、不做页面弹窗（battle-21）、不升版本、不改联机协议字段。
+- 验收命令：`node tests/engine/run.mjs`、`node tests/engine/batch.mjs --pairs=smoke --seeds=1`
+- 验收标准：新增窗架单测全绿，原有单测与冒烟不回归；pending 状态可序列化、可回放；压测无「等待响应」死循环。
+
+## battle-21 页面响应入口（本地弹窗 + 联机 + 回放只读）
+
+- 状态：已验（2026-11-28）
+- 验证记录：`node _local/tests/run-all.mjs --group=回合制` 17/0；`check.ps1` 全绿。adversary 两轮：P2-1 联机提交中误显示「回放中」、P2-2 提交失败同 id 重置倒计时，均已修；Node 复现 10 项 PASS（响应方/非响应方/回放文案、deadline 不重置、超时重试封顶 4 次）。`battle-remote.js` 900/940，`battle-page.js` 439/700。已知限制：本地 pending 收到非 respond 远端动作时只提示并保持轮询、不关房间（正常协议下不会出现）；后台标签页会节流 10 秒计时；热座挂起时点认输无反馈（记录，不修）。
+- 允许改的路径：`rpg6.0/js/battle/battle-page.js`、`rpg6.0/js/battle/battle-page-bind.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/stage-live.js`、`rpg6.0/js/battle/battle-remote.js`、`rpg6.0/css/battle-live.css`、`rpg6.0/test.html`、`_local/tests/cases/rpg-battle.mjs`（不提交）、`_local/tests/cases/rpg-room.mjs`（不提交）
+- 共享文件：`rpg6.0/js/battle/*` 与 battle-20 串行
+- 做什么：
+  - 操作栏/舞台显示 `pendingResponse` 的弹窗或按钮组：`answer`（说帅/不帅）、`guess`（1–6 或不猜）、`dodge`（花 15 防 / 花 10 抗 / 不闪，选项来自 `pending.options`）。
+  - 弹窗倒计时 10 秒，到 0 自动提交 `defaultChoice`（answer 默认「帅」、guess 默认未猜中、dodge 默认不闪）；同一 `pendingResponse.id` 只挂一个计时器，render 重建不清零。
+  - 只有 `responderUid` 一方的操作界面可点；非响应方显示「等待对方选择」；回放模式只读、不显示按钮、不启动计时器、按已记录响应推进。
+  - 联机：响应动作走 `R.act`，远端通过轮询应用；`R.act` 允许 `responderUid` 所属一方提交 `kind:"respond"`，其余动作仍只允许当前行动方；`battle-remote.js` 的指纹与 seq 校验兼容 pending。
+- 不做什么：不改技能数据与引擎规则（只接线）；不做动画与音效；不新增页面。
+- 验收命令：`node _local/tests/run-all.mjs --group=回合制`
+- 验收标准：现有热座、联机、回放用例全绿不回归；`renderQuery` 在 pending 时只输出响应块、按钮只给响应方；10 秒计时器按 id 复原不重置。带真实响应的点击验证在 battle-22（闪避）与 battle-23（问答/猜数）的浏览器用例里补。
+
+## battle-22 张家铭「卫委壮观」上线
+
+- 状态：已验（2026-11-28）
+- 验证记录：`run.mjs` 260/0、冒烟 32 局 0 异常、`run-all --group=回合制` 19/0、`check.ps1` 全绿。adversary 三轮：P1 持续/召唤/反弹伤害复用旧响应（改全局 `hitSeq` key、进 hash）、P2 群攻 UI 可选召唤物但引擎按嘲讽拒收（群攻跳过 `checkTaunt`）、P3 若干（`basicGroupOf` 改 `defOf/mresOf`、删死代码），均已修并复验 PASS。已知遗留：`actions.list` 的击溃 targets 被群攻放行顺带放宽（界面不可达、当前 batch 不触发），记入 battle-26 收尾。
+- 允许改的路径：`rpg6.0/data/skills/zhangjiaming.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/battle.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/battle/battle-page.js`、`rpg6.0/js/battle/battle-pick.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/scene3d.js`、`tools/rpg6-spec.js`、`tools/size-budget.json`、`改动索引.md`、`rpg6.0/README.md`、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`tests/engine/`、`_local/tests/cases/rpg-battle.mjs`（不提交）
+- 共享文件：`rpg6.0/js/engine/state.js`（579/580，本卡加 `hitSeq` 进 hash 需把 cap 调到 600 并在 `改动索引.md` 记待拆）、`tools/size-budget.json`
+- 做什么：
+  - 被动：每段伤害命中前询问受击方——花 15 防、花 10 法抗、或不闪（超时默认不闪）；选支付即扣对应属性并取消该段伤害（`dodge` 事件，不加击溃/眩晕、不清蓄力）；属性不足时只给「不闪」。
+  - 普攻群攻：防御或法抗不为 0 时，普攻改为敌方全体（英雄 + 有血召唤物）；点任意一个敌人发动，所有敌人都有被选中的提示，实际全体结算；防御和法抗都为 0 时恢复单体。1 蓄力需求不变。
+  - 去掉该技能 `unsupported`，条件文本与档案逐字一致。
+- 不做什么：不改其他角色；不做受击时的自动化策略；不改战报结构。
+- 验收命令：`node tests/engine/run.mjs`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1`
+- 验收标准：单测覆盖三种选择、属性不足、多段伤害逐段询问、群攻与恢复单体、回放指纹一致；lint 通过。
+
+## battle-23 韩东晓「我帅不帅？」「抽象艺术」上线
+
+- 状态：已验（2026-11-28）
+- 验证记录：`run.mjs` 268/0、冒烟 32 局 0 异常、`run-all --group=回合制` 20/0（含问答/猜数真实点击）、`check.ps1` 全绿。adversary 两轮：P1「抽象艺术按 1 行动/回合 + gap=1 永远放不出」；用户拍板「说帅只约束从 0 蓄第一层，已有蓄力后继续蓄力/释放跳过」（`requires.once`），已改并补真实流程单测（问帅→蓄1→蓄2→释放→猜数）与清空重蓄用例，复验 PASS。`stats.turns` 已进 hash。待办：`requires.once` 语义与「说帅窗口只卡第一层」写进 battle-26 的 skill/机制文档；`_local/tests/cases/rpg-battle.mjs` 加入本卡路径（不提交）。
+- 允许改的路径：`rpg6.0/data/skills/handongxiao.js`、`rpg6.0/js/engine/conditions.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/effect-ops-helpers.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/engine/ops/ops-damage.js`、`rpg6.0/js/engine/ops/ops-state.js`、`tools/rpg6-spec.js`、`tools/rpg6-lint.js`、`rpg6.0/README.md`、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`tests/engine/`
+- 共享文件：无（与 battle-20/22 串行）
+- 做什么：
+  - 「我帅不帅？」1 蓝：释放时向对方发起 `answer` 询问（超时默认「帅」）；说帅 → 自身回血 80；说不帅 → 对方受 150 物理伤害；说帅时把当前**己方回合序号**（`unit.stats.turns`）写进韩东晓的 `handsomeTurn`。
+  - 「抽象艺术」4 蓝 2 蓄力：条件增加「上个己方回合说过帅」，即 `unit.stats.turns === handsomeTurn + 1`，同一韩东晓回合内先说帅不算；**该条件只在从 0 层开始蓄第一层时检查，已有蓄力（含蓄满待释放）后继续蓄力/释放都跳过**（用户 2026-11-28 拍板；蓄力被清空后重新从 0 蓄才再检查）；释放后挂持续效果，每个标准回合开始（`roundStart`）掷 1–6 并向对方发起 `guess`（超时默认未猜中）；猜中 → 效果结束；未猜中 → 对对方造成 n 次普攻（`strike`，无击溃值，不消耗行动）。
+  - 去掉两条 `unsupported`，条件文本与档案逐字一致。
+- 不做什么：不改其他角色；不做「每段伤害」级联；不改联机协议。
+- 验收命令：`node tests/engine/run.mjs`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1`
+- 验收标准：单测覆盖说帅回血/说不帅物伤/记录回合、抽象艺术前置不满足置灰、猜中结束、未猜中 n 次普攻、回放一致；lint 通过。
+
+## battle-24 王荣逸「学习氛围」上线
+
+- 状态：已验（2026-11-28）
+- 验证记录：`run.mjs` 278/0、冒烟 32 局 0 异常、`run-all --group=回合制` 20/0、`check.ps1` 全绿。adversary 一轮 PASS，P3 三项已修：「（点击关闭）」只在 active 显示、战报 `closed` 事件显示「关闭」、单测补开/关不叠加/蓝=0 首拍/真实空标准回合/关闭不耗行动。记录：封锁状态下引擎允许关闭但 UI 先 evaluate 拦住（偏保守，可接受）；「算作全员 buff」实现为自身 tick + 己方回血，不是可被驱散的全员 Buff。
+- 允许改的路径：`rpg6.0/data/skills/wangrongyi.js`、`rpg6.0/js/engine/conditions.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/engine/battle.js`、`rpg6.0/js/engine/effect-ops.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/battle/battle-view.js`、`rpg6.0/js/battle/battle-view-effects.js`、`tools/rpg6-spec.js`、`rpg6.0/README.md`、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`tests/engine/`、`_local/tests/cases/rpg-battle.mjs`（不提交）
+- 共享文件：无（与 battle-20/22 串行）
+- 做什么：
+  - 学习氛围（无费用）：挂持续效果；每个标准回合末先判自己蓝 ≤0 → 效果结束；否则己方全体英雄回血 20、自己蓝 −1；自己攻防 ×2；无法被打断（不进蓄力路径）。
+  - 「可停止」：同一技能是开关——效果不在身时释放 = 开启（扣 1 行动）；效果在身时释放 = 关闭（不扣行动，但仍要求轮到自己且本回合未结束）；入口显示「（点击关闭）」。
+  - 去掉 `unsupported`，条件文本与档案逐字一致。
+- 不做什么：不改其他角色；不回滚已回的血；不改战报结构。
+- 验收命令：`node tests/engine/run.mjs`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1`
+- 验收标准：单测覆盖每回合扣蓝回血、攻防 ×2、蓝耗尽结束、手动停止、开关切换、回放一致；lint 通过。
+
+## battle-25 杨冬明「旱葱大祓」上线
+
+- 状态：已验（2026-11-28）
+- 验证记录：`run.mjs` 287/0、冒烟 32 局 0 异常、`run-all --group=回合制` 20/0、`check.ps1` 全绿、unsupported 2 条。adversary 两轮：P1 动态 `ignoreTaunt` 挂在共享 `checkTaunt` 导致单攻技能也越过嘲讽；已修为「`checkTaunt` 只看静态 trait，普攻路径单独放行」，并顺带修好 battle-22 的击溃 targets 放行问题，复验 PASS。P2 自动击溃按 seed/用户口径覆盖敌方全体（英雄 + 有血召唤物），任务卡已改。记录：10% 恐慌时长用 `hcdbDur`（恒 6/7），与效果剩余不完全同步；若干覆盖缺口留 battle-26 文档/测试说明。
+- 允许改的路径：`rpg6.0/data/skills/yangdongming.js`、`rpg6.0/js/engine/conditions.js`、`rpg6.0/js/engine/ops/ops-flow.js`、`rpg6.0/js/engine/ops/ops-state.js`、`rpg6.0/js/engine/damage.js`、`rpg6.0/js/engine/actions.js`、`rpg6.0/js/engine/state.js`、`rpg6.0/js/engine/skills.js`、`rpg6.0/js/engine/skills-target.js`、`rpg6.0/js/engine/effect-ops-helpers.js`、`rpg6.0/js/battle/battle-page.js`、`tools/rpg6-spec.js`、`tools/rpg6-lint.js`、`rpg6.0/README.md`、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`tests/engine/`、`_local/tests/cases/rpg-battle.mjs`（不提交）
+- 共享文件：无（与 battle-20/22 串行）
+- 做什么：
+  - 使用条件：8 蓝 + 己方召唤物 ≥3（条件读 `summons.ofSide/countKey`）。
+  - 结算：200 法伤打敌方全体；敌方全体 +50% 恐慌（持续与技能同步）；清除**己方**全部召唤物；自己速 +100、攻 +30；持续 6 标准回合，释放时掷 1–6，掷出 6 则 7 回合。
+  - 持续期间：自己普攻变真伤、普攻命中附加 10% 恐慌（与敌方已有 50% 恐慌取最大值，实际不叠加，不改恐慌规则）、普攻无视嘲讽等级；自己无法被击溃；敌方全体（英雄 + 有血召唤物）击溃值每次增加后检查，达到上限 5 立即击溃（击溃时长按 5 计算 = 8 标准回合，不消耗杨冬明行动，击溃值清零）。
+  - 去掉 `unsupported`，条件文本与档案逐字一致。
+- 不做什么：不改其他角色；不清敌方召唤物；不改召唤物规则与 tick 顺序；不改战报结构。
+- 验收命令：`node tests/engine/run.mjs`、`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1`
+- 验收标准：单测覆盖召唤物门槛、清己方召唤物、恐慌与属性持续、掷 6 延时、普攻真伤/恐慌/无视嘲讽、自身免击溃、敌方自动击溃、回放一致；lint 通过。
+
+## battle-26 版本、文档、统计与全量收尾
+
+- 状态：已验（2026-11-28）
+- 验证记录：`node tools/rpg6-bump.mjs 6.0-engine.16`（两处一致）；`rpg6-stats --write` 得 32 人 / 117 技能 / 2 条 unsupported（超度、春雨贵如油）/ 42 op / 6.0-engine.16；机制文档 5 条口径、`rpg6-battle` skill 响应/口径/踩坑、README「响应与暂停」、游戏说明玩家向均更新。`verify.ps1 -Browser` 全绿（引擎 287/0、冒烟 32 局 0 异常、浏览器 20/0）、`run-all --group=回合制` 20/0、`check.ps1` ALL PASSED。adversary 最终复核 PASS：旧战报在新版本下走「旧引擎」分支、统计/文档/SKILL 与实现一致；遗留 P2 为机制文档 10.7 旧批次快照（`_local/` 不入库）、P3 旧引擎分支无自动化用例。提交用路径限定 add，排除 `.trae-html-share-packages/`、`rpg6.0/archive/6.0doc/回合制/`、`.trae/team-plan.md`。
+- 允许改的路径：`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`rpg6.0/README.md`、`rpg6.0/游戏说明.md`、`rpg6.0/架构.md`、`tools/README.md`、`_local/docs/回合制6.0测试功能-角色机制.md`、`.dsh/skills/rpg6-battle/SKILL.md`、`.dsh/skills/rpg6-character-batch/引擎能力表.md`、`tools/size-budget.json`
+- 共享文件：`rpg6.0/js/engine/version.js`、`rpg6.0/data/config.js`、`tools/size-budget.json`（改前看 `git status --short`）
+- 做什么：
+  - `node tools/rpg6-bump.mjs 6.0-engine.16`，两处版本号一致。
+  - `node tools/rpg6-stats.js --write`：unsupported 表只剩「吕场龄 · 超度」「王春雨 · 春雨贵如油」两条，技能数/角色数同步。
+  - 机制文档：5 条技能去掉「本版未实现」，写清实现口径（弹窗响应、每段闪避、学习氛围停止、旱葱大祓持续规则）；补 `requires.once`（只在从 0 蓄第一层时检查）与「说帅窗口只卡第一层」。
+  - `rpg6-battle` skill：补「响应与暂停」一节（pendingResponse、respond、重放恢复、每段闪避的代价）与 `requires.once` 语义。
+  - README/游戏说明按实际行为更新；文件长度撞线时调 `size-budget.json` 并在 `改动索引.md` 记待拆。
+- 不做什么：不跑 `build-docs`；不改冻结面；不重写架构文档。
+- 验收命令：`powershell -NoProfile -ExecutionPolicy Bypass -File .dsh/skills/rpg6-character-batch/scripts/verify.ps1 -Browser`、`node _local/tests/run-all.mjs --group=回合制`、`powershell -NoProfile -ExecutionPolicy Bypass -File tools\check.ps1`
+- 验收标准：三条命令全绿；文档数字与 `rpg6-stats --check` 一致；unsupported 表只剩 2 条；桌面 1280×900 与手机 844×390 各核对一次。
+
 ## 收尾（不单独开卡）
 
 - 全量：`verify.ps1 -Browser` + `node _local/tests/run-all.mjs --group=回合制` + `check.ps1`。

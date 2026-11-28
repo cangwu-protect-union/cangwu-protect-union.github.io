@@ -353,6 +353,39 @@
     return html;
   }
 
+  /* 响应窗：挂起时替代技能与动作区，只有 responderUid 一方可点；回放只读 */
+  P.renderResponse = function (state, unit, readOnly) {
+    var pend = state && state.pendingResponse;
+    if (!pend) return "";
+    var mine = !!unit && pend.responderUid === unit.uid;
+    if (!mine) return '<div class="bq-response is-wait"><p>等待对方选择…</p></div>';
+    if (readOnly) {
+      /* 回放与「提交中/不可操作」要分开：只有回放才写「回放中」 */
+      var replay = !!(root.RPG6BattlePage && root.RPG6BattlePage.mode === "replay");
+      return '<div class="bq-response is-wait"><p>' +
+        (replay ? "等待响应（回放中）" : "正在提交选择…") + "</p></div>";
+    }
+    var options = pend.options || [];
+    if (pend.kind === "guess" && !options.length) options = ["1", "2", "3", "4", "5", "6"];
+    var html = '<div class="bq-response" data-response="' + P.esc(pend.id) + '">' +
+      '<p class="bq-response-prompt"><b>对方询问：</b>' + P.esc(pend.prompt) + "</p>" +
+      '<p class="bq-response-timer">剩余 <span data-resp-timer>10</span> 秒（超时自动选择）</p>' +
+      '<div class="bq-response-options">';
+    for (var i = 0; i < options.length; i++) {
+      var item = options[i];
+      var object = item && typeof item === "object";
+      var key = object ? item.key : item;
+      var label = object ? (item.label || item.key) : item;
+      html += '<button type="button" class="btn btn-ghost bq-btn" data-respond="' + P.esc(key) + '"' +
+        (object && item.disabled ? " disabled" : "") + ">" + P.esc(label) + "</button>";
+    }
+    if (pend.kind === "guess") {
+      html += '<button type="button" class="btn btn-ghost bq-btn" data-respond="0">不猜</button>';
+    }
+    html += "</div></div>";
+    return html;
+  };
+
   P.renderQuery = function (state, unit, meta, pick, readOnly, opts) {
     var options = opts || {};
     var character = meta[unit.uid] || { skills: [] };
@@ -381,6 +414,13 @@
       html += "</div>";
     }
 
+    /* 挂起时只给响应块，用响应替代技能与动作区，避免误点；六维面板保留 */
+    if (state.pendingResponse) {
+      html += P.renderResponse(state, unit, readOnly);
+      html += "</div>";
+      return html;
+    }
+
     var sheet = character.skills || [];
     html += '<ul class="bq-skills">';
     for (var i = 0; i < sheet.length; i++) {
@@ -393,6 +433,9 @@
         : (!skill ? "本版未编码这个技能" : (skill.unsupported || (check && check.reason) || ""));
       var picked = pick && (pick.mode === "skill" || pick.mode === "choice" || pick.mode === "input") && pick.id === (skill && skill.id);
       var condText = "（" + row.condition + "）";
+      if (active && skill && skill.toggleEffect && B.state.hasEffectKey(unit, skill.toggleEffect)) {
+        condText = "（点击关闭）";
+      }
       if (skill && skill.costFromLost && B.skills.effectiveCost) {
         var eff = B.skills.effectiveCost(unit, skill);
         if (eff.mp !== ((skill.cost && skill.cost.mp) || 0) || eff.charge !== (skill.charge || 0)) {

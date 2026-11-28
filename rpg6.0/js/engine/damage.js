@@ -115,6 +115,22 @@
     if (unit.breakValue >= max) return false;
     unit.breakValue += 1;
     pushEvent(events, { type: "breakValue", round: state.round, uid: unit.uid, value: unit.breakValue });
+    var foe = B.state.heroOf(state, B.state.otherSide(state, B.state.sideOf(state, unit.uid)));
+    if (foe && B.state.effectHasFlag(foe, "autoBreakAtCap") && unit.breakValue >= max) {
+      var rounds = B.rules.breakRounds(unit.breakValue);
+      var st = B.state.enterBreak(unit, rounds, "autoBreak", "击溃（旱葱大祓）");
+      if (st && st.remain > 0) {
+        pushEvent(events, {
+          type: "statusAdd",
+          round: state.round,
+          uid: unit.uid,
+          kind: "break",
+          remain: st.remain,
+          source: "autoBreak",
+          label: "击溃（旱葱大祓）"
+        });
+      }
+    }
     return true;
   }
 
@@ -281,6 +297,62 @@
       addStun = false;
     }
     if (source && B.state.hasStatus(source, "noBreakOut")) noBreak = true;
+
+    /* 主动闪避（卫委壮观）：受击方在扣血前选择花防御/法抗取消这一段。
+       只有真的能付得起才询问；两项都不够时既不询问也不递增 hitSeq。
+       选支付立即永久扣属性并取消该段（不加击溃/眩晕、不清蓄力、不触发受击后被动）。 */
+    if (dmg > 0 && B.skills && B.skills.activeDodgeOf) {
+      var ad = B.skills.activeDodgeOf(target);
+      if (ad) {
+        var options = [];
+        if (B.state.defOf(target) >= ad.costDef) options.push({ key: "def", label: "花 " + ad.costDef + " 防御" });
+        if (B.state.mresOf(target) >= ad.costMres) options.push({ key: "mres", label: "花 " + ad.costMres + " 法抗" });
+        if (options.length) {
+          var seq = (state.hitSeq || 0) + 1;
+          state.hitSeq = seq;
+          /* 全局段号，整局唯一：持续/召唤/反弹伤害没有 actionId，也不会和旧响应撞车；重放稳定 */
+          var key = "hit:" + seq;
+          var resp = state.responses && state.responses[key];
+          if (resp == null) {
+            var err = new Error("需要选择是否闪避");
+            err.pending = {
+              key: key,
+              kind: "dodge",
+              responderUid: target.uid,
+              requesterUid: spec.sourceUid || "",
+              skillId: spec.skillId || "",
+              round: state.round,
+              prompt: "卫委壮观：是否闪避这次伤害？",
+              options: options.concat([{ key: "none", label: "不闪" }]),
+              defaultChoice: "none",
+              payload: { defCost: ad.costDef, mresCost: ad.costMres }
+            };
+            throw err;
+          }
+          if (resp === "def" || resp === "mres") {
+            var cost = resp === "def" ? ad.costDef : ad.costMres;
+            B.state.addMod(target, {
+              stat: resp,
+              mode: "add",
+              value: -cost,
+              remain: B.state.PERMANENT,
+              source: "weixiang." + resp,
+              label: "卫委壮观"
+            });
+            pushEvent(events, {
+              type: "dodge",
+              round: state.round,
+              uid: target.uid,
+              sourceUid: spec.sourceUid || "",
+              label: "卫委壮观（花 " + cost + (resp === "def" ? " 防御" : " 法抗") + "）",
+              skillId: spec.skillId || ""
+            });
+            spec.dodged = true;
+            return 0;
+          }
+        }
+      }
+    }
 
     /* 防护层：完全免疫该次（不掉血、不加击溃/眩晕值、不清蓄力、不触发受击后被动） */
     if (dmg > 0 && consumeGuard(state, target, spec, events)) return 0;

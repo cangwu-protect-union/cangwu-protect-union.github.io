@@ -41,7 +41,8 @@
       targetUid: effect.targetUid,
       skillId: effect.skillId,
       label: effect.label,
-      fromBuff: effect.fromBuff
+      fromBuff: effect.fromBuff,
+      effectId: effect.id
     };
     if (effect.capture) {
       for (var key in effect.capture) {
@@ -172,8 +173,8 @@
       var active = unit.effects.slice();
       for (var e = 0; e < active.length; e++) {
         if (state.phase === "finished") break;
-        /* 回合开始时结算的效果（无能狂怒）只在持有者回合开始跑，不在标准回合末重复跑 */
-        if (active[e].when === "turnStart") continue;
+        /* 回合开始/持有者回合开始时结算的效果只在对应钩子跑，不在标准回合末重复跑 */
+        if (active[e].when === "turnStart" || active[e].when === "roundStart") continue;
         if (!effectDue(active[e], state)) continue;
         H.runOps(state, ctxOfEffect(active[e]), active[e].ops, events);
       }
@@ -372,6 +373,25 @@
       for (var d = 0; d < due.length; d++) {
         if (state.phase === "finished") return events;
         H.runOps(state, ctxOfEffect(due[d]), due[d].ops, events);
+      }
+    }
+    /* when:"roundStart" 的持续效果：每个标准回合开始、速度条之前结算（抽象艺术每回合猜数）。
+       pending 抛错时 battle.apply 会捕获并重放，roll 从同一 seed 重掷同一值。 */
+    for (var ri = 0; ri < state.units.length; ri++) {
+      var rUnit = state.units[ri];
+      var activeEffects = rUnit.effects.slice();
+      for (var re = 0; re < activeEffects.length; re++) {
+        var rEffect = activeEffects[re];
+        if (rEffect.when !== "roundStart") continue;
+        if (state.phase === "finished") return events;
+        H.runOps(state, ctxOfEffect(rEffect), rEffect.ops, events);
+        if (rEffect.remain !== B.state.PERMANENT) {
+          rEffect.remain -= 1;
+          if (rEffect.remain <= 0) {
+            rUnit.effects = rUnit.effects.filter(function (x) { return x !== rEffect; });
+            H.pushEvent(state, events, { type: "effectExpire", uid: rUnit.uid, kind: "effect", label: rEffect.label || "" });
+          }
+        }
       }
     }
     for (var i = 0; i < state.units.length; i++) {

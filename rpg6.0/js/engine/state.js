@@ -420,7 +420,12 @@
       units: [makeUnit(opts.a, "a"), makeUnit(opts.b, "b")],
       summons: [],
       summonSeq: 0,
-      log: []
+      log: [],
+      pendingResponse: null,
+      responses: {},
+      responseSeq: 0,
+      /* 主动闪避的全局段号：整局递增，进指纹 */
+      hitSeq: 0
     };
     state.units[0].side = "a";
     state.units[1].side = "b";
@@ -447,6 +452,7 @@
     var snap = JSON.parse(JSON.stringify(state));
     delete snap.clock;
     delete snap.pendingRewind;
+    delete snap.pendingResponse;
     delete snap.selfKillWinner;
     for (var i = 0; i < snap.units.length; i++) {
       delete snap.units[i].rewind;
@@ -516,8 +522,34 @@
     return ("0000000" + h.toString(16)).slice(-8);
   }
 
+  /* 指纹里的对象序列化必须与键序无关：对象按键排序递归、数组保序、原始值走 JSON.stringify */
+  function stableStringify(value) {
+    if (value == null) return "null";
+    if (Array.isArray(value)) return "[" + value.map(stableStringify).join(",") + "]";
+    if (typeof value !== "object") return JSON.stringify(value);
+    return "{" + Object.keys(value).sort().map(function (key) {
+      return JSON.stringify(key) + ":" + stableStringify(value[key]);
+    }).join(",") + "}";
+  }
+
   function hash(state) {
     var parts = [state.round, state.clock || 0, state.phase, state.rng, state.turnUid, state.queue.join(",")];
+    var pending = state.pendingResponse;
+    if (pending) {
+      parts.push([
+        pending.id, pending.kind, pending.key, pending.responderUid,
+        pending.requesterUid || "", pending.skillId || "", pending.round || 0,
+        pending.defaultChoice, (pending.options || []).join(","),
+        stableStringify(pending.resumeAction || null)
+      ].join("|"));
+    } else {
+      parts.push("-");
+    }
+    var respKeys = Object.keys(state.responses || {}).sort();
+    var respParts = [];
+    for (var rk = 0; rk < respKeys.length; rk++) respParts.push(respKeys[rk] + "=" + state.responses[respKeys[rk]]);
+    parts.push("R:" + respParts.join(","));
+    parts.push("H:" + (state.hitSeq || 0));
     for (var i = 0; i < state.units.length; i++) {
       var u = state.units[i];
       var buffs = [];
@@ -535,6 +567,9 @@
       var marks = [];
       var markKeys = Object.keys(u.marks || {});
       for (var mk = 0; mk < markKeys.length; mk++) marks.push(markKeys[mk] + u.marks[markKeys[mk]].value);
+      var flagKeys = Object.keys(u.flags || {}).sort();
+      var flagParts = [];
+      for (var fk = 0; fk < flagKeys.length; fk++) flagParts.push(flagKeys[fk] + "=" + stableStringify(u.flags[flagKeys[fk]]));
       parts.push([
         u.uid, u.hp, u.mp, u.gauge, u.actionsLeft, u.breakValue, u.stunValue,
         u.charge ? u.charge.skillId + ":" + u.charge.amount : "-",
@@ -543,7 +578,8 @@
         u.shield ? u.shield.hp + ":" + u.shield.remain : "-",
         u.reflectFixed ? u.reflectFixed.charges + ":" + u.reflectFixed.value + ":" + u.reflectFixed.type : "-",
         u.undying ? "u" + u.undying.untilRound : "-",
-        u.rewind ? "r" + u.rewind.count + ":" + (u.rewind.pending ? 1 : 0) + ":" + (u.rewind.penaltyAtClock || 0) : "-"
+        u.rewind ? "r" + u.rewind.count + ":" + (u.rewind.pending ? 1 : 0) + ":" + (u.rewind.penaltyAtClock || 0) : "-",
+        flagParts.join(","), "turns=" + ((u.stats && u.stats.turns) || 0)
       ].join("|"));
     }
     var summonParts = [];

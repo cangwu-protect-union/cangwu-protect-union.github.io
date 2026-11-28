@@ -201,9 +201,9 @@
   function playingStatus(room) {
     if (isOffline(room)) return "对手离线";
     var side = currentSide();
+    if (P.state && P.state.pendingResponse) return R.canRespond() ? "请做出选择" : "等待对方选择";
     if (!side) return "已进入房间";
-    if (side === R.side) return "轮到你";
-    return "等 " + (opponentNick(room) || "对手") + " 行动";
+    return side === R.side ? "轮到你" : "等 " + (opponentNick(room) || "对手") + " 行动";
   }
 
   function statusText() {
@@ -232,14 +232,20 @@
   R.canAct = function () {
     if (P.mode !== "play" || P.remote !== R || !R.room || R.room.status !== "playing") return false;
     if (!R.active || R.pending || R.locked || R.halted) return false;
-    if (!P.state || P.state.phase !== "fight" || !P.state.turnUid) return false;
+    if (!P.state || P.state.pendingResponse || P.state.phase !== "fight" || !P.state.turnUid) return false;
     try { return B.state.sideOf(P.state, P.state.turnUid) === R.side; } catch (err) { return false; }
+  };
+
+  /* 响应方（不一定是当前行动方）提交 kind:"respond" 时用 */
+  R.canRespond = function () {
+    if (P.mode !== "play" || P.remote !== R || !R.room || R.room.status !== "playing" || !R.active || R.pending || R.locked || R.halted) return false;
+    try { var pend = P.state && P.state.pendingResponse; return !!pend && B.state.sideOf(P.state, pend.responderUid) === R.side; } catch (err) { return false; }
   };
 
   /* 先在克隆状态上算出 committed，服务端确认后才替换本地状态 */
   R.act = function (action) {
-    if (!R.canAct()) {
-      P.setHint(R.pending ? "正在提交…" : "等对方行动");
+    if (!(action && action.kind === "respond" ? R.canRespond() : R.canAct())) {
+      P.setHint(R.pending ? "正在提交…" : ((action && action.kind === "respond") ? "还不到你选择" : "等对方行动"));
       return false;
     }
     var result;
@@ -266,7 +272,7 @@
       if (res.status) R.room.status = res.status;
       if (res.seq > R.seq) {
         P.state = next; P.actions.push(result.committed);
-        P.hint = P.describe(result.events); R.seq = res.seq;
+        P.hint = action && action.kind === "respond" ? "已提交选择" : P.describe(result.events); R.seq = res.seq;
         root.BattlePick.cancel(P.pick);
       }
       P.render();
@@ -591,7 +597,7 @@
       if (step !== R.seq + 1) return R.fail("同步序号不连续（第 " + step + " 步）");
       var next;
       try { next = B.battle.apply(P.state, item.action); } catch (err) {
-        return R.fail("与对手状态不一致（第 " + step + " 步）");
+        return P.state.pendingResponse && !(item.action && item.action.kind === "respond") ? P.setHint("等待对方选择") : R.fail("与对手状态不一致（第 " + step + " 步）");
       }
       if (B.state.hash(next.state) !== item.stateHash) return R.fail("与对手状态不一致（第 " + step + " 步）");
       P.state = next.state;

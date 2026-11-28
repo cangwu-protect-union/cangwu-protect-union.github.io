@@ -13,7 +13,7 @@
     return unit;
   }
 
-  function requireTarget(state, unit, uid) {
+  function requireTarget(state, unit, uid, ignoreTaunt) {
     if (!uid) throw new Error("没有选目标");
     var target;
     try {
@@ -29,7 +29,8 @@
     var canAlly = !!(unit.trait && unit.trait.canHitAlly);
     if (isSelf && !canAlly) throw new Error("不能以自己为目标");
     if (targetSide !== mySide) {
-      if (B.skills && B.skills.checkTaunt) B.skills.checkTaunt(state, unit, uid);
+      /* 群攻会打敌方全体，点谁结算都一样，所以跳过「嘲讽最高」的目标限制 */
+      if (!ignoreTaunt && B.skills && B.skills.checkTaunt) B.skills.checkTaunt(state, unit, uid);
     } else if (!isSelf && !canAlly) {
       throw new Error("不能以队友为目标");
     }
@@ -184,8 +185,14 @@
       if (mod.type) type = mod.type;
       if (mod.factor) amount = amount * mod.factor;
     }
+    /* 普攻群攻（卫委壮观）：防御或法抗不为 0 时改为敌方全体，1 蓄力需求不变 */
+    var group = !opts.forced && B.skills && B.skills.basicGroupOf && B.skills.basicGroupOf(unit);
     var hits = Math.max(1, Math.floor(Number(mod.hits) || 1));
     var noBreak = !!mod.noBreak || !!opts.noBreak;
+    var targets = group
+      ? B.state.combatantsOf(state, B.state.otherSide(state, unit.side))
+      : [target];
+    var totalHits = hits * targets.length;
     var dodged = 0;
     if (mod.misfire) {
       events.push({
@@ -195,27 +202,31 @@
         targetUid: target.uid,
         label: mod.misfireLabel || "哑火"
       });
-      hits = 0;
+      totalHits = 0;
     } else {
-      for (var i = 0; i < hits; i++) {
+      for (var t = 0; t < targets.length; t++) {
+        var foe = targets[t];
+        for (var i = 0; i < hits; i++) {
+          if (state.phase === "finished") break;
+          var hitSpec = {
+            sourceUid: unit.uid,
+            targetUid: foe.uid,
+            type: type,
+            amount: amount,
+            noBreak: noBreak,
+            noReaction: !!opts.noReaction,
+            healBack: foe.uid === unit.uid || !!mod.healBack,
+            skillId: opts.skillId || "basic.attack",
+            label: opts.label || "普攻",
+            actionId: opts.actionId || ""
+          };
+          B.damage.hit(state, hitSpec, events);
+          if (hitSpec.dodged) dodged += 1;
+        }
         if (state.phase === "finished") break;
-        var hitSpec = {
-          sourceUid: unit.uid,
-          targetUid: target.uid,
-          type: type,
-          amount: amount,
-          noBreak: noBreak,
-          noReaction: !!opts.noReaction,
-          healBack: selfHit || !!mod.healBack,
-          skillId: opts.skillId || "basic.attack",
-          label: opts.label || "普攻",
-          actionId: opts.actionId || ""
-        };
-        B.damage.hit(state, hitSpec, events);
-        if (hitSpec.dodged) dodged += 1;
       }
     }
-    if (state.phase !== "finished" && dodged < hits && !opts.skipHooks && B.skills && B.skills.runHooks) {
+    if (state.phase !== "finished" && dodged < totalHits && !opts.skipHooks && B.skills && B.skills.runHooks) {
       B.skills.runHooks(state, unit, "basicHit", {
         sourceUid: unit.uid,
         targetUid: target.uid,
@@ -223,7 +234,9 @@
         label: "普攻被动"
       }, events);
     }
-    return { kind: "basic", type: "attack", target: target.uid, charged: false, hits: hits, dodged: dodged };
+    var done = { kind: "basic", type: "attack", target: target.uid, charged: false, hits: totalHits, dodged: dodged };
+    if (group) done.group = true;
+    return done;
   }
 
   /* 被技能强制执行的一次普攻：不消耗行动、不检查普攻门槛、不跑 basicMod */
@@ -367,7 +380,9 @@
       if (action.type === "attack") {
         if (B.state.hasStatus(unit, "noBasic")) throw new Error("无法普攻");
         if (B.state.effectHasFlag && B.state.effectHasFlag(unit, "selfNoBasic")) throw new Error("无法普攻");
-        var targetUnit = requireTarget(state, unit, action.target);
+        var group = !!(B.skills && B.skills.basicGroupOf && B.skills.basicGroupOf(unit));
+        var ignoreTaunt = group || !!(B.state.effectHasFlag && B.state.effectHasFlag(unit, "ignoreTaunt"));
+        var targetUnit = requireTarget(state, unit, action.target, ignoreTaunt);
         var gate = B.skills && B.skills.basicGate
           ? B.skills.basicGate(state, unit, targetUnit.uid, events)
           : { allow: true, reason: "" };
@@ -403,15 +418,25 @@
 
   function list(state) {
     var out = [];
+    if (state.pendingResponse) return out;
     if (state.phase === "finished" || !state.turnUid) return out;
     var unit = B.state.unitOf(state, state.turnUid);
     var mySide = B.state.sideOf(state, unit.uid);
     var enemySide = B.state.otherSide(state, mySide);
     var enemyList = B.state.combatantsOf(state, enemySide);
-    var allowedUids = B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit)
+    var groupBasic = !!(B.skills && B.skills.basicGroupOf && B.skills.basicGroupOf(unit));
+    var ignoreTauntStatic = !!(B.traits && B.traits.ignoreTaunt && B.traits.ignoreTaunt(unit));
+    var ignoreTauntAll = ignoreTauntStatic || !!(B.state.effectHasFlag && B.state.effectHasFlag(unit, "ignoreTaunt"));
+    var allowedUids = groupBasic
+      ? enemyList.map(function (u) { return u.uid; })
+      : (ignoreTauntAll
+        ? enemyList.map(function (u) { return u.uid; })
+        : (B.skills && B.skills.maxTauntUids ? B.skills.maxTauntUids(state, enemySide) : enemyList.map(function (u) { return u.uid; })));
+    var targets = enemyList.filter(function (u) { return allowedUids.indexOf(u.uid) >= 0; }).map(function (u) { return u.uid; });
+    /* 击溃是单独动作，只认静态无视嘲讽（射手），不继承旱葱大祓这类持续效果的普攻特权 */
+    var breakUids = ignoreTauntStatic
       ? enemyList.map(function (u) { return u.uid; })
       : (B.skills && B.skills.maxTauntUids ? B.skills.maxTauntUids(state, enemySide) : enemyList.map(function (u) { return u.uid; }));
-    var targets = enemyList.filter(function (u) { return allowedUids.indexOf(u.uid) >= 0; }).map(function (u) { return u.uid; });
     var hasAction = unit.actionsLeft > 0;
     var basicNeed = unit.trait && unit.trait.basicCharge ? unit.trait.basicCharge : 0;
     var basicHave = basicNeed > 0 && unit.charge && unit.charge.skillId === BASIC_CHARGE_ID
@@ -424,7 +449,7 @@
     var gate = B.skills && B.skills.basicGate
       ? B.skills.basicGate(state, unit, targets[0] || "", [])
       : { allow: true, reason: "" };
-    var breakable = targets.filter(function (uid) {
+    var breakable = breakUids.filter(function (uid) {
       var t = B.state.unitOf(state, uid);
       if (t.breakImmune) return false;
       /* 防护层的免击溃也要在可行动作里排除，否则界面与 AI 会选到必失败的动作 */
@@ -440,6 +465,7 @@
         ? "本回合行动已用完"
         : (noBasic ? "无法普攻" : (gate.allow ? "" : (gate.reason || "无法普攻"))),
       targets: targets,
+      group: groupBasic,
       chargeNeed: basicNeed,
       chargeHave: basicHave
     });

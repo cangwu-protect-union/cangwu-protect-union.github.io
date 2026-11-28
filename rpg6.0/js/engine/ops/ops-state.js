@@ -204,8 +204,14 @@
       
   });
 
-  api.registerOp("counter", function (state, ctx, op, events) {
+  /* 写单位 flags（说帅回合等）：value 走数值表达式，结果进 state.hash */
+  api.registerOp("flag", function (state, ctx, op, events) {
+    var unit = H.sideUnit(state, ctx, op.who || "self");
+    if (!unit) return;
+    unit.flags[op.key] = H.evalValue(state, ctx, op.value);
+  });
 
+  api.registerOp("counter", function (state, ctx, op, events) {
         var holder = H.sideUnit(state, ctx, op.who || "self");
         if (!holder) return;
         var ckey = H.counterKey(ctx, op.key, op.perTarget !== false);

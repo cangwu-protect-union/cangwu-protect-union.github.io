@@ -6,7 +6,7 @@
   "use strict";
   var B = root.RPG6B || (root.RPG6B = {});
 
-  B.ENGINE_VERSION = "6.0-engine.15";
+  B.ENGINE_VERSION = "6.0-engine.16";
 
   if (typeof module === "object" && module.exports) module.exports = B;
 })(typeof globalThis !== "undefined" ? globalThis : this);

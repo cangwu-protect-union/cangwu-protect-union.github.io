@@ -58,7 +58,11 @@ export default [
         charge: 0,
         cooldown: 0,
         target: "self",
-        unsupported: "花防御/法抗主动闪避是可选防御动作，界面还没有这个入口",
+        activeDodge: { costDef: 15, costMres: 10 },
+        basicGroupWhen: [
+          { stat: "def", gt: 0 },
+          { stat: "mres", gt: 0 }
+        ],
         ops: []
       }
 ];

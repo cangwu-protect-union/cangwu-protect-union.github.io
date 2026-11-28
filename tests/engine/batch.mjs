@@ -174,12 +174,39 @@ function playOne(a, b, seed) {
   const rnd = rngFrom(seed * 7919 + 13);
   let steps = 0;
   let guard = 0;
+  /* respond 不消耗行动但占一步：上限只按实际提交的 respond 次数放宽，没 pending 的对局仍按 LIMIT */
+  let respondCount = 0;
 
-  while (state.phase !== "finished" && steps < LIMIT) {
+  while (state.phase !== "finished" && steps < LIMIT + respondCount) {
     guard += 1;
-    if (guard > LIMIT + 50) {
+    if (guard > LIMIT + respondCount + 50) {
       problems.push("推进次数超出上限，疑似死循环");
       break;
+    }
+    if (state.pendingResponse) {
+      const pend = state.pendingResponse;
+      let result;
+      try {
+        result = B.battle.apply(state, {
+          kind: "respond",
+          id: pend.id,
+          uid: pend.responderUid,
+          choice: pend.defaultChoice
+        });
+      } catch (err) {
+        problems.push("提交默认响应抛错：" + err.message + "（pending " + pend.key + "）");
+        break;
+      }
+      state = result.state;
+      actions.push(result.committed);
+      steps += 1;
+      respondCount += 1;
+      const badPending = problemsOf(state);
+      if (badPending.length) {
+        problems.push(...badPending.slice(0, 3));
+        break;
+      }
+      continue;
     }
     if (!state.turnUid) {
       problems.push("没有行动者但也没结束");

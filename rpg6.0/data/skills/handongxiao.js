@@ -8,8 +8,23 @@ export default [
         charge: 0,
         cooldown: 0,
         target: "self",
-        ops: [],
-        unsupported: "本版未实现：判定依赖对方的回答（「对面说帅」），对局页没有对方输入入口，结果无法进状态指纹与回放。"
+        ops: [
+          {
+            op: "ask",
+            kind: "answer",
+            key: "woshuai",
+            prompt: "我帅不帅？",
+            options: ["帅", "不帅"],
+            default: "帅",
+            then: [
+              { op: "heal", who: "self", value: 80 },
+              { op: "flag", who: "self", key: "handsomeTurn", value: { stat: "self.turns" } }
+            ],
+            else: [
+              { op: "damage", who: "enemyHero", type: "phys", value: 150 }
+            ]
+          }
+        ]
       },
       {
         id: "handongxiao.woshi",
@@ -43,8 +58,31 @@ export default [
         charge: 2,
         cooldown: 0,
         target: "self",
-        ops: [],
-        unsupported: "本版未实现：每回合要让对方「猜数」并在猜中时打断，需要对方输入与逐回合交互界面。"
+        requires: [{ flag: "handsomeTurn", gap: 1, once: true, reason: "需要对方在上个己方回合说你帅" }],
+        ops: [
+          {
+            op: "tick",
+            who: "self",
+            permanent: true,
+            when: "roundStart",
+            key: "handongxiao.chouxiang",
+            label: "抽象艺术",
+            ops: [
+              { op: "roll", key: "absN", sides: 6 },
+              {
+                op: "ask",
+                kind: "guess",
+                key: "caishu",
+                sides: 6,
+                value: { counter: "absN" },
+                prompt: "猜一个数（1–6）",
+                default: 0,
+                then: [{ op: "removeEffect", who: "self", key: "handongxiao.chouxiang" }],
+                else: [{ op: "strike", who: "self", victim: "enemyHero", times: { counter: "absN" }, noBreak: true }]
+              }
+            ]
+          }
+        ]
       },
       {
         id: "handongxiao.jiqiang",

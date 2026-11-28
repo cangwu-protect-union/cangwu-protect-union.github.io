@@ -108,9 +108,11 @@ js/
 <!-- RPG6-STATS:START ops-table -->
 | op | 参数 | 作用 |
 |---|---|---|
+| `ask` | `kind` answer/guess、`key` 响应 key、`sides` guess 面数，默认 6、`prompt` 弹窗文案、`options` answer 选项数组、`default` answer 默认选项、`value` guess 要比对的数值表达式 | 挂起等待对方选择：answer 选首项走 then、否则走 else；guess 猜中走 then、否则走 else |
 | `breakValue` | `delta` 必填 | 击溃值增减，钳制在 0..上限 |
 | `buff` | `kind` strong/fragile/brave/panic、`percent` 必填、`duration`、`stacking` false 则不叠层 | 四类 Buff |
 | `clearMods` | `source` 来源标记、`stats` 属性名数组 | 按来源移除属性修正，`stats` 只清指定属性 |
+| `clearSummons` | `who` self 或侧 | 清除一侧全部召唤物 |
 | `convert` | `to` 必填 | 配合 beforeDamage 钩子：把这次受击标记为伤害转血上限（不扣血、等量加血上限） |
 | `counter` | `key` 必填、`delta` 默认 +1、`perTarget` 默认 true | 计数器增减，供 `{counter}` 读取 |
 | `damage` | `value` 必填、`type` phys/magic/true/last/basic、`times` 段数、`factor` 倍率、`noBreak`、`addStun` 计眩晕值、`fromBuff`、`healBack` | 造成伤害；默认只加击溃值，`addStun` 才加眩晕值；`healBack` 按造成的伤害给自己回血 |
@@ -120,6 +122,7 @@ js/
 | `directLoss` | `value` 必填 | 强扣：不减免、不加击溃值 |
 | `dispel` | `scope` debuff/all/status/marked/breakValue/marks，默认 debuff | 清 Debuff / 清异常状态 / 清带标记的负面修正 / 清击溃值 / 清标记 |
 | `dodge` | 无 | 把这次受击标记为已闪避 |
+| `flag` | `key` 必填、`value` 数值表达式、`who` | 写单位 flags（说帅回合等） |
 | `forceBreak` | 无 | 按当前击溃值直接进入击溃，击溃值不足时不生效 |
 | `heal` | `value` 必填、`bonus` 额外值、`rounding` round5/int/ten/none | 回血，受血量上限钳制 |
 | `healFull` | 无 | 回满血 |
@@ -141,15 +144,26 @@ js/
 | `shield` | `hp` 必填、`duration` 标准回合数，默认 1、`label`、`onExpire` 到期执行的 ops | 护盾：独立血量池，伤害全额吸收；标准回合末计时，到期执行 `onExpire`（杨冬明坚若磐石） |
 | `stat` | `stat` 必填、`mode` add/set/mul，默认 add、`value`、`duration` 数字或 {unit,count}、`restore` 每标准回合恢复量（配合 mode:set）、`untilRecast` removeEffect 按 key 回滚、`debuff` 负面标记，dispel marked 清除 | 面板修改，进 `mods`；`restore` 让 set 归零后逐标准回合恢复原值 |
 | `status` | `kind` 必填、`duration` 数字或 {unit,count}、`rounds` 同 duration、`permanent` 整局、`skillId` 只封锁该技能时填、`chargeOk` noSkill 下仍可蓄力（只禁释放） | 状态，按标准回合计时；permanent 表示整局 |
-| `strike` | `target` source 表示打来源、`victim` 显式指定打谁（target/enemyHero 等）、`noBreak` | 立刻执行一次普攻 |
+| `strike` | `target` source 表示打来源、`victim` 显式指定打谁（target/enemyHero 等）、`times` 重复次数、`noBreak` | 立刻执行一次普攻 |
 | `stunValue` | `delta` 必填 | 眩晕值增减，钳制在 0..上限 |
 | `summon` | `key` 必填、`ttl` 覆盖定义里的 ttl | 生成召唤物，`key` 指向 `summons` 定义 |
 | `taunt` | `delta` 必填 | 嘲讽值增减 |
-| `tick` | `ops` 必填、`duration`、`period` 每 N 回合、`permanent`、`unstoppable`、`desc` chip 说明、`when` turnStart 时在持有者回合开始时结算、`tag` 给 interrupt 用、`key` 给 if.cond.effect 用、`gate` {sides,cancel}、`breakOnSourceStatus`、`breakOnHolderStatus`、`fromBuff`、`debuff` 负面标记，dispel marked 清除、`guard` {remaining,onBreak,ops}、`immune` {buffs,statuses}、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic`、`onExpire` 到期时执行的 ops | 逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:"turnStart"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明 |
+| `tick` | `ops` 必填、`duration`、`period` 每 N 回合、`permanent`、`unstoppable`、`desc` chip 说明、`when` turnStart 时在持有者回合开始时结算；roundStart 时在每个标准回合开始时结算、`tag` 给 interrupt 用、`key` 给 if.cond.effect 用、`gate` {sides,cancel}、`breakOnSourceStatus`、`breakOnHolderStatus`、`fromBuff`、`debuff` 负面标记，dispel marked 清除、`guard` {remaining,onBreak,ops}、`immune` {buffs,statuses}、`breakImmune`、`chargeGuard`、`enemyNoSkill`、`selfNoBasic`、`onExpire` 到期时执行的 ops、`ignoreTaunt` 效果在身时无视嘲讽等级、`autoBreakAtCap` 效果在身时敌方击溃值到上限自动击溃 | 逐标准回合重复执行的持续效果（DoT、回蓝、属性）；`when:"turnStart"` 改为持有者回合开始时结算并在此时扣层；`gate` 是持有者行动前掷骰跳过行动，`period` 是每 N 个标准回合结算一次，`breakOnSourceStatus` 是来源被击晕/击溃即结束，`breakOnHolderStatus` 是持有者进入指定状态即结束；`guard` 是防护层（取消 N 次伤害 + onCancel ops），`immune`/`breakImmune`/`chargeGuard` 是防护声明 |
 | `use` | `skillId` 必填、`times` 重复次数 | 内联执行另一个技能的 ops |
 <!-- RPG6-STATS:END ops-table -->
 
 `data/rule-docs.js` 是规则条目的标题与 HTML 正文，也是规则唯一的来源。改它等于改规则，刷新页面就生效，不写数据库、没有后台界面。
+
+## 响应与暂停
+
+个别技能要等对方（或受击方）先选择，引擎用「挂起 + 重放」实现，不把界面状态写进规则：
+
+- 什么时候弹窗：「我帅不帅？」让对方选「帅 / 不帅」；「抽象艺术」每个标准回合让对方猜 1–6；「卫委壮观」每段伤害前让受击方选「花 15 防 / 花 10 抗 / 不闪」。
+- 执行到询问点，`battle.apply` 只写 `state.pendingResponse`（含 `responderUid`、`defaultChoice`、`resumeAction`），原动作的扣费、伤害、日志都不生效、不扣行动；界面用 `kind:"respond"`（带 `uid`、`id`）提交，只有 `responderUid` 一方能提交，不消耗行动、不触发 `afterAction`。
+- 10 秒不选由界面提交 `defaultChoice`：说帅默认「帅」、猜数默认「未猜中」、闪避默认「不闪」。
+- 响应后从同一份输入 state 重放 `resumeAction`，按 `state.responses` 读选择，RNG 与随机序列一致；所以 `[原动作, respond]` 整串可完整重算、状态指纹一致，回放只按记录推进、不再询问。
+
+新 op 与技能字段：`ask`（answer/guess 分支，带 then/else）、`flag`（写 `unit.flags`，如说帅回合）、`clearSummons`（清一侧召唤物）是 op；`activeDodge`（每段伤害前主动闪避）、`basicGroupWhen`（满足条件时普攻改全体）、`toggleEffect`（开关技能）是技能字段；`requires.once` 只在从 0 蓄第一层时检查该条条件。
 
 ## 与其它模块的共用
 

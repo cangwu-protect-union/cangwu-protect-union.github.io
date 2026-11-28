@@ -147,14 +147,34 @@
       return out;
     }
     var need = eff.charge;
+    var have = chargeOf(unit, skill.id);
     if (skill.requires) {
       for (var r = 0; r < skill.requires.length; r++) {
         var req = skill.requires[r];
+        /* once：已有蓄力（含蓄满待释放）时这条只约束「从 0 蓄第一层」，续蓄与释放跳过 */
+        if (req.once && have > 0) continue;
         var current = B.state.markOf(unit, req.mark);
         var pass = true;
         if (req.gte != null) pass = current >= req.gte;
         else if (req.lte != null) pass = current <= req.lte;
         else if (req.eq != null) pass = current === req.eq;
+        else if (req.flag) {
+          var recorded = unit.flags ? unit.flags[req.flag] : null;
+          var gap = req.gap == null ? 1 : Number(req.gap);
+          pass = recorded != null && (Number((unit.stats && unit.stats.turns) || 0) - Number(recorded)) === gap;
+        }
+        else if (req.summonCount) {
+          var sc = req.summonCount;
+          var count = B.summons && B.summons.ofSide
+            ? B.summons.ofSide(state, B.state.sideOf(state, unit.uid)).length
+            : 0;
+          if (sc.op === "gte") pass = count >= sc.right;
+          else if (sc.op === "gt") pass = count > sc.right;
+          else if (sc.op === "lte") pass = count <= sc.right;
+          else if (sc.op === "lt") pass = count < sc.right;
+          else if (sc.op === "eq") pass = count === sc.right;
+          else pass = false;
+        }
         if (!pass) {
           out.ok = false;
           out.reason = req.reason || ("「" + B.state.markName(unit, req.mark) + "」层数不满足");
@@ -164,7 +184,6 @@
         }
       }
     }
-    var have = chargeOf(unit, skill.id);
     if (have < need) {
       out.needsCharge = true;
       out.canRelease = false;

@@ -77,6 +77,7 @@
     if (name === "breakValue") return unit.breakValue;
     if (name === "stunValue") return unit.stunValue;
     if (name === "gauge") return unit.gauge;
+    if (name === "turns") return (unit.stats && unit.stats.turns) || 0;
     return B.state.statOf(unit, name);
   }
 
@@ -175,6 +176,9 @@
       var tctx = H.ctxFor(ctx, target);
       var before = B.state.statOf(target, op.stat);
       var spec = H.durationOf(op.duration);
+      if (spec && op.duration && op.duration.count && typeof op.duration.count === "object") {
+        spec.count = Math.max(0, Math.floor(H.evalValue(state, tctx, op.duration.count)));
+      }
       var value = op.value == null ? 0 : H.evalValue(state, tctx, op.value);
       if (B.state.strongImmune && B.state.strongImmune(target) && tctx.sourceUid !== target.uid) {
         var nextValue = op.mode === "set" ? value : (op.mode === "mul" ? before * value : before + value);
@@ -279,6 +283,9 @@
         H.pushEvent(state, events, { type: "reflect", uid: target.uid, kind: "buff", detail: op.kind });
       }
       var spec = H.durationOf(op.duration);
+      if (spec && op.duration && op.duration.count && typeof op.duration.count === "object") {
+        spec.count = Math.max(0, Math.floor(H.evalValue(state, tctx, op.duration.count)));
+      }
       var entry = B.state.addBuff(target, {
         kind: op.kind,
         percent: op.percent == null ? 0 : H.evalValue(state, tctx, op.percent),
@@ -397,6 +404,8 @@
         /* 防护层：取消 N 次伤害 + 用完后执行的 ops；免疫异常/击溃/蓄力打断 */
         guard: op.guard ? { remaining: Math.max(1, Number(op.guard.remaining) || 1), ops: op.guard.ops || [], blockedActionId: "" } : null,
         immune: op.immune || null,
+        ignoreTaunt: !!op.ignoreTaunt,
+        autoBreakAtCap: !!op.autoBreakAtCap,
         breakImmune: !!op.breakImmune,
         chargeGuard: !!op.chargeGuard,
         ops: op.ops || [],

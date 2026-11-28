@@ -50,7 +50,44 @@ export default [
         charge: 0,
         cooldown: 0,
         target: "allEnemies",
-        ops: [],
-        unsupported: "本版未实现：需要消除全部召唤物、普攻改真伤+无视嘲讽+附加恐慌、全局「击溃值溢出自动击溃」开关、技能条件读召唤物数量、动态改持续回合；这批只补防护层与解锁动作。"
+        forbidEffect: "yangdongming.hancongdafu",
+        requires: [{ summonCount: { op: "gte", right: 3 }, reason: "需要己方召唤物 ≥3（当前不足）" }],
+        ops: [
+          { op: "counter", who: "self", key: "hcdbDur", perTarget: false, delta: { mult: { counter: "hcdbDur", perTarget: false }, factor: -1 } },
+          {
+            op: "dice",
+            sides: 6,
+            cases: [{ roll: 6, ops: [{ op: "counter", who: "self", key: "hcdbDur", perTarget: false, delta: 7 }] }],
+            else: [{ op: "counter", who: "self", key: "hcdbDur", perTarget: false, delta: 6 }]
+          },
+          { op: "damage", who: "allEnemies", type: "magic", value: 200 },
+          { op: "buff", who: "allEnemies", kind: "panic", percent: 50, duration: { unit: "standard", count: { counter: "hcdbDur", perTarget: false } } },
+          { op: "clearSummons", who: "self" },
+          { op: "stat", who: "self", stat: "spd", mode: "add", value: 100, duration: { unit: "standard", count: { counter: "hcdbDur", perTarget: false } } },
+          { op: "stat", who: "self", stat: "atk", mode: "add", value: 30, duration: { unit: "standard", count: { counter: "hcdbDur", perTarget: false } } },
+          {
+            op: "tick",
+            who: "self",
+            key: "yangdongming.hancongdafu",
+            label: "旱葱大祓",
+            breakImmune: true,
+            ignoreTaunt: true,
+            autoBreakAtCap: true,
+            duration: { unit: "standard", count: { counter: "hcdbDur", perTarget: false } },
+            ops: []
+          }
+        ],
+        hooks: {
+          basicMod: [
+            { op: "if", cond: { effect: "yangdongming.hancongdafu" }, then: [{ op: "setBasicMod", type: "true" }] }
+          ],
+          basicHit: [
+            {
+              op: "if",
+              cond: { effect: "yangdongming.hancongdafu" },
+              then: [{ op: "buff", who: "target", kind: "panic", percent: 10, duration: { unit: "standard", count: { counter: "hcdbDur", perTarget: false } } }]
+            }
+          ]
+        }
       }
 ];
